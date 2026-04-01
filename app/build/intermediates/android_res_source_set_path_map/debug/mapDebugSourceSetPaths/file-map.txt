@@ -1,0 +1,8 @@
+com.rotein.ebookreader.app-pngs-0 /Users/rotein/dev/ebook-reader-app/app/build/generated/res/pngs/debug
+com.rotein.ebookreader.app-resValues-1 /Users/rotein/dev/ebook-reader-app/app/build/generated/res/resValues/debug
+com.rotein.ebookreader.app-updated_navigation_xml-2 /Users/rotein/dev/ebook-reader-app/app/build/generated/updated_navigation_xml/debug
+com.rotein.ebookreader.app-packageDebugResources-3 /Users/rotein/dev/ebook-reader-app/app/build/intermediates/incremental/debug/packageDebugResources/merged.dir
+com.rotein.ebookreader.app-packageDebugResources-4 /Users/rotein/dev/ebook-reader-app/app/build/intermediates/incremental/debug/packageDebugResources/stripped.dir
+com.rotein.ebookreader.app-debug-5 /Users/rotein/dev/ebook-reader-app/app/build/intermediates/merged_res/debug/mergeDebugResources
+com.rotein.ebookreader.app-debug-6 /Users/rotein/dev/ebook-reader-app/app/src/debug/res
+com.rotein.ebookreader.app-main-7 /Users/rotein/dev/ebook-reader-app/app/src/main/res
