@@ -10,6 +10,8 @@ import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -28,17 +30,19 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -51,13 +55,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 @Composable
 fun AllBooksScreen(modifier: Modifier = Modifier) {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
 
     var hasPermission by remember {
         mutableStateOf(
@@ -73,9 +75,16 @@ fun AllBooksScreen(modifier: Modifier = Modifier) {
     var isLoading by remember { mutableStateOf(false) }
     var isSearchActive by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
+    var sortPref by remember { mutableStateOf(SortPreferenceStore.load(context)) }
 
-    val filteredBooks = remember(books, searchQuery) {
-        if (searchQuery.isBlank()) books
+    // 정렬 설정 변경 시 기기에 저장
+    LaunchedEffect(sortPref) {
+        SortPreferenceStore.save(context, sortPref)
+    }
+
+    val processedBooks = remember(books, searchQuery, sortPref) {
+        // 1) 검색 필터
+        val filtered = if (searchQuery.isBlank()) books
         else {
             val q = searchQuery.trim().lowercase()
             books.filter { book ->
@@ -84,6 +93,15 @@ fun AllBooksScreen(modifier: Modifier = Modifier) {
                 title.contains(q) || author.contains(q) || book.name.lowercase().contains(q)
             }
         }
+        // 2) 정렬 (방향은 필드별 기본값 적용)
+        val comparator: Comparator<BookFile> = when (sortPref.field) {
+            SortField.TITLE -> compareBy { (it.metadata?.title ?: it.name).lowercase() }
+            SortField.AUTHOR -> compareBy { it.metadata?.author?.lowercase() ?: "\uFFFF" }
+            SortField.DATE_ADDED -> compareBy { it.dateAdded }
+            SortField.LAST_READ -> compareBy { it.dateModified }
+        }
+        val sorted = filtered.sortedWith(comparator)
+        if (sortPref.field.defaultDescending) sorted.reversed() else sorted
     }
 
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -107,15 +125,17 @@ fun AllBooksScreen(modifier: Modifier = Modifier) {
     }
 
     Column(modifier = modifier.fillMaxSize()) {
-        SearchBar(
-            isActive = isSearchActive,
-            query = searchQuery,
+        TopBar(
+            isSearchActive = isSearchActive,
+            searchQuery = searchQuery,
+            sortPref = sortPref,
             onSearchClick = { isSearchActive = true },
             onQueryChange = { searchQuery = it },
-            onClear = {
+            onSearchClear = {
                 searchQuery = ""
                 isSearchActive = false
-            }
+            },
+            onSortChange = { sortPref = it }
         )
 
         Box(modifier = Modifier.weight(1f)) {
@@ -147,7 +167,7 @@ fun AllBooksScreen(modifier: Modifier = Modifier) {
                     Text("파일 검색 중...", modifier = Modifier.align(Alignment.Center))
                 }
 
-                filteredBooks.isEmpty() -> {
+                processedBooks.isEmpty() -> {
                     Text(
                         if (searchQuery.isBlank()) "epub, txt, mobi, pdf 파일을 찾을 수 없습니다."
                         else "\"$searchQuery\"에 해당하는 파일이 없습니다.",
@@ -157,7 +177,7 @@ fun AllBooksScreen(modifier: Modifier = Modifier) {
 
                 else -> {
                     LazyColumn(modifier = Modifier.fillMaxSize()) {
-                        items(filteredBooks) { book ->
+                        items(processedBooks) { book ->
                             BookItem(book)
                             HorizontalDivider()
                         }
@@ -169,74 +189,132 @@ fun AllBooksScreen(modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun SearchBar(
-    isActive: Boolean,
-    query: String,
+private fun TopBar(
+    isSearchActive: Boolean,
+    searchQuery: String,
+    sortPref: SortPreference,
     onSearchClick: () -> Unit,
     onQueryChange: (String) -> Unit,
-    onClear: () -> Unit
+    onSearchClear: () -> Unit,
+    onSortChange: (SortPreference) -> Unit
 ) {
     val focusRequester = remember { FocusRequester() }
+    var dropdownExpanded by remember { mutableStateOf(false) }
 
-    LaunchedEffect(isActive) {
-        if (isActive) focusRequester.requestFocus()
+    LaunchedEffect(isSearchActive) {
+        if (isSearchActive) focusRequester.requestFocus()
     }
 
-    Row(
+    Box(
         modifier = Modifier
             .fillMaxWidth()
             .height(56.dp)
-            .padding(horizontal = 4.dp),
-        verticalAlignment = Alignment.CenterVertically
     ) {
-        IconButton(onClick = { if (!isActive) onSearchClick() }) {
-            Icon(
-                imageVector = Icons.Default.Search,
-                contentDescription = "검색",
-                tint = if (isActive) MaterialTheme.colorScheme.primary
-                       else MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-
-        // 검색창 (비활성 상태에서는 숨김)
-        AnimatedVisibility(
-            visible = isActive,
-            modifier = Modifier.weight(1f)
+        // 베이스 레이어: 돋보기 아이콘 + 정렬 컨트롤
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            BasicTextField(
-                value = query,
-                onValueChange = onQueryChange,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .focusRequester(focusRequester),
-                singleLine = true,
-                textStyle = MaterialTheme.typography.bodyLarge.copy(
-                    color = MaterialTheme.colorScheme.onSurface
-                ),
-                cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-                decorationBox = { innerTextField ->
-                    Box {
-                        if (query.isEmpty()) {
-                            Text(
-                                text = "책 제목, 저자 검색...",
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        innerTextField()
-                    }
-                }
-            )
-        }
-
-        // X 버튼 (활성 상태에서만 표시)
-        AnimatedVisibility(visible = isActive) {
-            IconButton(onClick = onClear) {
+            IconButton(onClick = onSearchClick) {
                 Icon(
-                    imageVector = Icons.Default.Close,
-                    contentDescription = "검색 닫기",
+                    imageVector = Icons.Default.Search,
+                    contentDescription = "검색",
                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+            }
+
+            Box(modifier = Modifier.weight(1f))
+
+            // 정렬 필드 드롭다운
+            Box {
+                TextButton(onClick = { dropdownExpanded = true }) {
+                    Text(
+                        text = sortPref.field.label,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+                DropdownMenu(
+                    expanded = dropdownExpanded,
+                    onDismissRequest = { dropdownExpanded = false }
+                ) {
+                    SortField.entries.forEach { field ->
+                        val isSelected = sortPref.field == field
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    text = field.label,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = if (isSelected) MaterialTheme.colorScheme.primary
+                                            else MaterialTheme.colorScheme.onSurface
+                                )
+                            },
+                            onClick = {
+                                onSortChange(sortPref.copy(field = field))
+                                dropdownExpanded = false
+                            }
+                        )
+                    }
+                }
+            }
+
+        }
+
+        // 오버레이 레이어: 검색 활성 시 전체 행을 덮음
+        AnimatedVisibility(
+            visible = isSearchActive,
+            enter = fadeIn(),
+            exit = fadeOut()
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.surface)
+                    .padding(horizontal = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = {}) {
+                    Icon(
+                        imageVector = Icons.Default.Search,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+
+                BasicTextField(
+                    value = searchQuery,
+                    onValueChange = onQueryChange,
+                    modifier = Modifier
+                        .weight(1f)
+                        .focusRequester(focusRequester),
+                    singleLine = true,
+                    textStyle = MaterialTheme.typography.bodyLarge.copy(
+                        color = MaterialTheme.colorScheme.onSurface
+                    ),
+                    cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                    decorationBox = { innerTextField ->
+                        Box {
+                            if (searchQuery.isEmpty()) {
+                                Text(
+                                    text = "책 제목, 저자 검색...",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            innerTextField()
+                        }
+                    }
+                )
+
+                IconButton(onClick = onSearchClear) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "검색 닫기",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
         }
     }
