@@ -2,12 +2,15 @@ package com.rotein.ebookreader
 
 import android.Manifest
 import android.content.Intent
+import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,6 +18,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
@@ -30,6 +34,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -55,14 +61,12 @@ fun AllBooksScreen(modifier: Modifier = Modifier) {
     var books by remember { mutableStateOf<List<BookFile>>(emptyList()) }
     var isLoading by remember { mutableStateOf(false) }
 
-    // API 26~29: READ_EXTERNAL_STORAGE 런타임 권한 요청
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
         hasPermission = granted
     }
 
-    // API 30+: MANAGE_EXTERNAL_STORAGE는 설정 화면으로 이동
     val manageStorageLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) {
@@ -71,7 +75,6 @@ fun AllBooksScreen(modifier: Modifier = Modifier) {
         }
     }
 
-    // 권한이 생기면 파일 스캔
     LaunchedEffect(hasPermission) {
         if (hasPermission) {
             isLoading = true
@@ -130,33 +133,69 @@ fun AllBooksScreen(modifier: Modifier = Modifier) {
 
 @Composable
 private fun BookItem(book: BookFile) {
+    val displayTitle = book.metadata?.title ?: book.name
+    val author = book.metadata?.author
+
+    // 아이템이 화면에 보일 때만 커버를 로드, LruCache로 재사용
+    var cover by remember(book.path) { mutableStateOf<Bitmap?>(null) }
+    LaunchedEffect(book.path) {
+        cover = BookCoverLoader.load(book.path, book.extension)
+    }
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+        // 커버 썸네일
+        Box(
+            modifier = Modifier
+                .size(width = 44.dp, height = 60.dp)
+                .background(MaterialTheme.colorScheme.surfaceVariant),
+            contentAlignment = Alignment.Center
+        ) {
+            if (cover != null) {
+                Image(
+                    bitmap = cover!!.asImageBitmap(),
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
+            } else {
+                Text(
+                    text = book.extension.uppercase(),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+
+        // 텍스트 정보
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = book.name,
+                text = displayTitle,
                 style = MaterialTheme.typography.bodyLarge,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
             Text(
-                text = book.path,
+                text = author ?: book.path,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
         }
-        Text(
-            text = book.extension.uppercase(),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(start = 8.dp)
-        )
+
+        // 커버가 로드된 경우에는 확장자 배지 표시
+        if (cover == null) {
+            Text(
+                text = book.extension.uppercase(),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
     }
 }

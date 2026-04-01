@@ -17,7 +17,6 @@ object FileScanner {
             MediaStore.Files.FileColumns.SIZE
         )
 
-        // LIKE 조건으로 각 확장자 필터링
         val selectionParts = SUPPORTED_EXTENSIONS.map {
             "${MediaStore.Files.FileColumns.DISPLAY_NAME} LIKE ?"
         }
@@ -38,11 +37,18 @@ object FileScanner {
                 val size = cursor.getLong(sizeCol)
                 val ext = name.substringAfterLast('.', "").lowercase()
                 if (ext in SUPPORTED_EXTENSIONS) {
-                    books.add(BookFile(name, path, ext, size))
+                    val metadata = extractMetadata(path, ext)
+                    books.add(BookFile(name, path, ext, size, metadata))
                 }
             }
         }
 
         return books
+    }
+
+    private fun extractMetadata(path: String, extension: String): BookMetadata? = when (extension) {
+        "epub" -> EpubMetadataParser.parse(path)
+        "mobi" -> MobiMetadataParser.parse(path)
+        else -> null
     }
 }
