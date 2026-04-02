@@ -63,7 +63,9 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.xmlpull.v1.XmlPullParser
 import java.io.File
@@ -77,15 +79,27 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
     var showMenu by remember { mutableStateOf(false) }
     val onCenterTap = { showMenu = !showMenu }
 
+    val context = LocalContext.current
+    val dao = remember { BookDatabase.getInstance(context).bookReadRecordDao() }
+    val scope = rememberCoroutineScope()
+
     var readingProgress by remember(book.path) { mutableStateOf(0f) }
     var chapterTitle by remember(book.path) { mutableStateOf("") }
+    var savedCfi by remember(book.path) { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(book.path) {
+        val record = withContext(Dispatchers.IO) { dao.getByPath(book.path) }
+        readingProgress = record?.readingProgress ?: 0f
+        savedCfi = record?.lastCfi ?: ""
+    }
 
     Box(modifier = modifier.fillMaxSize()) {
         when (book.extension.lowercase()) {
             "txt"  -> TxtViewer(book.path, onCenterTap)
-            "epub" -> EpubViewer(book.path, onCenterTap) { progress, chapter ->
+            "epub" -> EpubViewer(book.path, savedCfi, onCenterTap) { progress, cfi, chapter ->
                 readingProgress = progress
                 chapterTitle = chapter
+                scope.launch(Dispatchers.IO) { dao.upsertProgress(book.path, progress, cfi) }
             }
             "pdf"  -> PdfViewer(book.path, onCenterTap)
             "mobi" -> MobiViewer(book.path, onCenterTap)
@@ -249,8 +263,9 @@ private fun TxtViewer(path: String, onCenterTap: () -> Unit) {
 @Composable
 private fun EpubViewer(
     path: String,
+    savedCfi: String?,
     onCenterTap: () -> Unit,
-    onLocationUpdate: (progress: Float, chapterTitle: String) -> Unit = { _, _ -> }
+    onLocationUpdate: (progress: Float, cfi: String, chapterTitle: String) -> Unit = { _, _, _ -> }
 ) {
     val context = LocalContext.current
     var bookDir by remember(path) { mutableStateOf<String?>(null) }
@@ -267,7 +282,7 @@ private fun EpubViewer(
 
     when {
         error -> CenteredMessage("EPUB 파일을 읽을 수 없습니다.")
-        bookDir == null -> LoadingIndicator()
+        bookDir == null || savedCfi == null -> LoadingIndicator()
         else -> AndroidView(
             factory = { ctx ->
                 // iframe 내 터치도 가로채기 위해 WebView 위에 투명 overlay View 를 배치
@@ -310,7 +325,7 @@ private fun EpubViewer(
                     val webView = frameLayout.getChildAt(0) as WebView
                     webView.loadDataWithBaseURL(
                         "file://${bookDir}/",
-                        buildEpubJsHtml(opfPath!!),
+                        buildEpubJsHtml(opfPath!!, savedCfi),
                         "text/html",
                         "UTF-8",
                         null
@@ -366,7 +381,7 @@ private fun findOpfPath(dir: File): String? {
     return null
 }
 
-private fun buildEpubJsHtml(opfPath: String) = """<!DOCTYPE html>
+private fun buildEpubJsHtml(opfPath: String, savedCfi: String) = """<!DOCTYPE html>
 <html>
 <head>
 <meta charset='UTF-8'/>
@@ -407,12 +422,13 @@ function findTocEntry(href, items) {
 function reportLocation(location) {
     try {
         var percentage = (location.start && location.start.percentage) ? location.start.percentage : 0;
+        var cfi = (location.start && location.start.cfi) ? location.start.cfi : "";
         var href = (location.start && location.start.href) ? location.start.href : "";
         var chapter = "";
         if (book.navigation && book.navigation.toc) {
             chapter = findTocEntry(href, book.navigation.toc);
         }
-        Android.onLocationChanged(percentage, chapter);
+        Android.onLocationChanged(percentage, cfi, chapter);
     } catch(e) {}
 }
 
@@ -429,7 +445,8 @@ book.ready.then(function() {
     }
 });
 
-rendition.display();
+var _savedCfi = "${savedCfi.replace("\"", "\\\"")}";
+rendition.display(_savedCfi.length > 0 ? _savedCfi : undefined);
 window._prev = function() { rendition.prev(); };
 window._next = function() { rendition.next(); };
 </script>
@@ -437,13 +454,13 @@ window._next = function() { rendition.next(); };
 </html>"""
 
 private class EpubBridge(
-    private val onUpdate: (progress: Float, chapterTitle: String) -> Unit
+    private val onUpdate: (progress: Float, cfi: String, chapterTitle: String) -> Unit
 ) {
     private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
 
     @android.webkit.JavascriptInterface
-    fun onLocationChanged(progress: Float, chapterTitle: String) {
-        mainHandler.post { onUpdate(progress, chapterTitle) }
+    fun onLocationChanged(progress: Float, cfi: String, chapterTitle: String) {
+        mainHandler.post { onUpdate(progress, cfi, chapterTitle) }
     }
 }
 

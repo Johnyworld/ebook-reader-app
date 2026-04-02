@@ -199,7 +199,7 @@ fun AllBooksScreen(onBookClick: (BookFile) -> Unit, modifier: Modifier = Modifie
                             BookItem(book, onClick = {
                                 val now = System.currentTimeMillis()
                                 scope.launch(Dispatchers.IO) {
-                                    dao.upsert(BookReadRecord(bookPath = book.path, lastReadAt = now))
+                                    dao.upsertLastReadAt(book.path, now)
                                 }
                                 lastReadTimes = lastReadTimes + (book.path to now)
                                 onBookClick(book)
