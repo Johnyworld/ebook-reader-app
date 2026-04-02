@@ -14,6 +14,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -58,7 +59,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 @Composable
-fun AllBooksScreen(modifier: Modifier = Modifier) {
+fun AllBooksScreen(onBookClick: (BookFile) -> Unit, modifier: Modifier = Modifier) {
     val context = LocalContext.current
 
     var hasPermission by remember {
@@ -178,7 +179,7 @@ fun AllBooksScreen(modifier: Modifier = Modifier) {
                 else -> {
                     LazyColumn(modifier = Modifier.fillMaxSize()) {
                         items(processedBooks) { book ->
-                            BookItem(book)
+                            BookItem(book, onClick = { onBookClick(book) })
                             HorizontalDivider()
                         }
                     }
@@ -323,7 +324,7 @@ private fun TopBar(
 }
 
 @Composable
-private fun BookItem(book: BookFile) {
+private fun BookItem(book: BookFile, onClick: () -> Unit) {
     val displayTitle = book.metadata?.title ?: book.name
     val author = book.metadata?.author
 
@@ -335,6 +336,7 @@ private fun BookItem(book: BookFile) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .clickable { onClick() }
             .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp)
