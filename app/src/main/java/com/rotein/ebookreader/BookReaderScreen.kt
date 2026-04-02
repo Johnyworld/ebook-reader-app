@@ -18,6 +18,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -29,14 +30,23 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -65,7 +75,7 @@ import java.util.zip.ZipFile
 fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = Modifier) {
     BackHandler { onClose() }
     var showMenu by remember { mutableStateOf(false) }
-    val onCenterTap = { showMenu = true }
+    val onCenterTap = { showMenu = !showMenu }
 
     Box(modifier = modifier.fillMaxSize()) {
         when (book.extension.lowercase()) {
@@ -75,26 +85,115 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
             "mobi" -> MobiViewer(book.path, onCenterTap)
             else   -> CenteredMessage("지원하지 않는 형식입니다.")
         }
-    }
 
-    if (showMenu) {
-        ModalBottomSheet(
-            onDismissRequest = { showMenu = false },
-            sheetState = rememberModalBottomSheetState()
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { showMenu = false; onClose() }
-                    .padding(horizontal = 16.dp, vertical = 14.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
-                Text("목록 보기", style = MaterialTheme.typography.bodyLarge)
-            }
-            Spacer(Modifier.height(16.dp))
+        // 투명 스크림 - 메뉴 외 영역 탭시 닫기
+        if (showMenu) {
+            Box(modifier = Modifier.fillMaxSize().clickable { showMenu = false })
         }
+
+        // 바텀 시트 (스크림보다 위, 헤더보다 아래)
+        if (showMenu) {
+            Column(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .pointerInput(Unit) { detectTapGestures {} }
+            ) {
+                HorizontalDivider(color = Color.Black)
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    color = Color.White
+                ) {
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        // 진행 상황
+                        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text("15 / 320 페이지", style = MaterialTheme.typography.bodyMedium)
+                                Text(
+                                    "4% 읽음",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Spacer(Modifier.height(8.dp))
+                            LinearProgressIndicator(progress = { 0.04f }, modifier = Modifier.fillMaxWidth())
+                            Spacer(Modifier.height(8.dp))
+                            Text(
+                                "1장. 시작하며",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+
+                        HorizontalDivider(color = Color.Black)
+
+                        ReaderMenuItem(Icons.Default.Search, "본문 검색")
+                        ReaderMenuItem(Icons.Default.Star, "하이라이트")
+                        ReaderMenuItem(Icons.Default.Edit, "메모")
+                        ReaderMenuItem(Icons.Default.Bookmark, "북마크")
+                        ReaderMenuItem(Icons.Default.Settings, "설정")
+
+                        Spacer(Modifier.height(16.dp))
+                    }
+                }
+            }
+        }
+
+        // 헤더 (최상위 레이어)
+        if (showMenu) {
+            Column(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .fillMaxWidth()
+            ) {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    color = Color.White
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 4.dp)
+                            .height(56.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(onClick = onClose) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "뒤로가기")
+                        }
+                        Text(
+                            text = book.metadata?.title ?: book.name,
+                            style = MaterialTheme.typography.titleMedium,
+                            modifier = Modifier.weight(1f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        IconButton(onClick = {}) {
+                            Icon(Icons.Filled.Bookmark, contentDescription = "북마크")
+                        }
+                    }
+                }
+                HorizontalDivider(color = Color.Black)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ReaderMenuItem(icon: ImageVector, label: String) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable {}
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Icon(icon, contentDescription = null)
+        Text(label, style = MaterialTheme.typography.bodyLarge)
     }
 }
 
