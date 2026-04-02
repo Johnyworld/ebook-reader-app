@@ -20,7 +20,8 @@ data class BookReadRecord(
     val lastReadAt: Long,
     val readingProgress: Float = 0f,
     val lastCfi: String = "",
-    val tocJson: String = ""
+    val tocJson: String = "",
+    val totalPages: Int = 0
 )
 
 @Dao
@@ -43,6 +44,9 @@ interface BookReadRecordDao {
     @Query("UPDATE book_read_records SET tocJson = :tocJson WHERE bookPath = :bookPath")
     suspend fun updateTocJson(bookPath: String, tocJson: String)
 
+    @Query("UPDATE book_read_records SET totalPages = :totalPages WHERE bookPath = :bookPath")
+    suspend fun updateTotalPages(bookPath: String, totalPages: Int)
+
     @Transaction
     suspend fun upsertLastReadAt(bookPath: String, lastReadAt: Long) {
         insertIfNotExists(BookReadRecord(bookPath = bookPath, lastReadAt = lastReadAt))
@@ -60,6 +64,12 @@ interface BookReadRecordDao {
         insertIfNotExists(BookReadRecord(bookPath = bookPath, lastReadAt = 0L))
         updateTocJson(bookPath, tocJson)
     }
+
+    @Transaction
+    suspend fun upsertTotalPages(bookPath: String, totalPages: Int) {
+        insertIfNotExists(BookReadRecord(bookPath = bookPath, lastReadAt = 0L))
+        updateTotalPages(bookPath, totalPages)
+    }
 }
 
 private val MIGRATION_1_2 = object : Migration(1, 2) {
@@ -75,7 +85,24 @@ private val MIGRATION_2_3 = object : Migration(2, 3) {
     }
 }
 
-@Database(entities = [BookReadRecord::class], version = 3)
+private val MIGRATION_3_4 = object : Migration(3, 4) {
+    override fun migrate(database: SupportSQLiteDatabase) {
+        database.execSQL("ALTER TABLE book_read_records ADD COLUMN totalPages INTEGER NOT NULL DEFAULT 0")
+        database.execSQL("ALTER TABLE book_read_records ADD COLUMN currentPage INTEGER NOT NULL DEFAULT 0")
+    }
+}
+
+private val MIGRATION_4_5 = object : Migration(4, 5) {
+    override fun migrate(database: SupportSQLiteDatabase) {
+        // currentPage 컬럼은 SQLite에서 DROP COLUMN이 불가하므로 테이블 재생성
+        database.execSQL("CREATE TABLE book_read_records_new (bookPath TEXT NOT NULL PRIMARY KEY, lastReadAt INTEGER NOT NULL, readingProgress REAL NOT NULL DEFAULT 0.0, lastCfi TEXT NOT NULL DEFAULT '', tocJson TEXT NOT NULL DEFAULT '', totalPages INTEGER NOT NULL DEFAULT 0)")
+        database.execSQL("INSERT INTO book_read_records_new SELECT bookPath, lastReadAt, readingProgress, lastCfi, tocJson, totalPages FROM book_read_records")
+        database.execSQL("DROP TABLE book_read_records")
+        database.execSQL("ALTER TABLE book_read_records_new RENAME TO book_read_records")
+    }
+}
+
+@Database(entities = [BookReadRecord::class], version = 5)
 abstract class BookDatabase : RoomDatabase() {
     abstract fun bookReadRecordDao(): BookReadRecordDao
 
@@ -88,7 +115,7 @@ abstract class BookDatabase : RoomDatabase() {
                     context.applicationContext,
                     BookDatabase::class.java,
                     "book_database"
-                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3).build().also { INSTANCE = it }
+                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5).build().also { INSTANCE = it }
             }
     }
 }

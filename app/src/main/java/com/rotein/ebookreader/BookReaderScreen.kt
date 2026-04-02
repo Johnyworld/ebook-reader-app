@@ -146,6 +146,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
         val record = withContext(Dispatchers.IO) { dao.getByPath(book.path) }
         readingProgress = record?.readingProgress ?: 0f
         savedCfi = record?.lastCfi ?: ""
+        totalPages = record?.totalPages ?: 0
         val cachedToc = record?.tocJson.orEmpty()
         if (cachedToc.isNotEmpty()) {
             try {
@@ -183,9 +184,14 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                 onContentRendered = { isLoading = false },
                 onChapterChanged = { chapter -> chapterTitle = chapter },
                 onWebViewCreated = { webView -> epubWebView.value = webView },
-                onPageInfoChanged = { page, total ->
+                onPageInfoChanged = { page, _ ->
                     currentPage = page
-                    totalPages = total
+                },
+                onScanComplete = { scannedTotal ->
+                    if (scannedTotal != totalPages) {
+                        totalPages = scannedTotal
+                    }
+                    scope.launch(Dispatchers.IO) { dao.upsertTotalPages(book.path, scannedTotal) }
                 }
             )
             "pdf"  -> PdfViewer(book.path, onCenterTap)
@@ -235,7 +241,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                                     if (isLoading) "도서 불러오는 중..." else "${(readingProgress * 100).toInt()}% 읽음",
                                     style = MaterialTheme.typography.bodyMedium
                                 )
-                                if (!isLoading && totalPages > 0) {
+                                if (totalPages > 0) {
                                     Text(
                                         "$currentPage / $totalPages",
                                         style = MaterialTheme.typography.bodyMedium
@@ -541,7 +547,8 @@ private fun EpubViewer(
     onChapterChanged: (chapter: String) -> Unit = {},
     onTocReady: (tocJson: String) -> Unit = {},
     onWebViewCreated: (WebView) -> Unit = {},
-    onPageInfoChanged: (currentPage: Int, totalPages: Int) -> Unit = { _, _ -> }
+    onPageInfoChanged: (currentPage: Int, totalPages: Int) -> Unit = { _, _ -> },
+    onScanComplete: (totalPages: Int) -> Unit = {}
 ) {
     val context = LocalContext.current
     var bookDir by remember(path) { mutableStateOf<String?>(null) }
@@ -574,7 +581,7 @@ private fun EpubViewer(
                         isHorizontalScrollBarEnabled = false
                         isVerticalScrollBarEnabled = false
                         webViewClient = WebViewClient()
-                        addJavascriptInterface(EpubBridge(onLocationUpdate, onTocLoaded, onContentRendered, onChapterChanged, onTocReady, onPageInfoChanged), "Android")
+                        addJavascriptInterface(EpubBridge(onLocationUpdate, onTocLoaded, onContentRendered, onChapterChanged, onTocReady, onPageInfoChanged, onScanComplete), "Android")
                     }
                     onWebViewCreated(webView)
                     val overlay = android.view.View(ctx).apply {
@@ -784,6 +791,7 @@ function computeVisualPages() {
             }
             _totalVisualPages = offset;
             document.body.removeChild(scanDiv);
+            Android.onScanComplete(_totalVisualPages);
             var loc = rendition.currentLocation();
             if (loc && loc.start) {
                 var idx = loc.start.index !== undefined ? loc.start.index : 0;
@@ -870,7 +878,8 @@ private class EpubBridge(
     private val onRenderedCallback: () -> Unit = {},
     private val onChapterChangedCallback: (chapter: String) -> Unit = {},
     private val onTocReadyCallback: (tocJson: String) -> Unit = {},
-    private val onPageInfoChangedCallback: (currentPage: Int, totalPages: Int) -> Unit = { _, _ -> }
+    private val onPageInfoChangedCallback: (currentPage: Int, totalPages: Int) -> Unit = { _, _ -> },
+    private val onScanCompleteCallback: (totalPages: Int) -> Unit = {}
 ) {
     private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
 
@@ -902,6 +911,11 @@ private class EpubBridge(
     @android.webkit.JavascriptInterface
     fun onPageInfoChanged(currentPage: Int, totalPages: Int) {
         mainHandler.post { onPageInfoChangedCallback(currentPage, totalPages) }
+    }
+
+    @android.webkit.JavascriptInterface
+    fun onScanComplete(totalPages: Int) {
+        mainHandler.post { onScanCompleteCallback(totalPages) }
     }
 }
 
