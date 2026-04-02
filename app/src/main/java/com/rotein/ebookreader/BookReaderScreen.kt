@@ -135,6 +135,8 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
     var tocItems by remember(book.path) { mutableStateOf<List<TocItem>>(emptyList()) }
     var showTocPopup by remember { mutableStateOf(false) }
     val epubWebView = remember { mutableStateOf<WebView?>(null) }
+    var currentPage by remember(book.path) { mutableStateOf(0) }
+    var totalPages by remember(book.path) { mutableStateOf(0) }
 
     BackHandler { onClose() }
     BackHandler(enabled = showMenu) { showMenu = false }
@@ -180,7 +182,11 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                 },
                 onContentRendered = { isLoading = false },
                 onChapterChanged = { chapter -> chapterTitle = chapter },
-                onWebViewCreated = { webView -> epubWebView.value = webView }
+                onWebViewCreated = { webView -> epubWebView.value = webView },
+                onPageInfoChanged = { page, total ->
+                    currentPage = page
+                    totalPages = total
+                }
             )
             "pdf"  -> PdfViewer(book.path, onCenterTap)
             "mobi" -> MobiViewer(book.path, onCenterTap)
@@ -220,10 +226,22 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                     Column(modifier = Modifier.fillMaxWidth()) {
                         // 진행 상황
                         Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
-                            Text(
-                                if (isLoading) "도서 불러오는 중..." else "${(readingProgress * 100).toInt()}% 읽음",
-                                style = MaterialTheme.typography.bodyMedium
-                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    if (isLoading) "도서 불러오는 중..." else "${(readingProgress * 100).toInt()}% 읽음",
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                                if (!isLoading && totalPages > 0) {
+                                    Text(
+                                        "$currentPage / $totalPages",
+                                        style = MaterialTheme.typography.bodyMedium
+                                    )
+                                }
+                            }
                             if (!isLoading) {
                             Spacer(Modifier.height(8.dp))
                             LinearProgressIndicator(
@@ -319,7 +337,6 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                 tocItems = tocItems,
                 bookTitle = book.metadata?.title ?: book.name,
                 currentChapterTitle = chapterTitle,
-                locationsReady = locationsReady,
                 onNavigate = { href ->
                     epubWebView.value?.post {
                         epubWebView.value?.evaluateJavascript(
@@ -356,7 +373,6 @@ private fun TocPopup(
     tocItems: List<TocItem>,
     bookTitle: String,
     currentChapterTitle: String,
-    locationsReady: Boolean = true,
     onNavigate: (String) -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -412,12 +428,6 @@ private fun TocPopup(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Text(
-                                if (locationsReady) "${(item.percentage * 100).toInt()}%" else "",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.width(36.dp)
-                            )
                             Text(
                                 item.label,
                                 style = if (item.depth == 0) MaterialTheme.typography.bodyLarge else MaterialTheme.typography.bodyMedium,
@@ -530,7 +540,8 @@ private fun EpubViewer(
     onContentRendered: () -> Unit = {},
     onChapterChanged: (chapter: String) -> Unit = {},
     onTocReady: (tocJson: String) -> Unit = {},
-    onWebViewCreated: (WebView) -> Unit = {}
+    onWebViewCreated: (WebView) -> Unit = {},
+    onPageInfoChanged: (currentPage: Int, totalPages: Int) -> Unit = { _, _ -> }
 ) {
     val context = LocalContext.current
     var bookDir by remember(path) { mutableStateOf<String?>(null) }
@@ -563,7 +574,7 @@ private fun EpubViewer(
                         isHorizontalScrollBarEnabled = false
                         isVerticalScrollBarEnabled = false
                         webViewClient = WebViewClient()
-                        addJavascriptInterface(EpubBridge(onLocationUpdate, onTocLoaded, onContentRendered, onChapterChanged, onTocReady), "Android")
+                        addJavascriptInterface(EpubBridge(onLocationUpdate, onTocLoaded, onContentRendered, onChapterChanged, onTocReady, onPageInfoChanged), "Android")
                     }
                     onWebViewCreated(webView)
                     val overlay = android.view.View(ctx).apply {
@@ -667,7 +678,9 @@ var rendition = book.renderTo("viewer", {
     width: window.innerWidth,
     height: window.innerHeight,
     spread: "none",
-    flow: "paginated"
+    flow: "paginated",
+    manager: "default",
+    minSpreadWidth: 9999
 });
 
 function findTocEntry(href, items) {
@@ -695,9 +708,18 @@ function reportLocation(location) {
             chapter = findTocEntry(href, book.navigation.toc);
         }
         Android.onLocationChanged(percentage, cfi, chapter);
+        if (_totalVisualPages > 0 && location.start) {
+            var idx = location.start.index !== undefined ? location.start.index : 0;
+            var pg = location.start.displayed ? location.start.displayed.page : 1;
+            Android.onPageInfoChanged((_spinePageOffsets[idx] || 0) + pg, _totalVisualPages);
+        }
     } catch(e) {}
 }
 
+var _totalLocations = 0;
+var _spinePageCounts = {};
+var _spinePageOffsets = {};
+var _totalVisualPages = 0;
 var _locationsReady = false;
 var _rendered = false;
 rendition.on("relocated", function(location) {
@@ -738,12 +760,55 @@ book.loaded.navigation.then(function(nav) {
     } catch(e) {}
 });
 
+function computeVisualPages() {
+    var items = book.spine ? (book.spine.items || []) : [];
+    if (items.length === 0) return;
+    var scanDiv = document.createElement('div');
+    scanDiv.style.cssText = 'position:fixed;left:-' + (window.innerWidth + 10) + 'px;top:0;width:' + window.innerWidth + 'px;height:' + window.innerHeight + 'px;overflow:hidden;';
+    document.body.appendChild(scanDiv);
+    var scanRendition = book.renderTo(scanDiv, {
+        width: window.innerWidth,
+        height: window.innerHeight,
+        spread: "none",
+        flow: "paginated",
+        manager: "default",
+        minSpreadWidth: 9999
+    });
+    var i = 0;
+    function next() {
+        if (i >= items.length) {
+            var offset = 0;
+            for (var j = 0; j < items.length; j++) {
+                _spinePageOffsets[j] = offset;
+                offset += (_spinePageCounts[j] || 1);
+            }
+            _totalVisualPages = offset;
+            document.body.removeChild(scanDiv);
+            var loc = rendition.currentLocation();
+            if (loc && loc.start) {
+                var idx = loc.start.index !== undefined ? loc.start.index : 0;
+                var pg = loc.start.displayed ? loc.start.displayed.page : 1;
+                Android.onPageInfoChanged((_spinePageOffsets[idx] || 0) + pg, _totalVisualPages);
+            }
+            return;
+        }
+        scanRendition.display(items[i].href).then(function() {
+            var loc = scanRendition.currentLocation();
+            _spinePageCounts[i] = (loc && loc.start && loc.start.displayed) ? loc.start.displayed.total : 1;
+            i++;
+            next();
+        });
+    }
+    next();
+}
+
 book.ready.then(function() {
-    return book.locations.generate(1024);
+    return book.locations.generate(150);
 }).then(function() {
     try {
         var locs = book.locations._locations || [];
         var total = locs.length || 1;
+        _totalLocations = total;
         // Build map: spine step number -> first location index (percentage)
         var spineStepToPct = {};
         for (var k = 0; k < locs.length; k++) {
@@ -787,6 +852,7 @@ book.ready.then(function() {
     if (loc && loc.start) {
         reportLocation(loc);
     }
+    computeVisualPages();
 });
 
 var _savedCfi = "${savedCfi.replace("\"", "\\\"")}";
@@ -803,7 +869,8 @@ private class EpubBridge(
     private val onTocLoadedCallback: (tocJson: String) -> Unit = {},
     private val onRenderedCallback: () -> Unit = {},
     private val onChapterChangedCallback: (chapter: String) -> Unit = {},
-    private val onTocReadyCallback: (tocJson: String) -> Unit = {}
+    private val onTocReadyCallback: (tocJson: String) -> Unit = {},
+    private val onPageInfoChangedCallback: (currentPage: Int, totalPages: Int) -> Unit = { _, _ -> }
 ) {
     private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
 
@@ -830,6 +897,11 @@ private class EpubBridge(
     @android.webkit.JavascriptInterface
     fun onTocReady(tocJson: String) {
         mainHandler.post { onTocReadyCallback(tocJson) }
+    }
+
+    @android.webkit.JavascriptInterface
+    fun onPageInfoChanged(currentPage: Int, totalPages: Int) {
+        mainHandler.post { onPageInfoChangedCallback(currentPage, totalPages) }
     }
 }
 
