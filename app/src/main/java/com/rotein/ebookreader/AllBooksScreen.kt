@@ -44,6 +44,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -56,11 +57,14 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 @Composable
 fun AllBooksScreen(onBookClick: (BookFile) -> Unit, modifier: Modifier = Modifier) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val dao = remember { BookDatabase.getInstance(context).bookReadRecordDao() }
 
     var hasPermission by remember {
         mutableStateOf(
@@ -77,13 +81,21 @@ fun AllBooksScreen(onBookClick: (BookFile) -> Unit, modifier: Modifier = Modifie
     var isSearchActive by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
     var sortPref by remember { mutableStateOf(SortPreferenceStore.load(context)) }
+    var lastReadTimes by remember { mutableStateOf<Map<String, Long>>(emptyMap()) }
 
     // 정렬 설정 변경 시 기기에 저장
     LaunchedEffect(sortPref) {
         SortPreferenceStore.save(context, sortPref)
     }
 
-    val processedBooks = remember(books, searchQuery, sortPref) {
+    // DB에서 읽은 시각 로드
+    LaunchedEffect(Unit) {
+        lastReadTimes = withContext(Dispatchers.IO) {
+            dao.getAll().associate { it.bookPath to it.lastReadAt }
+        }
+    }
+
+    val processedBooks = remember(books, searchQuery, sortPref, lastReadTimes) {
         // 1) 검색 필터
         val filtered = if (searchQuery.isBlank()) books
         else {
@@ -99,7 +111,7 @@ fun AllBooksScreen(onBookClick: (BookFile) -> Unit, modifier: Modifier = Modifie
             SortField.TITLE -> compareBy { (it.metadata?.title ?: it.name).lowercase() }
             SortField.AUTHOR -> compareBy { it.metadata?.author?.lowercase() ?: "\uFFFF" }
             SortField.DATE_ADDED -> compareBy { it.dateAdded }
-            SortField.LAST_READ -> compareBy { it.dateModified }
+            SortField.LAST_READ -> compareBy { lastReadTimes[it.path] ?: 0L }
         }
         val sorted = filtered.sortedWith(comparator)
         if (sortPref.field.defaultDescending) sorted.reversed() else sorted
@@ -179,7 +191,14 @@ fun AllBooksScreen(onBookClick: (BookFile) -> Unit, modifier: Modifier = Modifie
                 else -> {
                     LazyColumn(modifier = Modifier.fillMaxSize()) {
                         items(processedBooks) { book ->
-                            BookItem(book, onClick = { onBookClick(book) })
+                            BookItem(book, onClick = {
+                                val now = System.currentTimeMillis()
+                                scope.launch(Dispatchers.IO) {
+                                    dao.upsert(BookReadRecord(bookPath = book.path, lastReadAt = now))
+                                }
+                                lastReadTimes = lastReadTimes + (book.path to now)
+                                onBookClick(book)
+                            })
                             HorizontalDivider()
                         }
                     }

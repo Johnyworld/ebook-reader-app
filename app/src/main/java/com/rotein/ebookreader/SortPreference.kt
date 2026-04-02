@@ -3,10 +3,10 @@ package com.rotein.ebookreader
 import android.content.Context
 
 enum class SortField(val label: String) {
-    TITLE("제목"),
-    AUTHOR("작가명"),
-    DATE_ADDED("담은 순"),
-    LAST_READ("읽은 순");
+    TITLE("제목순"),
+    AUTHOR("작가순"),
+    DATE_ADDED("담은순"),
+    LAST_READ("읽은순");
 
     /** 각 필드의 기본 정렬 방향 */
     val defaultDescending: Boolean get() = this == DATE_ADDED || this == LAST_READ
