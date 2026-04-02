@@ -14,6 +14,7 @@ import android.webkit.WebViewClient
 import android.widget.FrameLayout
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -25,14 +26,19 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.FormatListBulleted
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.CircularProgressIndicator
@@ -60,17 +66,56 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.xmlpull.v1.XmlPullParser
+import org.json.JSONArray
 import java.io.File
 import java.io.RandomAccessFile
 import java.util.zip.ZipFile
+
+data class TocItem(
+    val label: String,
+    val href: String,
+    val percentage: Float,
+    val depth: Int,
+    val subitems: List<TocItem> = emptyList()
+)
+
+private fun parseTocJson(json: JSONArray, depth: Int = 0): List<TocItem> {
+    val items = mutableListOf<TocItem>()
+    for (i in 0 until json.length()) {
+        val obj = json.getJSONObject(i)
+        val subitems = if (obj.has("subitems")) parseTocJson(obj.getJSONArray("subitems"), depth + 1) else emptyList()
+        items.add(TocItem(
+            label = obj.getString("label"),
+            href = obj.getString("href"),
+            percentage = obj.getDouble("percentage").toFloat(),
+            depth = depth,
+            subitems = subitems
+        ))
+    }
+    return items
+}
+
+private fun flattenToc(items: List<TocItem>): List<TocItem> {
+    val result = mutableListOf<TocItem>()
+    for (item in items) {
+        result.add(item)
+        result.addAll(flattenToc(item.subitems))
+    }
+    return result
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -86,6 +131,9 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
     var readingProgress by remember(book.path) { mutableStateOf(0f) }
     var chapterTitle by remember(book.path) { mutableStateOf("") }
     var savedCfi by remember(book.path) { mutableStateOf<String?>(null) }
+    var tocItems by remember(book.path) { mutableStateOf<List<TocItem>>(emptyList()) }
+    var showTocPopup by remember { mutableStateOf(false) }
+    val epubWebView = remember { mutableStateOf<WebView?>(null) }
 
     LaunchedEffect(book.path) {
         val record = withContext(Dispatchers.IO) { dao.getByPath(book.path) }
@@ -96,11 +144,20 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
     Box(modifier = modifier.fillMaxSize()) {
         when (book.extension.lowercase()) {
             "txt"  -> TxtViewer(book.path, onCenterTap)
-            "epub" -> EpubViewer(book.path, savedCfi, onCenterTap) { progress, cfi, chapter ->
-                readingProgress = progress
-                chapterTitle = chapter
-                scope.launch(Dispatchers.IO) { dao.upsertProgress(book.path, progress, cfi) }
-            }
+            "epub" -> EpubViewer(
+                path = book.path,
+                savedCfi = savedCfi,
+                onCenterTap = onCenterTap,
+                onLocationUpdate = { progress, cfi, chapter ->
+                    readingProgress = progress
+                    chapterTitle = chapter
+                    scope.launch(Dispatchers.IO) { dao.upsertProgress(book.path, progress, cfi) }
+                },
+                onTocLoaded = { tocJson ->
+                    try { tocItems = parseTocJson(JSONArray(tocJson)) } catch (_: Exception) {}
+                },
+                onWebViewCreated = { webView -> epubWebView.value = webView }
+            )
             "pdf"  -> PdfViewer(book.path, onCenterTap)
             "mobi" -> MobiViewer(book.path, onCenterTap)
             else   -> CenteredMessage("지원하지 않는 형식입니다.")
@@ -142,12 +199,28 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                                 drawStopIndicator = {}
                             )
                             if (chapterTitle.isNotEmpty()) {
-                                Spacer(Modifier.height(8.dp))
-                                Text(
-                                    chapterTitle,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
+                                Spacer(Modifier.height(12.dp))
+                                Row(
+                                    modifier = Modifier
+                                        .align(Alignment.CenterHorizontally)
+                                        .clickable { showTocPopup = true }
+                                        .border(1.dp, MaterialTheme.colorScheme.onSurfaceVariant, RoundedCornerShape(4.dp))
+                                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.FormatListBulleted,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(14.dp),
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Text(
+                                        chapterTitle,
+                                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 14.sp),
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
                             }
                         }
 
@@ -201,6 +274,26 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                 HorizontalDivider(color = Color.Black)
             }
         }
+
+        // 목차 팝업 (헤더보다 위, 최상위 레이어)
+        if (showTocPopup) {
+            TocPopup(
+                tocItems = tocItems,
+                bookTitle = book.metadata?.title ?: book.name,
+                currentChapterTitle = chapterTitle,
+                onNavigate = { href ->
+                    epubWebView.value?.post {
+                        epubWebView.value?.evaluateJavascript(
+                            "window._displayHref(\"${href.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n")}\")",
+                            null
+                        )
+                    }
+                    showTocPopup = false
+                    showMenu = false
+                },
+                onDismiss = { showTocPopup = false }
+            )
+        }
     }
 }
 
@@ -216,6 +309,133 @@ private fun ReaderMenuItem(icon: ImageVector, label: String) {
     ) {
         Icon(icon, contentDescription = null)
         Text(label, style = MaterialTheme.typography.bodyLarge)
+    }
+}
+
+@Composable
+private fun TocPopup(
+    tocItems: List<TocItem>,
+    bookTitle: String,
+    currentChapterTitle: String,
+    onNavigate: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val flatItems = remember(tocItems) { flattenToc(tocItems) }
+    val screenHeightDp = LocalConfiguration.current.screenHeightDp
+    val density = LocalDensity.current
+    val itemHeightDp = 49 // top(12) + bottom(12) padding + bodyLarge line height
+    var bottomBarHeightPx by remember { mutableStateOf(0) }
+    val bottomBarHeightDp = with(density) { bottomBarHeightPx.toDp().value.toInt() }
+    val itemsPerPage = maxOf(1, (screenHeightDp - 56 - bottomBarHeightDp) / itemHeightDp)
+    val totalPages = maxOf(1, (flatItems.size + itemsPerPage - 1) / itemsPerPage)
+    var currentPage by remember { mutableStateOf(0) }
+    val pageItems = flatItems.drop(currentPage * itemsPerPage).take(itemsPerPage)
+
+    Surface(modifier = Modifier.fillMaxSize(), color = Color.White) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp)
+                    .padding(horizontal = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = onDismiss) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "닫기")
+                }
+                Text(
+                    "목차: $bookTitle",
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.weight(1f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            HorizontalDivider(color = Color.Black)
+            Column(modifier = Modifier.weight(1f)) {
+                if (flatItems.isEmpty()) {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text("목차를 불러오는 중입니다.", style = MaterialTheme.typography.bodyMedium)
+                    }
+                } else {
+                    pageItems.forEach { item ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onNavigate(item.href) }
+                                .padding(
+                                    start = (16 + item.depth * 16).dp,
+                                    end = 16.dp,
+                                    top = 12.dp,
+                                    bottom = 12.dp
+                                ),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text(
+                                "${(item.percentage * 100).toInt()}%",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.width(36.dp)
+                            )
+                            Text(
+                                item.label,
+                                style = if (item.depth == 0) MaterialTheme.typography.bodyLarge else MaterialTheme.typography.bodyMedium,
+                                color = if (item.label == currentChapterTitle) Color.Black else MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                        HorizontalDivider(color = Color(0xFFCCCCCC))
+                    }
+                }
+            }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp)
+                    .onSizeChanged { bottomBarHeightPx = it.height },
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    modifier = Modifier
+                        .clickable(enabled = currentPage > 0) { currentPage-- }
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "이전",
+                        modifier = Modifier.height(16.dp),
+                        tint = if (currentPage > 0) Color.Black else Color(0xFFCCCCCC)
+                    )
+                    Text(
+                        "이전",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = if (currentPage > 0) Color.Black else Color(0xFFCCCCCC)
+                    )
+                }
+                Row(
+                    modifier = Modifier
+                        .clickable(enabled = currentPage < totalPages - 1) { currentPage++ }
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        "다음",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = if (currentPage < totalPages - 1) Color.Black else Color(0xFFCCCCCC)
+                    )
+                    Icon(
+                        Icons.AutoMirrored.Filled.ArrowForward,
+                        contentDescription = "다음",
+                        modifier = Modifier.height(16.dp),
+                        tint = if (currentPage < totalPages - 1) Color.Black else Color(0xFFCCCCCC)
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -265,7 +485,9 @@ private fun EpubViewer(
     path: String,
     savedCfi: String?,
     onCenterTap: () -> Unit,
-    onLocationUpdate: (progress: Float, cfi: String, chapterTitle: String) -> Unit = { _, _, _ -> }
+    onLocationUpdate: (progress: Float, cfi: String, chapterTitle: String) -> Unit = { _, _, _ -> },
+    onTocLoaded: (tocJson: String) -> Unit = {},
+    onWebViewCreated: (WebView) -> Unit = {}
 ) {
     val context = LocalContext.current
     var bookDir by remember(path) { mutableStateOf<String?>(null) }
@@ -298,8 +520,9 @@ private fun EpubViewer(
                         isHorizontalScrollBarEnabled = false
                         isVerticalScrollBarEnabled = false
                         webViewClient = WebViewClient()
-                        addJavascriptInterface(EpubBridge(onLocationUpdate), "Android")
+                        addJavascriptInterface(EpubBridge(onLocationUpdate, onTocLoaded), "Android")
                     }
+                    onWebViewCreated(webView)
                     val overlay = android.view.View(ctx).apply {
                         setOnTouchListener { v, event ->
                             if (event.action == MotionEvent.ACTION_UP) {
@@ -436,9 +659,71 @@ rendition.on("relocated", function(location) {
     reportLocation(location);
 });
 
+book.loaded.navigation.then(function(nav) {
+    try {
+        var toc = nav.toc || [];
+        function buildToc(items, depth) {
+            var result = [];
+            for (var i = 0; i < items.length; i++) {
+                var item = items[i];
+                result.push({
+                    label: item.label.trim(),
+                    href: item.href,
+                    percentage: 0,
+                    depth: depth,
+                    subitems: item.subitems ? buildToc(item.subitems, depth + 1) : []
+                });
+            }
+            return result;
+        }
+        Android.onTocLoaded(JSON.stringify(buildToc(toc, 0)));
+    } catch(e) {}
+});
+
 book.ready.then(function() {
     return book.locations.generate(1024);
 }).then(function() {
+    try {
+        var locs = book.locations._locations || [];
+        var total = locs.length || 1;
+        // Build map: spine step number -> first location index (percentage)
+        var spineStepToPct = {};
+        for (var k = 0; k < locs.length; k++) {
+            var m = locs[k].match(/epubcfi\(\/6\/(\d+)/);
+            if (m) {
+                var step = m[1];
+                if (!(step in spineStepToPct)) spineStepToPct[step] = k / total;
+            }
+        }
+        var spineItems = book.spine.items || [];
+        var toc = book.navigation ? (book.navigation.toc || []) : [];
+        function buildTocWithPct(items, depth) {
+            var result = [];
+            for (var i = 0; i < items.length; i++) {
+                var item = items[i];
+                var hrefBase = item.href.split('#')[0];
+                var percentage = 0;
+                for (var j = 0; j < spineItems.length; j++) {
+                    var siHref = (spineItems[j].href || '').split('?')[0];
+                    if (siHref === hrefBase || siHref.endsWith('/' + hrefBase) || hrefBase.endsWith('/' + siHref)) {
+                        var spineStep = String((j + 1) * 2);
+                        percentage = (spineStep in spineStepToPct) ? spineStepToPct[spineStep] : j / (spineItems.length || 1);
+                        break;
+                    }
+                }
+                result.push({
+                    label: item.label.trim(),
+                    href: item.href,
+                    percentage: percentage,
+                    depth: depth,
+                    subitems: item.subitems ? buildTocWithPct(item.subitems, depth + 1) : []
+                });
+            }
+            return result;
+        }
+        Android.onTocLoaded(JSON.stringify(buildTocWithPct(toc, 0)));
+    } catch(e) {}
+
     var loc = rendition.currentLocation();
     if (loc && loc.start) {
         reportLocation(loc);
@@ -449,18 +734,25 @@ var _savedCfi = "${savedCfi.replace("\"", "\\\"")}";
 rendition.display(_savedCfi.length > 0 ? _savedCfi : undefined);
 window._prev = function() { rendition.prev(); };
 window._next = function() { rendition.next(); };
+window._displayHref = function(href) { rendition.display(href); };
 </script>
 </body>
 </html>"""
 
 private class EpubBridge(
-    private val onUpdate: (progress: Float, cfi: String, chapterTitle: String) -> Unit
+    private val onUpdate: (progress: Float, cfi: String, chapterTitle: String) -> Unit,
+    private val onTocLoadedCallback: (tocJson: String) -> Unit = {}
 ) {
     private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
 
     @android.webkit.JavascriptInterface
     fun onLocationChanged(progress: Float, cfi: String, chapterTitle: String) {
         mainHandler.post { onUpdate(progress, cfi, chapterTitle) }
+    }
+
+    @android.webkit.JavascriptInterface
+    fun onTocLoaded(tocJson: String) {
+        mainHandler.post { onTocLoadedCallback(tocJson) }
     }
 }
 
