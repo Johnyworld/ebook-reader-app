@@ -52,7 +52,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -78,10 +77,16 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
     var showMenu by remember { mutableStateOf(false) }
     val onCenterTap = { showMenu = !showMenu }
 
+    var readingProgress by remember(book.path) { mutableStateOf(0f) }
+    var chapterTitle by remember(book.path) { mutableStateOf("") }
+
     Box(modifier = modifier.fillMaxSize()) {
         when (book.extension.lowercase()) {
             "txt"  -> TxtViewer(book.path, onCenterTap)
-            "epub" -> EpubViewer(book.path, onCenterTap)
+            "epub" -> EpubViewer(book.path, onCenterTap) { progress, chapter ->
+                readingProgress = progress
+                chapterTitle = chapter
+            }
             "pdf"  -> PdfViewer(book.path, onCenterTap)
             "mobi" -> MobiViewer(book.path, onCenterTap)
             else   -> CenteredMessage("지원하지 않는 형식입니다.")
@@ -108,21 +113,13 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                     Column(modifier = Modifier.fillMaxWidth()) {
                         // 진행 상황
                         Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text("15 / 320 페이지", style = MaterialTheme.typography.bodyMedium)
-                                Text(
-                                    "4% 읽음",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
+                            Text(
+                                "${(readingProgress * 100).toInt()}% 읽음",
+                                style = MaterialTheme.typography.bodyMedium
+                            )
                             Spacer(Modifier.height(8.dp))
                             LinearProgressIndicator(
-                                progress = { 0.04f },
+                                progress = { readingProgress },
                                 modifier = Modifier.fillMaxWidth(),
                                 color = Color.Black,
                                 trackColor = Color(0xFFCCCCCC),
@@ -130,12 +127,14 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                                 gapSize = 0.dp,
                                 drawStopIndicator = {}
                             )
-                            Spacer(Modifier.height(8.dp))
-                            Text(
-                                "1장. 시작하며",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                            if (chapterTitle.isNotEmpty()) {
+                                Spacer(Modifier.height(8.dp))
+                                Text(
+                                    chapterTitle,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                         }
 
                         HorizontalDivider(color = Color.Black)
@@ -248,7 +247,11 @@ private fun TxtViewer(path: String, onCenterTap: () -> Unit) {
 
 @SuppressLint("ClickableViewAccessibility", "SetJavaScriptEnabled")
 @Composable
-private fun EpubViewer(path: String, onCenterTap: () -> Unit) {
+private fun EpubViewer(
+    path: String,
+    onCenterTap: () -> Unit,
+    onLocationUpdate: (progress: Float, chapterTitle: String) -> Unit = { _, _ -> }
+) {
     val context = LocalContext.current
     var bookDir by remember(path) { mutableStateOf<String?>(null) }
     var opfPath by remember(path) { mutableStateOf<String?>(null) }
@@ -280,6 +283,7 @@ private fun EpubViewer(path: String, onCenterTap: () -> Unit) {
                         isHorizontalScrollBarEnabled = false
                         isVerticalScrollBarEnabled = false
                         webViewClient = WebViewClient()
+                        addJavascriptInterface(EpubBridge(onLocationUpdate), "Android")
                     }
                     val overlay = android.view.View(ctx).apply {
                         setOnTouchListener { v, event ->
@@ -384,12 +388,64 @@ var rendition = book.renderTo("viewer", {
     spread: "none",
     flow: "paginated"
 });
+
+function findTocEntry(href, items) {
+    for (var i = 0; i < items.length; i++) {
+        var item = items[i];
+        var itemHref = item.href.split('#')[0];
+        if (href === itemHref || href.endsWith('/' + itemHref) || itemHref.endsWith('/' + href)) {
+            return item.label.trim();
+        }
+        if (item.subitems && item.subitems.length > 0) {
+            var found = findTocEntry(href, item.subitems);
+            if (found) return found;
+        }
+    }
+    return "";
+}
+
+function reportLocation(location) {
+    try {
+        var percentage = (location.start && location.start.percentage) ? location.start.percentage : 0;
+        var href = (location.start && location.start.href) ? location.start.href : "";
+        var chapter = "";
+        if (book.navigation && book.navigation.toc) {
+            chapter = findTocEntry(href, book.navigation.toc);
+        }
+        Android.onLocationChanged(percentage, chapter);
+    } catch(e) {}
+}
+
+rendition.on("relocated", function(location) {
+    reportLocation(location);
+});
+
+book.ready.then(function() {
+    return book.locations.generate(1024);
+}).then(function() {
+    var loc = rendition.currentLocation();
+    if (loc && loc.start) {
+        reportLocation(loc);
+    }
+});
+
 rendition.display();
 window._prev = function() { rendition.prev(); };
 window._next = function() { rendition.next(); };
 </script>
 </body>
 </html>"""
+
+private class EpubBridge(
+    private val onUpdate: (progress: Float, chapterTitle: String) -> Unit
+) {
+    private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
+
+    @android.webkit.JavascriptInterface
+    fun onLocationChanged(progress: Float, chapterTitle: String) {
+        mainHandler.post { onUpdate(progress, chapterTitle) }
+    }
+}
 
 // ─── PDF ─────────────────────────────────────────────────────────────────────
 
