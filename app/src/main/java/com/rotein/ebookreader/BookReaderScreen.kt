@@ -45,6 +45,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.runtime.Composable
@@ -120,7 +121,15 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                                 )
                             }
                             Spacer(Modifier.height(8.dp))
-                            LinearProgressIndicator(progress = { 0.04f }, modifier = Modifier.fillMaxWidth())
+                            LinearProgressIndicator(
+                                progress = { 0.04f },
+                                modifier = Modifier.fillMaxWidth(),
+                                color = Color.Black,
+                                trackColor = Color(0xFFCCCCCC),
+                                strokeCap = StrokeCap.Square,
+                                gapSize = 0.dp,
+                                drawStopIndicator = {}
+                            )
                             Spacer(Modifier.height(8.dp))
                             Text(
                                 "1장. 시작하며",
