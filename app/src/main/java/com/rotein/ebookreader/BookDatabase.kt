@@ -19,7 +19,8 @@ data class BookReadRecord(
     @PrimaryKey val bookPath: String,
     val lastReadAt: Long,
     val readingProgress: Float = 0f,
-    val lastCfi: String = ""
+    val lastCfi: String = "",
+    val tocJson: String = ""
 )
 
 @Dao
@@ -39,6 +40,9 @@ interface BookReadRecordDao {
     @Query("UPDATE book_read_records SET readingProgress = :progress, lastCfi = :cfi WHERE bookPath = :bookPath")
     suspend fun updateProgress(bookPath: String, progress: Float, cfi: String)
 
+    @Query("UPDATE book_read_records SET tocJson = :tocJson WHERE bookPath = :bookPath")
+    suspend fun updateTocJson(bookPath: String, tocJson: String)
+
     @Transaction
     suspend fun upsertLastReadAt(bookPath: String, lastReadAt: Long) {
         insertIfNotExists(BookReadRecord(bookPath = bookPath, lastReadAt = lastReadAt))
@@ -50,6 +54,12 @@ interface BookReadRecordDao {
         insertIfNotExists(BookReadRecord(bookPath = bookPath, lastReadAt = 0L))
         updateProgress(bookPath, progress, cfi)
     }
+
+    @Transaction
+    suspend fun upsertTocJson(bookPath: String, tocJson: String) {
+        insertIfNotExists(BookReadRecord(bookPath = bookPath, lastReadAt = 0L))
+        updateTocJson(bookPath, tocJson)
+    }
 }
 
 private val MIGRATION_1_2 = object : Migration(1, 2) {
@@ -59,7 +69,13 @@ private val MIGRATION_1_2 = object : Migration(1, 2) {
     }
 }
 
-@Database(entities = [BookReadRecord::class], version = 2)
+private val MIGRATION_2_3 = object : Migration(2, 3) {
+    override fun migrate(database: SupportSQLiteDatabase) {
+        database.execSQL("ALTER TABLE book_read_records ADD COLUMN tocJson TEXT NOT NULL DEFAULT ''")
+    }
+}
+
+@Database(entities = [BookReadRecord::class], version = 3)
 abstract class BookDatabase : RoomDatabase() {
     abstract fun bookReadRecordDao(): BookReadRecordDao
 
@@ -72,7 +88,7 @@ abstract class BookDatabase : RoomDatabase() {
                     context.applicationContext,
                     BookDatabase::class.java,
                     "book_database"
-                ).addMigrations(MIGRATION_1_2).build().also { INSTANCE = it }
+                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3).build().also { INSTANCE = it }
             }
     }
 }

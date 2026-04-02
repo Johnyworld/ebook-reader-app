@@ -130,6 +130,8 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
     var readingProgress by remember(book.path) { mutableStateOf(0f) }
     var chapterTitle by remember(book.path) { mutableStateOf("") }
     var savedCfi by remember(book.path) { mutableStateOf<String?>(null) }
+    var isLoading by remember(book.path) { mutableStateOf(book.extension.lowercase() == "epub") }
+    var locationsReady by remember(book.path) { mutableStateOf(false) }
     var tocItems by remember(book.path) { mutableStateOf<List<TocItem>>(emptyList()) }
     var showTocPopup by remember { mutableStateOf(false) }
     val epubWebView = remember { mutableStateOf<WebView?>(null) }
@@ -142,6 +144,13 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
         val record = withContext(Dispatchers.IO) { dao.getByPath(book.path) }
         readingProgress = record?.readingProgress ?: 0f
         savedCfi = record?.lastCfi ?: ""
+        val cachedToc = record?.tocJson.orEmpty()
+        if (cachedToc.isNotEmpty()) {
+            try {
+                tocItems = parseTocJson(JSONArray(cachedToc))
+                locationsReady = true
+            } catch (_: Exception) {}
+        }
     }
 
     Box(modifier = modifier.fillMaxSize()) {
@@ -152,18 +161,40 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                 savedCfi = savedCfi,
                 onCenterTap = onCenterTap,
                 onLocationUpdate = { progress, cfi, chapter ->
+                    locationsReady = true
                     readingProgress = progress
                     chapterTitle = chapter
                     scope.launch(Dispatchers.IO) { dao.upsertProgress(book.path, progress, cfi) }
                 },
                 onTocLoaded = { tocJson ->
-                    try { tocItems = parseTocJson(JSONArray(tocJson)) } catch (_: Exception) {}
+                    if (!locationsReady) {
+                        try { tocItems = parseTocJson(JSONArray(tocJson)) } catch (_: Exception) {}
+                    }
                 },
+                onTocReady = { tocJson ->
+                    try {
+                        tocItems = parseTocJson(JSONArray(tocJson))
+                        locationsReady = true
+                    } catch (_: Exception) {}
+                    scope.launch(Dispatchers.IO) { dao.upsertTocJson(book.path, tocJson) }
+                },
+                onContentRendered = { isLoading = false },
+                onChapterChanged = { chapter -> chapterTitle = chapter },
                 onWebViewCreated = { webView -> epubWebView.value = webView }
             )
             "pdf"  -> PdfViewer(book.path, onCenterTap)
             "mobi" -> MobiViewer(book.path, onCenterTap)
             else   -> CenteredMessage("지원하지 않는 형식입니다.")
+        }
+
+        // 로딩 오버레이
+        if (isLoading) {
+            Box(
+                modifier = Modifier.fillMaxSize().clickable(enabled = false) {},
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator(color = Color.Black)
+            }
         }
 
         // 투명 스크림 - 클릭 이벤트는 아래 레이어로 통과 (가운데 탭으로 닫기)
@@ -190,9 +221,10 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                         // 진행 상황
                         Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
                             Text(
-                                "${(readingProgress * 100).toInt()}% 읽음",
+                                if (isLoading) "도서 불러오는 중..." else "${(readingProgress * 100).toInt()}% 읽음",
                                 style = MaterialTheme.typography.bodyMedium
                             )
+                            if (!isLoading) {
                             Spacer(Modifier.height(8.dp))
                             LinearProgressIndicator(
                                 progress = { readingProgress },
@@ -203,6 +235,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                                 gapSize = 0.dp,
                                 drawStopIndicator = {}
                             )
+                            }
                             if (chapterTitle.isNotEmpty()) {
                                 Spacer(Modifier.height(12.dp))
                                 Row(
@@ -286,6 +319,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                 tocItems = tocItems,
                 bookTitle = book.metadata?.title ?: book.name,
                 currentChapterTitle = chapterTitle,
+                locationsReady = locationsReady,
                 onNavigate = { href ->
                     epubWebView.value?.post {
                         epubWebView.value?.evaluateJavascript(
@@ -322,6 +356,7 @@ private fun TocPopup(
     tocItems: List<TocItem>,
     bookTitle: String,
     currentChapterTitle: String,
+    locationsReady: Boolean = true,
     onNavigate: (String) -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -378,7 +413,7 @@ private fun TocPopup(
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             Text(
-                                "${(item.percentage * 100).toInt()}%",
+                                if (locationsReady) "${(item.percentage * 100).toInt()}%" else "",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.width(36.dp)
@@ -492,6 +527,9 @@ private fun EpubViewer(
     onCenterTap: () -> Unit,
     onLocationUpdate: (progress: Float, cfi: String, chapterTitle: String) -> Unit = { _, _, _ -> },
     onTocLoaded: (tocJson: String) -> Unit = {},
+    onContentRendered: () -> Unit = {},
+    onChapterChanged: (chapter: String) -> Unit = {},
+    onTocReady: (tocJson: String) -> Unit = {},
     onWebViewCreated: (WebView) -> Unit = {}
 ) {
     val context = LocalContext.current
@@ -525,7 +563,7 @@ private fun EpubViewer(
                         isHorizontalScrollBarEnabled = false
                         isVerticalScrollBarEnabled = false
                         webViewClient = WebViewClient()
-                        addJavascriptInterface(EpubBridge(onLocationUpdate, onTocLoaded), "Android")
+                        addJavascriptInterface(EpubBridge(onLocationUpdate, onTocLoaded, onContentRendered, onChapterChanged, onTocReady), "Android")
                     }
                     onWebViewCreated(webView)
                     val overlay = android.view.View(ctx).apply {
@@ -660,8 +698,18 @@ function reportLocation(location) {
     } catch(e) {}
 }
 
+var _locationsReady = false;
+var _rendered = false;
 rendition.on("relocated", function(location) {
-    reportLocation(location);
+    if (!_rendered) { _rendered = true; Android.onContentRendered(); }
+    try {
+        var href = (location.start && location.start.href) ? location.start.href : "";
+        if (href && book.navigation && book.navigation.toc) {
+            var chapter = findTocEntry(href, book.navigation.toc);
+            if (chapter) Android.onChapterChanged(chapter);
+        }
+    } catch(e) {}
+    if (_locationsReady) reportLocation(location);
 });
 
 book.loaded.navigation.then(function(nav) {
@@ -682,6 +730,11 @@ book.loaded.navigation.then(function(nav) {
             return result;
         }
         Android.onTocLoaded(JSON.stringify(buildToc(toc, 0)));
+        var loc = rendition.currentLocation();
+        if (loc && loc.start && loc.start.href) {
+            var chapter = findTocEntry(loc.start.href, toc);
+            if (chapter) Android.onChapterChanged(chapter);
+        }
     } catch(e) {}
 });
 
@@ -726,9 +779,10 @@ book.ready.then(function() {
             }
             return result;
         }
-        Android.onTocLoaded(JSON.stringify(buildTocWithPct(toc, 0)));
+        Android.onTocReady(JSON.stringify(buildTocWithPct(toc, 0)));
     } catch(e) {}
 
+    _locationsReady = true;
     var loc = rendition.currentLocation();
     if (loc && loc.start) {
         reportLocation(loc);
@@ -746,7 +800,10 @@ window._displayHref = function(href) { rendition.display(href); };
 
 private class EpubBridge(
     private val onUpdate: (progress: Float, cfi: String, chapterTitle: String) -> Unit,
-    private val onTocLoadedCallback: (tocJson: String) -> Unit = {}
+    private val onTocLoadedCallback: (tocJson: String) -> Unit = {},
+    private val onRenderedCallback: () -> Unit = {},
+    private val onChapterChangedCallback: (chapter: String) -> Unit = {},
+    private val onTocReadyCallback: (tocJson: String) -> Unit = {}
 ) {
     private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
 
@@ -758,6 +815,21 @@ private class EpubBridge(
     @android.webkit.JavascriptInterface
     fun onTocLoaded(tocJson: String) {
         mainHandler.post { onTocLoadedCallback(tocJson) }
+    }
+
+    @android.webkit.JavascriptInterface
+    fun onContentRendered() {
+        mainHandler.post { onRenderedCallback() }
+    }
+
+    @android.webkit.JavascriptInterface
+    fun onChapterChanged(chapter: String) {
+        mainHandler.post { onChapterChangedCallback(chapter) }
+    }
+
+    @android.webkit.JavascriptInterface
+    fun onTocReady(tocJson: String) {
+        mainHandler.post { onTocReadyCallback(tocJson) }
     }
 }
 
