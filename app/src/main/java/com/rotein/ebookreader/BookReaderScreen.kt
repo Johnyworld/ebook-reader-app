@@ -166,9 +166,9 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
             else   -> CenteredMessage("지원하지 않는 형식입니다.")
         }
 
-        // 투명 스크림 - 메뉴 외 영역 탭시 닫기
+        // 투명 스크림 - 클릭 이벤트는 아래 레이어로 통과 (가운데 탭으로 닫기)
         if (showMenu) {
-            Box(modifier = Modifier.fillMaxSize().clickable { showMenu = false })
+            Box(modifier = Modifier.fillMaxSize())
         }
 
         // 바텀 시트 (스크림보다 위, 헤더보다 아래)
@@ -177,11 +177,13 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
-                    .pointerInput(Unit) { detectTapGestures {} }
+                    .padding(horizontal = 16.dp, vertical = 16.dp)
             ) {
-                HorizontalDivider(color = Color.Black)
                 Surface(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(1.dp, Color.Black)
+                        .pointerInput(Unit) { detectTapGestures {} },
                     color = Color.White
                 ) {
                     Column(modifier = Modifier.fillMaxWidth()) {
