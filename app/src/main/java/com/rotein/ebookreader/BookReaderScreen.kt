@@ -120,7 +120,6 @@ private fun flattenToc(items: List<TocItem>): List<TocItem> {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = Modifier) {
-    BackHandler { onClose() }
     var showMenu by remember { mutableStateOf(false) }
     val onCenterTap = { showMenu = !showMenu }
 
@@ -134,6 +133,10 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
     var tocItems by remember(book.path) { mutableStateOf<List<TocItem>>(emptyList()) }
     var showTocPopup by remember { mutableStateOf(false) }
     val epubWebView = remember { mutableStateOf<WebView?>(null) }
+
+    BackHandler { onClose() }
+    BackHandler(enabled = showMenu) { showMenu = false }
+    BackHandler(enabled = showTocPopup) { showTocPopup = false }
 
     LaunchedEffect(book.path) {
         val record = withContext(Dispatchers.IO) { dao.getByPath(book.path) }
