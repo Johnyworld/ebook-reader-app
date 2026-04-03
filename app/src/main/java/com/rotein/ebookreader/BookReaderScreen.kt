@@ -31,6 +31,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -50,6 +53,13 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -67,6 +77,9 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -91,6 +104,27 @@ data class TocItem(
     val page: Int = 0,
     val subitems: List<TocItem> = emptyList()
 )
+
+data class SearchResultItem(
+    val cfi: String,
+    val excerpt: String,
+    val chapter: String = "",
+    val page: Int = 0
+)
+
+private fun parseSearchResults(json: JSONArray): List<SearchResultItem> {
+    val items = mutableListOf<SearchResultItem>()
+    for (i in 0 until json.length()) {
+        val obj = json.getJSONObject(i)
+        items.add(SearchResultItem(
+            cfi = obj.optString("cfi", ""),
+            excerpt = obj.optString("excerpt", ""),
+            chapter = obj.optString("chapter", ""),
+            page = obj.optInt("page", 0)
+        ))
+    }
+    return items
+}
 
 private fun parseTocJson(json: JSONArray, depth: Int = 0): List<TocItem> {
     val items = mutableListOf<TocItem>()
@@ -134,6 +168,9 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
     var locationsReady by remember(book.path) { mutableStateOf(false) }
     var tocItems by remember(book.path) { mutableStateOf<List<TocItem>>(emptyList()) }
     var showTocPopup by remember { mutableStateOf(false) }
+    var showSearchPopup by remember { mutableStateOf(false) }
+    var searchResults by remember { mutableStateOf<List<SearchResultItem>?>(null) }
+    var isSearching by remember { mutableStateOf(false) }
     val epubWebView = remember { mutableStateOf<WebView?>(null) }
     var currentPage by remember(book.path) { mutableStateOf(0) }
     var totalPages by remember(book.path) { mutableStateOf(0) }
@@ -141,6 +178,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
     BackHandler { onClose() }
     BackHandler(enabled = showMenu) { showMenu = false }
     BackHandler(enabled = showTocPopup) { showTocPopup = false }
+    BackHandler(enabled = showSearchPopup) { showSearchPopup = false }
 
     LaunchedEffect(book.path) {
         val record = withContext(Dispatchers.IO) { dao.getByPath(book.path) }
@@ -197,7 +235,14 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                         totalPages = scannedTotal
                     }
                     scope.launch(Dispatchers.IO) { dao.upsertTotalPages(book.path, scannedTotal) }
-                }
+                },
+                onSearchResultsPartial = { json ->
+                    try {
+                        val partial = parseSearchResults(JSONArray(json))
+                        searchResults = (searchResults ?: emptyList()) + partial
+                    } catch (_: Exception) {}
+                },
+                onSearchComplete = { isSearching = false }
             )
             "pdf"  -> PdfViewer(book.path, onCenterTap)
             "mobi" -> MobiViewer(book.path, onCenterTap)
@@ -293,7 +338,11 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
 
                         HorizontalDivider(color = Color.Black)
 
-                        ReaderMenuItem(Icons.Default.Search, "본문 검색")
+                        ReaderMenuItem(Icons.Default.Search, "본문 검색", onClick = {
+                            searchResults = null
+                            isSearching = false
+                            showSearchPopup = true
+                        })
                         ReaderMenuItem(Icons.Default.Star, "하이라이트")
                         ReaderMenuItem(Icons.Default.Edit, "메모")
                         ReaderMenuItem(Icons.Default.Bookmark, "북마크")
@@ -362,15 +411,48 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                 onDismiss = { showTocPopup = false }
             )
         }
+
+        // 검색 팝업
+        if (showSearchPopup) {
+            SearchPopup(
+                searchResults = searchResults,
+                isSearching = isSearching,
+                tocItems = tocItems,
+                onSearch = { query ->
+                    isSearching = true
+                    searchResults = emptyList()
+                    val escaped = query.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n")
+                    epubWebView.value?.post {
+                        epubWebView.value?.evaluateJavascript("window._search(\"$escaped\")", null)
+                    }
+                },
+                onNavigate = { cfi, page ->
+                    epubWebView.value?.post {
+                        if (page > 0) {
+                            epubWebView.value?.evaluateJavascript("window._displayPageNum($page)", null)
+                        } else if (cfi.startsWith("epubcfi(")) {
+                            val escaped = cfi.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n")
+                            epubWebView.value?.evaluateJavascript("window._displayCfi(\"$escaped\")", null)
+                        } else {
+                            val escaped = cfi.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n")
+                            epubWebView.value?.evaluateJavascript("window._displayCfi(\"$escaped\")", null)
+                        }
+                    }
+                    showSearchPopup = false
+                    showMenu = false
+                },
+                onDismiss = { showSearchPopup = false }
+            )
+        }
     }
 }
 
 @Composable
-private fun ReaderMenuItem(icon: ImageVector, label: String) {
+private fun ReaderMenuItem(icon: ImageVector, label: String, onClick: () -> Unit = {}) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable {}
+            .clickable { onClick() }
             .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -517,6 +599,249 @@ private fun TocPopup(
     }
 }
 
+@Composable
+private fun SearchPopup(
+    searchResults: List<SearchResultItem>?,
+    isSearching: Boolean,
+    tocItems: List<TocItem>,
+    onSearch: (String) -> Unit,
+    onNavigate: (cfi: String, page: Int) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val tocPageMap = remember(tocItems) {
+        flattenToc(tocItems).filter { it.page > 0 }.associate { it.label to it.page }
+    }
+    val sortedResults = remember(searchResults, tocPageMap) {
+        searchResults?.sortedBy { r ->
+            if (r.page > 0) r.page else (tocPageMap[r.chapter] ?: Int.MAX_VALUE)
+        }
+    }
+    var query by remember { mutableStateOf("") }
+    var searchedQuery by remember { mutableStateOf("") }
+    val focusRequester = remember { FocusRequester() }
+    var currentPage by remember { mutableStateOf(0) }
+
+    val density = LocalDensity.current
+    val screenHeightDp = LocalConfiguration.current.screenHeightDp
+    val statusBarHeightDp = with(density) { WindowInsets.statusBars.getTop(this).toDp().value.toInt() }
+    val itemHeightDp = 80
+    val headerHeightDp = 56
+    val paginationHeightDp = 56
+    val searchBarHeightDp = 45
+    val itemsPerPage = maxOf(1, (screenHeightDp - statusBarHeightDp - headerHeightDp - paginationHeightDp - searchBarHeightDp) / itemHeightDp)
+    val resultList = sortedResults ?: emptyList()
+    val totalPages = maxOf(1, (resultList.size + itemsPerPage - 1) / itemsPerPage)
+    val pageItems = resultList.drop(currentPage * itemsPerPage).take(itemsPerPage)
+
+    LaunchedEffect(Unit) { focusRequester.requestFocus() }
+    LaunchedEffect(searchedQuery) { currentPage = 0 }
+
+    Surface(modifier = Modifier.fillMaxSize(), color = Color.White) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp)
+                    .padding(horizontal = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = onDismiss) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "닫기")
+                }
+                Text(
+                    "본문 검색",
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+            HorizontalDivider(color = Color.Black)
+
+            Box(modifier = Modifier.weight(1f)) {
+                when {
+                    searchResults == null -> Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("검색어를 입력하세요.", style = MaterialTheme.typography.bodyMedium)
+                    }
+                    isSearching && searchResults.isEmpty() -> Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(color = Color.Black)
+                    }
+                    searchResults.isEmpty() -> Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("검색 결과가 없습니다.", style = MaterialTheme.typography.bodyMedium)
+                    }
+                    else -> Column(modifier = Modifier.fillMaxSize()) {
+                        pageItems.forEachIndexed { index, result ->
+                            if (index > 0) HorizontalDivider(color = Color(0xFFCCCCCC))
+                            val effectivePage = if (result.page > 0) result.page else (tocPageMap[result.chapter] ?: 0)
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(80.dp)
+                                    .clickable { onNavigate(result.cfi, effectivePage) }
+                                    .padding(horizontal = 16.dp, vertical = 12.dp)
+                            ) {
+                                if (result.chapter.isNotEmpty() || effectivePage > 0) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            result.chapter,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = Color(0xFFBBBBBB),
+                                            modifier = Modifier.weight(1f),
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        if (effectivePage > 0) {
+                                            Text(
+                                                "p.$effectivePage",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = Color(0xFFBBBBBB)
+                                            )
+                                        }
+                                    }
+                                }
+                                Text(
+                                    text = buildAnnotatedString {
+                                        val excerpt = result.excerpt.trim()
+                                        val lowerExcerpt = excerpt.lowercase()
+                                        val lowerQuery = searchedQuery.lowercase()
+                                        var cursor = 0
+                                        if (lowerQuery.isNotEmpty()) {
+                                            var idx = lowerExcerpt.indexOf(lowerQuery)
+                                            while (idx != -1) {
+                                                append(excerpt.substring(cursor, idx))
+                                                withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
+                                                    append(excerpt.substring(idx, idx + lowerQuery.length))
+                                                }
+                                                cursor = idx + lowerQuery.length
+                                                idx = lowerExcerpt.indexOf(lowerQuery, cursor)
+                                            }
+                                        }
+                                        append(excerpt.substring(cursor))
+                                    },
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            Column {
+                if (!searchResults.isNullOrEmpty()) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().height(56.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .clickable(enabled = currentPage > 0) { currentPage-- }
+                                .padding(horizontal = 16.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "이전",
+                                modifier = Modifier.height(16.dp),
+                                tint = if (currentPage > 0) Color.Black else Color(0xFFCCCCCC)
+                            )
+                            Text(
+                                "이전",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = if (currentPage > 0) Color.Black else Color(0xFFCCCCCC)
+                            )
+                        }
+                        Text(
+                            "${currentPage + 1}/$totalPages (${resultList.size}건)",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        Row(
+                            modifier = Modifier
+                                .clickable(enabled = currentPage < totalPages - 1) { currentPage++ }
+                                .padding(horizontal = 16.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text(
+                                "다음",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = if (currentPage < totalPages - 1) Color.Black else Color(0xFFCCCCCC)
+                            )
+                            Icon(
+                                Icons.AutoMirrored.Filled.ArrowForward,
+                                contentDescription = "다음",
+                                modifier = Modifier.height(16.dp),
+                                tint = if (currentPage < totalPages - 1) Color.Black else Color(0xFFCCCCCC)
+                            )
+                        }
+                    }
+                }
+                HorizontalDivider(color = Color.Black)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(44.dp)
+                        .padding(start = 4.dp, end = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.Default.Search,
+                        contentDescription = null,
+                        modifier = Modifier.padding(horizontal = 12.dp).size(24.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    BasicTextField(
+                        value = query,
+                        onValueChange = { query = it },
+                        modifier = Modifier.weight(1f).focusRequester(focusRequester),
+                        singleLine = true,
+                        textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                        keyboardActions = KeyboardActions(onSearch = {
+                            if (query.length >= 2) { val q = query.trim().replace(Regex("\\s+"), " "); searchedQuery = q; onSearch(q) }
+                        }),
+                        decorationBox = { innerTextField ->
+                            Box {
+                                if (query.isEmpty()) {
+                                    Text(
+                                        "검색어를 두 글자 이상 입력하세요.",
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                innerTextField()
+                            }
+                        }
+                    )
+                    Box(
+                        modifier = Modifier
+                            .border(1.dp, Color.Black, RoundedCornerShape(4.dp))
+                            .clickable { if (query.length >= 2) { val q = query.trim().replace(Regex("\\s+"), " "); searchedQuery = q; onSearch(q) } }
+                            .padding(horizontal = 16.dp, vertical = 10.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("검색", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+    }
+}
+
 // ─── TXT ─────────────────────────────────────────────────────────────────────
 
 @Composable
@@ -570,7 +895,9 @@ private fun EpubViewer(
     onTocReady: (tocJson: String) -> Unit = {},
     onWebViewCreated: (WebView) -> Unit = {},
     onPageInfoChanged: (currentPage: Int, totalPages: Int) -> Unit = { _, _ -> },
-    onScanComplete: (totalPages: Int) -> Unit = {}
+    onScanComplete: (totalPages: Int) -> Unit = {},
+    onSearchResultsPartial: (resultsJson: String) -> Unit = {},
+    onSearchComplete: () -> Unit = {}
 ) {
     val context = LocalContext.current
     var bookDir by remember(path) { mutableStateOf<String?>(null) }
@@ -603,7 +930,7 @@ private fun EpubViewer(
                         isHorizontalScrollBarEnabled = false
                         isVerticalScrollBarEnabled = false
                         webViewClient = WebViewClient()
-                        addJavascriptInterface(EpubBridge(onLocationUpdate, onTocLoaded, onContentRendered, onChapterChanged, onTocReady, onPageInfoChanged, onScanComplete), "Android")
+                        addJavascriptInterface(EpubBridge(onLocationUpdate, onTocLoaded, onContentRendered, onChapterChanged, onTocReady, onPageInfoChanged, onScanComplete, onSearchResultsPartial, onSearchComplete), "Android")
                     }
                     onWebViewCreated(webView)
                     val overlay = android.view.View(ctx).apply {
@@ -902,6 +1229,126 @@ rendition.display(_savedCfi.length > 0 ? _savedCfi : undefined);
 window._prev = function() { rendition.prev(); };
 window._next = function() { rendition.next(); };
 window._displayHref = function(href) { rendition.display(href); };
+window._displayCfi = function(cfi) { rendition.display(cfi); };
+window._displayPageNum = function(pageNum) {
+    try {
+        var items = book.spine ? (book.spine.items || []) : [];
+        var targetIdx = 0;
+        var pageWithin = 0;
+        for (var i = 0; i < items.length; i++) {
+            var offset = _spinePageOffsets[i] || 0;
+            var count = _spinePageCounts[i] || 1;
+            if (pageNum - 1 < offset + count) {
+                targetIdx = i;
+                pageWithin = Math.max(0, pageNum - 1 - offset);
+                break;
+            }
+        }
+        var ov = document.createElement('div');
+        ov.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:#fff;z-index:99999;';
+        document.body.appendChild(ov);
+        function done() { if (ov.parentNode) ov.parentNode.removeChild(ov); }
+        var capturedTargetIdx = targetIdx;
+        rendition.display(items[targetIdx].href).then(function() {
+            var remaining = pageWithin;
+            function step() {
+                if (remaining <= 0) { done(); return; }
+                remaining--;
+                rendition.next().then(function() {
+                    var loc = rendition.currentLocation();
+                    if (loc && loc.start && loc.start.index !== undefined && loc.start.index !== capturedTargetIdx) {
+                        rendition.prev().then(done).catch(done);
+                    } else {
+                        step();
+                    }
+                }).catch(done);
+            }
+            step();
+        }).catch(done);
+    } catch(e) {}
+};
+window._search = function(query) {
+    var items = book.spine ? (book.spine.items || []) : [];
+    var lowerQuery = query.toLowerCase();
+    var nextIdx = 0;
+    var activeChains = 0;
+    var CONCURRENCY = 3;
+
+    function next() {
+        if (nextIdx >= items.length) {
+            if (--activeChains === 0) Android.onSearchComplete();
+            return;
+        }
+        var spineIndex = nextIdx;
+        var section = items[nextIdx++];
+        var href = section.href;
+        var chapter = '';
+        try {
+            if (book.navigation && book.navigation.toc) {
+                chapter = findTocEntry(href, book.navigation.toc);
+            }
+        } catch(e) {}
+        try {
+        var sectionHref = typeof section.url === 'string' ? section.url : (section.canonical || section.href || href);
+        book.load(sectionHref)
+            .then(function(doc) {
+                try {
+                    var body = doc.body || doc.querySelector('body') || doc.documentElement;
+                    // 텍스트 노드별 문서 내 시작 offset 수집
+                    var nodeMap = [];
+                    var walker = doc.createTreeWalker(body, NodeFilter.SHOW_TEXT, null, false);
+                    var nd, offset = 0;
+                    while ((nd = walker.nextNode())) {
+                        nodeMap.push({ node: nd, start: offset });
+                        offset += nd.textContent.length;
+                    }
+                    var fullText = body ? body.textContent : '';
+                    var lowerText = fullText.toLowerCase();
+                    var positions = [];
+                    var p = lowerText.indexOf(lowerQuery);
+                    while (p !== -1 && positions.length < 5) { positions.push(p); p = lowerText.indexOf(lowerQuery, p + 1); }
+                    if (positions.length > 0) {
+                        var found = [];
+                        for (var i = 0; i < positions.length; i++) {
+                            var pos = positions[i];
+                            var matchPage = 0;
+                            if (_totalVisualPages > 0) {
+                                var sectionPages = _spinePageCounts[spineIndex] || 1;
+                                var pageWithin = Math.floor((pos / Math.max(fullText.length, 1)) * sectionPages);
+                                matchPage = (_spinePageOffsets[spineIndex] || 0) + pageWithin + 1;
+                            }
+                            var s = Math.max(0, pos - 60);
+                            var e = Math.min(fullText.length, pos + query.length + 60);
+                            var cfi = href;
+                            try {
+                                for (var j = 0; j < nodeMap.length; j++) {
+                                    var nm = nodeMap[j];
+                                    var nodeEnd = nm.start + nm.node.textContent.length;
+                                    if (nm.start <= pos && pos < nodeEnd) {
+                                        var range = doc.createRange();
+                                        range.setStart(nm.node, pos - nm.start);
+                                        range.setEnd(nm.node, Math.min(pos - nm.start + query.length, nm.node.textContent.length));
+                                        cfi = section.cfiFromRange(range).toString();
+                                        break;
+                                    }
+                                }
+                            } catch(e2) { cfi = href; }
+                            found.push({ cfi: cfi, excerpt: fullText.substring(s, e).replace(/\s+/g, ' ').trim(), chapter: chapter, page: matchPage });
+                        }
+                        if (found.length) Android.onSearchResultsPartial(JSON.stringify(found));
+                    }
+                } catch(e4) {}
+                next();
+            })
+            .catch(function() { next(); });
+        } catch(e5) { next(); }
+    }
+
+    var count = Math.min(CONCURRENCY, items.length);
+    if (count === 0) { Android.onSearchComplete(); return; }
+    activeChains = count;
+    for (var c = 0; c < count; c++) next();
+};
 </script>
 </body>
 </html>"""
@@ -913,7 +1360,9 @@ private class EpubBridge(
     private val onChapterChangedCallback: (chapter: String) -> Unit = {},
     private val onTocReadyCallback: (tocJson: String) -> Unit = {},
     private val onPageInfoChangedCallback: (currentPage: Int, totalPages: Int) -> Unit = { _, _ -> },
-    private val onScanCompleteCallback: (totalPages: Int) -> Unit = {}
+    private val onScanCompleteCallback: (totalPages: Int) -> Unit = {},
+    private val onSearchResultsPartialCallback: (resultsJson: String) -> Unit = {},
+    private val onSearchCompleteCallback: () -> Unit = {}
 ) {
     private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
 
@@ -951,6 +1400,17 @@ private class EpubBridge(
     fun onScanComplete(totalPages: Int) {
         mainHandler.post { onScanCompleteCallback(totalPages) }
     }
+
+    @android.webkit.JavascriptInterface
+    fun onSearchResultsPartial(resultsJson: String) {
+        mainHandler.post { onSearchResultsPartialCallback(resultsJson) }
+    }
+
+    @android.webkit.JavascriptInterface
+    fun onSearchComplete() {
+        mainHandler.post { onSearchCompleteCallback() }
+    }
+
 }
 
 // ─── PDF ─────────────────────────────────────────────────────────────────────
