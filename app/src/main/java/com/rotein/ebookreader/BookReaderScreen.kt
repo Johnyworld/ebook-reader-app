@@ -575,6 +575,10 @@ private fun TocPopup(
                         color = if (currentPage > 0) Color.Black else Color(0xFFCCCCCC)
                     )
                 }
+                Text(
+                    "${currentPage + 1}/$totalPages (${flatItems.size}건)",
+                    style = MaterialTheme.typography.bodyMedium
+                )
                 Row(
                     modifier = Modifier
                         .clickable(enabled = currentPage < totalPages - 1) { currentPage++ }
