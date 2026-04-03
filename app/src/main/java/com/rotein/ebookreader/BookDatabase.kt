@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Dao
 import androidx.room.Database
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.PrimaryKey
@@ -101,6 +102,29 @@ private val MIGRATION_4_5 = object : Migration(4, 5) {
     }
 }
 
+@Entity(tableName = "bookmarks", indices = [Index("bookPath")])
+data class Bookmark(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val bookPath: String,
+    val cfi: String,
+    val chapterTitle: String = "",
+    val page: Int = 0,
+    val excerpt: String = "",
+    val createdAt: Long = System.currentTimeMillis()
+)
+
+@Dao
+interface BookmarkDao {
+    @Query("SELECT * FROM bookmarks WHERE bookPath = :bookPath ORDER BY createdAt ASC")
+    suspend fun getByBook(bookPath: String): List<Bookmark>
+
+    @Insert
+    suspend fun insert(bookmark: Bookmark): Long
+
+    @Query("DELETE FROM bookmarks WHERE bookPath = :bookPath AND cfi = :cfi")
+    suspend fun deleteByCfi(bookPath: String, cfi: String)
+}
+
 private val MIGRATION_5_6 = object : Migration(5, 6) {
     override fun migrate(database: SupportSQLiteDatabase) {
         database.execSQL("CREATE TABLE book_read_records_new (bookPath TEXT NOT NULL PRIMARY KEY, lastReadAt INTEGER NOT NULL, lastCfi TEXT NOT NULL DEFAULT '', tocJson TEXT NOT NULL DEFAULT '', totalPages INTEGER NOT NULL DEFAULT 0)")
@@ -110,9 +134,23 @@ private val MIGRATION_5_6 = object : Migration(5, 6) {
     }
 }
 
-@Database(entities = [BookReadRecord::class], version = 6)
+private val MIGRATION_6_7 = object : Migration(6, 7) {
+    override fun migrate(database: SupportSQLiteDatabase) {
+        database.execSQL("CREATE TABLE bookmarks (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, bookPath TEXT NOT NULL, cfi TEXT NOT NULL, chapterTitle TEXT NOT NULL DEFAULT '', page INTEGER NOT NULL DEFAULT 0, createdAt INTEGER NOT NULL DEFAULT 0)")
+        database.execSQL("CREATE INDEX index_bookmarks_bookPath ON bookmarks (bookPath)")
+    }
+}
+
+private val MIGRATION_7_8 = object : Migration(7, 8) {
+    override fun migrate(database: SupportSQLiteDatabase) {
+        database.execSQL("ALTER TABLE bookmarks ADD COLUMN excerpt TEXT NOT NULL DEFAULT ''")
+    }
+}
+
+@Database(entities = [BookReadRecord::class, Bookmark::class], version = 8)
 abstract class BookDatabase : RoomDatabase() {
     abstract fun bookReadRecordDao(): BookReadRecordDao
+    abstract fun bookmarkDao(): BookmarkDao
 
     companion object {
         @Volatile private var INSTANCE: BookDatabase? = null
@@ -123,7 +161,7 @@ abstract class BookDatabase : RoomDatabase() {
                     context.applicationContext,
                     BookDatabase::class.java,
                     "book_database"
-                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6).build().also { INSTANCE = it }
+                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8).build().also { INSTANCE = it }
             }
     }
 }

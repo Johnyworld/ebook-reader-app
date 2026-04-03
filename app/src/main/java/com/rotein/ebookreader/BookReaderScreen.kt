@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -39,11 +40,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.FormatListBulleted
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -63,6 +66,7 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -77,6 +81,13 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.material3.TextButton
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupProperties
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.statusBars
@@ -95,6 +106,9 @@ import org.xmlpull.v1.XmlPullParser
 import org.json.JSONArray
 import java.io.File
 import java.io.RandomAccessFile
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import java.util.zip.ZipFile
 
 data class TocItem(
@@ -159,6 +173,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
 
     val context = LocalContext.current
     val dao = remember { BookDatabase.getInstance(context).bookReadRecordDao() }
+    val bookmarkDao = remember { BookDatabase.getInstance(context).bookmarkDao() }
     val scope = rememberCoroutineScope()
 
     var readingProgress by remember(book.path) { mutableStateOf(0f) }
@@ -169,16 +184,29 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
     var tocItems by remember(book.path) { mutableStateOf<List<TocItem>>(emptyList()) }
     var showTocPopup by remember { mutableStateOf(false) }
     var showSearchPopup by remember { mutableStateOf(false) }
+    var showBookmarkPopup by remember { mutableStateOf(false) }
     var searchResults by remember { mutableStateOf<List<SearchResultItem>?>(null) }
     var isSearching by remember { mutableStateOf(false) }
     val epubWebView = remember { mutableStateOf<WebView?>(null) }
     var currentPage by remember(book.path) { mutableStateOf(0) }
     var totalPages by remember(book.path) { mutableStateOf(0) }
+    var currentCfi by remember(book.path) { mutableStateOf("") }
+    var bookmarks by remember(book.path) { mutableStateOf<List<Bookmark>>(emptyList()) }
 
     BackHandler { onClose() }
     BackHandler(enabled = showMenu) { showMenu = false }
     BackHandler(enabled = showTocPopup) { showTocPopup = false }
     BackHandler(enabled = showSearchPopup) { showSearchPopup = false }
+    BackHandler(enabled = showBookmarkPopup) { showBookmarkPopup = false }
+
+    LaunchedEffect(showMenu) {
+        if (showMenu) {
+            epubWebView.value?.evaluateJavascript("window._currentCfi || ''") { result ->
+                val cfi = result?.removeSurrounding("\"")?.trim().orEmpty()
+                if (cfi.isNotEmpty()) currentCfi = cfi
+            }
+        }
+    }
 
     LaunchedEffect(book.path) {
         val record = withContext(Dispatchers.IO) { dao.getByPath(book.path) }
@@ -191,6 +219,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                 locationsReady = true
             } catch (_: Exception) {}
         }
+        bookmarks = withContext(Dispatchers.IO) { bookmarkDao.getByBook(book.path) }
     }
 
     Box(modifier = modifier.fillMaxSize()) {
@@ -202,6 +231,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                 onCenterTap = onCenterTap,
                 onLocationUpdate = { progress, cfi, chapter ->
                     locationsReady = true
+                    currentCfi = cfi
                     if (progress > 0f) readingProgress = progress
                     if (chapter.isNotEmpty()) chapterTitle = chapter
                     scope.launch(Dispatchers.IO) { dao.upsertCfi(book.path, cfi) }
@@ -345,7 +375,9 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                         })
                         ReaderMenuItem(Icons.Default.Star, "하이라이트")
                         ReaderMenuItem(Icons.Default.Edit, "메모")
-                        ReaderMenuItem(Icons.Default.Bookmark, "북마크")
+                        ReaderMenuItem(Icons.Default.Bookmark, "북마크", onClick = {
+                            showBookmarkPopup = true
+                        })
                         ReaderMenuItem(Icons.Default.Settings, "설정")
 
                         Spacer(Modifier.height(16.dp))
@@ -382,8 +414,60 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
-                        IconButton(onClick = {}) {
-                            Icon(Icons.Filled.Bookmark, contentDescription = "북마크")
+                        val isBookmarked = currentCfi.isNotEmpty() && bookmarks.any { it.cfi == currentCfi }
+                        IconButton(onClick = {
+                            if (currentCfi.isEmpty()) return@IconButton
+                            if (isBookmarked) {
+                                scope.launch {
+                                    withContext(Dispatchers.IO) { bookmarkDao.deleteByCfi(book.path, currentCfi) }
+                                    bookmarks = bookmarks.filter { it.cfi != currentCfi }
+                                }
+                            } else {
+                                val wv = epubWebView.value
+                                val pageSnapshot = currentPage
+                                val saveBookmark = { cfi: String, excerpt: String ->
+                                    scope.launch {
+                                        val bookmark = Bookmark(
+                                            bookPath = book.path,
+                                            cfi = cfi,
+                                            chapterTitle = chapterTitle,
+                                            page = pageSnapshot,
+                                            excerpt = excerpt,
+                                            createdAt = System.currentTimeMillis()
+                                        )
+                                        withContext(Dispatchers.IO) { bookmarkDao.insert(bookmark) }
+                                        bookmarks = bookmarks + bookmark
+                                    }
+                                }
+                                if (wv != null) {
+                                    wv.evaluateJavascript(
+                                        "(function(){try{var loc=rendition.currentLocation();var cfi=(loc&&loc.start&&loc.start.cfi)?loc.start.cfi:'';var excerpt='';if(cfi){var r=rendition.getRange(cfi);if(r){var doc=r.startContainer.ownerDocument;var er=doc.createRange();er.setStart(r.startContainer,r.startOffset);er.setEnd(doc.body,doc.body.childNodes.length);excerpt=er.toString().trim().replace(/\\s+/g,' ').substring(0,150);}}if(!excerpt){var c=rendition.getContents();if(c&&c[0]){excerpt=(c[0].document.body.innerText||'').trim().replace(/\\s+/g,' ').substring(0,150);}}return JSON.stringify({cfi:cfi,excerpt:excerpt});}catch(e){return JSON.stringify({cfi:'',excerpt:''});}})()"
+                                    ) { result ->
+                                        try {
+                                            val json = org.json.JSONObject(
+                                                result?.removeSurrounding("\"")
+                                                    ?.replace("\\\"", "\"")
+                                                    ?.replace("\\\\", "\\")
+                                                    ?: "{}"
+                                            )
+                                            val cfi = json.optString("cfi", "")
+                                            val excerpt = json.optString("excerpt", "")
+                                                .replace("\\n", " ").replace("\\r", "").trim()
+                                            saveBookmark(cfi, excerpt)
+                                        } catch (e: Exception) {
+                                            saveBookmark("", "")
+                                        }
+                                    }
+                                } else {
+                                    saveBookmark("", "")
+                                }
+                            }
+                        }) {
+                            Icon(
+                                if (isBookmarked) Icons.Filled.Bookmark else Icons.Filled.BookmarkBorder,
+                                contentDescription = "북마크",
+                                tint = Color.Black
+                            )
                         }
                     }
                 }
@@ -435,6 +519,28 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                     showMenu = false
                 },
                 onDismiss = { showSearchPopup = false }
+            )
+        }
+
+        // 북마크 팝업
+        if (showBookmarkPopup) {
+            BookmarkPopup(
+                bookmarks = bookmarks,
+                onNavigate = { cfi ->
+                    epubWebView.value?.post {
+                        val escaped = cfi.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n")
+                        epubWebView.value?.evaluateJavascript("window._displayCfi(\"$escaped\")", null)
+                    }
+                    showBookmarkPopup = false
+                    showMenu = false
+                },
+                onDelete = { bookmark ->
+                    scope.launch {
+                        withContext(Dispatchers.IO) { bookmarkDao.deleteByCfi(bookmark.bookPath, bookmark.cfi) }
+                        bookmarks = bookmarks.filter { it.id != bookmark.id }
+                    }
+                },
+                onDismiss = { showBookmarkPopup = false }
             )
         }
     }
@@ -839,6 +945,243 @@ private fun SearchPopup(
     }
 }
 
+@Composable
+private fun BookmarkPopup(
+    bookmarks: List<Bookmark>,
+    onNavigate: (cfi: String) -> Unit,
+    onDelete: (Bookmark) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+    val density = LocalDensity.current
+    val screenHeightDp = LocalConfiguration.current.screenHeightDp
+    val statusBarHeightDp = with(density) { WindowInsets.statusBars.getTop(this).toDp().value.toInt() }
+    val itemHeightDp = 88
+    val headerHeightDp = 56
+    val paginationHeightDp = 56
+    val itemsPerPage = maxOf(1, (screenHeightDp - statusBarHeightDp - headerHeightDp - paginationHeightDp) / itemHeightDp)
+    var currentPage by remember { mutableStateOf(0) }
+    var sortOrder by remember { mutableStateOf(BookmarkSortStore.load(context)) }
+    var dropdownExpanded by remember { mutableStateOf(false) }
+    var anchorHeight by remember { mutableStateOf(0) }
+    val sortedBookmarks = remember(bookmarks, sortOrder) {
+        when (sortOrder) {
+            BookmarkSortOrder.CREATED_ASC -> bookmarks.sortedBy { it.createdAt }
+            BookmarkSortOrder.CREATED_DESC -> bookmarks.sortedByDescending { it.createdAt }
+            BookmarkSortOrder.PAGE_ASC -> bookmarks.sortedBy { it.page }
+        }
+    }
+    val totalPages = maxOf(1, (sortedBookmarks.size + itemsPerPage - 1) / itemsPerPage)
+    val pageItems = sortedBookmarks.drop(currentPage * itemsPerPage).take(itemsPerPage)
+    val dateFormat = remember { SimpleDateFormat("yyyy.MM.dd HH:mm", Locale.getDefault()) }
+
+    LaunchedEffect(sortOrder) { BookmarkSortStore.save(context, sortOrder) }
+    LaunchedEffect(sortedBookmarks.size) {
+        if (currentPage >= totalPages) currentPage = maxOf(0, totalPages - 1)
+    }
+
+    Surface(modifier = Modifier.fillMaxSize(), color = Color.White) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp)
+                    .padding(horizontal = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = onDismiss) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "닫기")
+                }
+                Text(
+                    "북마크",
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.weight(1f)
+                )
+                Box(modifier = Modifier.onGloballyPositioned { anchorHeight = it.size.height }) {
+                    TextButton(onClick = { dropdownExpanded = true }) {
+                        Text(
+                            text = sortOrder.label,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                    if (dropdownExpanded) {
+                        Popup(
+                            alignment = Alignment.TopEnd,
+                            offset = IntOffset(0, anchorHeight),
+                            onDismissRequest = { dropdownExpanded = false },
+                            properties = PopupProperties(focusable = true)
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .width(IntrinsicSize.Max)
+                                    .background(Color.White)
+                                    .border(1.dp, Color.Black)
+                            ) {
+                                BookmarkSortOrder.entries.forEachIndexed { index, order ->
+                                    val isSelected = sortOrder == order
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clickable {
+                                                sortOrder = order
+                                                dropdownExpanded = false
+                                            }
+                                            .padding(start = 16.dp, end = 12.dp, top = 12.dp, bottom = 12.dp)
+                                    ) {
+                                        Text(
+                                            text = order.label,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = Color.Black,
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                        if (isSelected) {
+                                            Spacer(modifier = Modifier.width(16.dp))
+                                            Icon(
+                                                imageVector = Icons.Default.Check,
+                                                contentDescription = null,
+                                                tint = Color.Black,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        }
+                                    }
+                                    if (index < BookmarkSortOrder.entries.lastIndex) {
+                                        HorizontalDivider(color = Color(0xFFE0E0E0))
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            HorizontalDivider(color = Color.Black)
+
+            Box(modifier = Modifier.weight(1f)) {
+                if (bookmarks.isEmpty()) {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text("북마크가 없습니다.", style = MaterialTheme.typography.bodyMedium)
+                    }
+                } else {
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        pageItems.forEachIndexed { index, bookmark ->
+                            if (index > 0) HorizontalDivider(color = Color(0xFFCCCCCC))
+                            Row(
+                                modifier = Modifier.fillMaxWidth().height(88.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .fillMaxHeight()
+                                        .clickable { onNavigate(bookmark.cfi) }
+                                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        if (bookmark.page > 0) {
+                                            Text(
+                                                "p.${bookmark.page}",
+                                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                                color = Color.Black
+                                            )
+                                        }
+                                        Text(
+                                            bookmark.chapterTitle,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = Color(0xFFBBBBBB),
+                                            modifier = Modifier.weight(1f).padding(start = if (bookmark.page > 0) 8.dp else 0.dp),
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                            textAlign = TextAlign.End
+                                        )
+                                    }
+                                    Text(
+                                        bookmark.excerpt,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.padding(bottom = 4.dp)
+                                    )
+                                    Text(
+                                        dateFormat.format(Date(bookmark.createdAt)),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = Color(0xFFBBBBBB)
+                                    )
+                                }
+                                IconButton(onClick = { onDelete(bookmark) }) {
+                                    Icon(
+                                        Icons.Default.Close,
+                                        contentDescription = "삭제",
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            Column {
+                if (sortedBookmarks.isNotEmpty()) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().height(56.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .clickable(enabled = currentPage > 0) { currentPage-- }
+                                .padding(horizontal = 16.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "이전",
+                                modifier = Modifier.height(16.dp),
+                                tint = if (currentPage > 0) Color.Black else Color(0xFFCCCCCC)
+                            )
+                            Text(
+                                "이전",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = if (currentPage > 0) Color.Black else Color(0xFFCCCCCC)
+                            )
+                        }
+                        Text(
+                            "${currentPage + 1}/$totalPages (${sortedBookmarks.size}건)",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        Row(
+                            modifier = Modifier
+                                .clickable(enabled = currentPage < totalPages - 1) { currentPage++ }
+                                .padding(horizontal = 16.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text(
+                                "다음",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = if (currentPage < totalPages - 1) Color.Black else Color(0xFFCCCCCC)
+                            )
+                            Icon(
+                                Icons.AutoMirrored.Filled.ArrowForward,
+                                contentDescription = "다음",
+                                modifier = Modifier.height(16.dp),
+                                tint = if (currentPage < totalPages - 1) Color.Black else Color(0xFFCCCCCC)
+                            )
+                        }
+                    }
+                }
+                HorizontalDivider(color = Color.Black)
+            }
+        }
+    }
+}
+
 // ─── TXT ─────────────────────────────────────────────────────────────────────
 
 @Composable
@@ -1078,6 +1421,7 @@ var _spinePageOffsets = {};
 var _totalVisualPages = 0;
 var _locationsReady = false;
 var _rendered = false;
+window._currentCfi = "";
 rendition.on("relocated", function(location) {
     if (!_rendered) { _rendered = true; Android.onContentRendered(); }
     try {
@@ -1089,7 +1433,7 @@ rendition.on("relocated", function(location) {
     } catch(e) {}
     try {
         var cfi = (location.start && location.start.cfi) ? location.start.cfi : "";
-        if (cfi) Android.onLocationChanged(0, cfi, "");
+        if (cfi) { window._currentCfi = cfi; Android.onLocationChanged(0, cfi, ""); }
     } catch(e) {}
     if (_locationsReady) reportLocation(location);
 });
