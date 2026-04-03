@@ -144,7 +144,6 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
 
     LaunchedEffect(book.path) {
         val record = withContext(Dispatchers.IO) { dao.getByPath(book.path) }
-        readingProgress = record?.readingProgress ?: 0f
         savedCfi = record?.lastCfi ?: ""
         totalPages = record?.totalPages ?: 0
         val cachedToc = record?.tocJson.orEmpty()
@@ -165,9 +164,9 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                 onCenterTap = onCenterTap,
                 onLocationUpdate = { progress, cfi, chapter ->
                     locationsReady = true
-                    readingProgress = progress
-                    chapterTitle = chapter
-                    scope.launch(Dispatchers.IO) { dao.upsertProgress(book.path, progress, cfi) }
+                    if (progress > 0f) readingProgress = progress
+                    if (chapter.isNotEmpty()) chapterTitle = chapter
+                    scope.launch(Dispatchers.IO) { dao.upsertCfi(book.path, cfi) }
                 },
                 onTocLoaded = { tocJson ->
                     if (!locationsReady) {
@@ -708,6 +707,9 @@ function findTocEntry(href, items) {
 function reportLocation(location) {
     try {
         var percentage = (location.start && location.start.percentage) ? location.start.percentage : 0;
+        if (percentage === 0 && location.start && book.spine && book.spine.items.length > 0) {
+            percentage = location.start.index / book.spine.items.length;
+        }
         var cfi = (location.start && location.start.cfi) ? location.start.cfi : "";
         var href = (location.start && location.start.href) ? location.start.href : "";
         var chapter = "";
@@ -737,6 +739,10 @@ rendition.on("relocated", function(location) {
             var chapter = findTocEntry(href, book.navigation.toc);
             if (chapter) Android.onChapterChanged(chapter);
         }
+    } catch(e) {}
+    try {
+        var cfi = (location.start && location.start.cfi) ? location.start.cfi : "";
+        if (cfi) Android.onLocationChanged(0, cfi, "");
     } catch(e) {}
     if (_locationsReady) reportLocation(location);
 });

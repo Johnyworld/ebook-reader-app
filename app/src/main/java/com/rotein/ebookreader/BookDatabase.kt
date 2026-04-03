@@ -18,7 +18,6 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 data class BookReadRecord(
     @PrimaryKey val bookPath: String,
     val lastReadAt: Long,
-    val readingProgress: Float = 0f,
     val lastCfi: String = "",
     val tocJson: String = "",
     val totalPages: Int = 0
@@ -38,8 +37,8 @@ interface BookReadRecordDao {
     @Query("UPDATE book_read_records SET lastReadAt = :lastReadAt WHERE bookPath = :bookPath")
     suspend fun updateLastReadAt(bookPath: String, lastReadAt: Long)
 
-    @Query("UPDATE book_read_records SET readingProgress = :progress, lastCfi = :cfi WHERE bookPath = :bookPath")
-    suspend fun updateProgress(bookPath: String, progress: Float, cfi: String)
+    @Query("UPDATE book_read_records SET lastCfi = :cfi WHERE bookPath = :bookPath")
+    suspend fun updateCfi(bookPath: String, cfi: String)
 
     @Query("UPDATE book_read_records SET tocJson = :tocJson WHERE bookPath = :bookPath")
     suspend fun updateTocJson(bookPath: String, tocJson: String)
@@ -54,9 +53,9 @@ interface BookReadRecordDao {
     }
 
     @Transaction
-    suspend fun upsertProgress(bookPath: String, progress: Float, cfi: String) {
+    suspend fun upsertCfi(bookPath: String, cfi: String) {
         insertIfNotExists(BookReadRecord(bookPath = bookPath, lastReadAt = 0L))
-        updateProgress(bookPath, progress, cfi)
+        updateCfi(bookPath, cfi)
     }
 
     @Transaction
@@ -102,7 +101,16 @@ private val MIGRATION_4_5 = object : Migration(4, 5) {
     }
 }
 
-@Database(entities = [BookReadRecord::class], version = 5)
+private val MIGRATION_5_6 = object : Migration(5, 6) {
+    override fun migrate(database: SupportSQLiteDatabase) {
+        database.execSQL("CREATE TABLE book_read_records_new (bookPath TEXT NOT NULL PRIMARY KEY, lastReadAt INTEGER NOT NULL, lastCfi TEXT NOT NULL DEFAULT '', tocJson TEXT NOT NULL DEFAULT '', totalPages INTEGER NOT NULL DEFAULT 0)")
+        database.execSQL("INSERT INTO book_read_records_new SELECT bookPath, lastReadAt, lastCfi, tocJson, totalPages FROM book_read_records")
+        database.execSQL("DROP TABLE book_read_records")
+        database.execSQL("ALTER TABLE book_read_records_new RENAME TO book_read_records")
+    }
+}
+
+@Database(entities = [BookReadRecord::class], version = 6)
 abstract class BookDatabase : RoomDatabase() {
     abstract fun bookReadRecordDao(): BookReadRecordDao
 
@@ -115,7 +123,7 @@ abstract class BookDatabase : RoomDatabase() {
                     context.applicationContext,
                     BookDatabase::class.java,
                     "book_database"
-                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5).build().also { INSTANCE = it }
+                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6).build().also { INSTANCE = it }
             }
     }
 }
