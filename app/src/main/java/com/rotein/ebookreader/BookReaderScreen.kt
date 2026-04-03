@@ -428,15 +428,8 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                 },
                 onNavigate = { cfi, page ->
                     epubWebView.value?.post {
-                        if (page > 0) {
-                            epubWebView.value?.evaluateJavascript("window._displayPageNum($page)", null)
-                        } else if (cfi.startsWith("epubcfi(")) {
-                            val escaped = cfi.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n")
-                            epubWebView.value?.evaluateJavascript("window._displayCfi(\"$escaped\")", null)
-                        } else {
-                            val escaped = cfi.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n")
-                            epubWebView.value?.evaluateJavascript("window._displayCfi(\"$escaped\")", null)
-                        }
+                        val escaped = cfi.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n")
+                        epubWebView.value?.evaluateJavascript("window._displayCfi(\"$escaped\")", null)
                     }
                     showSearchPopup = false
                     showMenu = false
@@ -705,7 +698,7 @@ private fun SearchPopup(
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis
                                         )
-                                        if (effectivePage > 0) {
+                                        if (result.page > 0) {
                                             Text(
                                                 "p.$effectivePage",
                                                 style = MaterialTheme.typography.labelSmall,
@@ -1248,27 +1241,23 @@ window._displayPageNum = function(pageNum) {
                 break;
             }
         }
-        var ov = document.createElement('div');
-        ov.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:#fff;z-index:99999;';
-        document.body.appendChild(ov);
-        function done() { if (ov.parentNode) ov.parentNode.removeChild(ov); }
         var capturedTargetIdx = targetIdx;
         rendition.display(items[targetIdx].href).then(function() {
             var remaining = pageWithin;
             function step() {
-                if (remaining <= 0) { done(); return; }
+                if (remaining <= 0) { return; }
                 remaining--;
                 rendition.next().then(function() {
                     var loc = rendition.currentLocation();
                     if (loc && loc.start && loc.start.index !== undefined && loc.start.index !== capturedTargetIdx) {
-                        rendition.prev().then(done).catch(done);
+                        rendition.prev();
                     } else {
                         step();
                     }
-                }).catch(done);
+                }).catch(function() {});
             }
             step();
-        }).catch(done);
+        }).catch(function() {});
     } catch(e) {}
 };
 window._search = function(query) {
@@ -1329,14 +1318,34 @@ window._search = function(query) {
                                     var nm = nodeMap[j];
                                     var nodeEnd = nm.start + nm.node.textContent.length;
                                     if (nm.start <= pos && pos < nodeEnd) {
-                                        var range = doc.createRange();
-                                        range.setStart(nm.node, pos - nm.start);
-                                        range.setEnd(nm.node, Math.min(pos - nm.start + query.length, nm.node.textContent.length));
-                                        cfi = section.cfiFromRange(range).toString();
+                                        var charOffset = pos - nm.start;
+                                        var steps = [];
+                                        var cur = nm.node;
+                                        // text node: position among all childNodes (1-indexed)
+                                        var nodeIdx = Array.prototype.indexOf.call(cur.parentNode.childNodes, cur) + 1;
+                                        steps.unshift('/' + nodeIdx + ':' + charOffset);
+                                        cur = cur.parentNode;
+                                        // walk up to body (case-insensitive for xhtml)
+                                        while (cur && cur.parentNode) {
+                                            var n = cur.nodeName.toUpperCase();
+                                            if (n === 'BODY' || n === 'HTML' || n === '#DOCUMENT') break;
+                                            var idx = 1;
+                                            var s2 = cur.previousSibling;
+                                            while (s2) { if (s2.nodeType === 1) idx++; s2 = s2.previousSibling; }
+                                            steps.unshift('/' + (idx * 2));
+                                            cur = cur.parentNode;
+                                        }
+                                        var cfiBase = section.cfiBase || '';
+                                        if (cfiBase) {
+                                            cfi = 'epubcfi(' + cfiBase + '!/4' + steps.join('') + ')';
+                                        }
                                         break;
                                     }
                                 }
-                            } catch(e2) { cfi = href; }
+                            } catch(e2) {
+                                var cfiBase = section.cfiBase || '';
+                                if (cfiBase) { cfi = 'epubcfi(' + cfiBase + ')'; }
+                            }
                             found.push({ cfi: cfi, excerpt: fullText.substring(s, e).replace(/\s+/g, ' ').trim(), chapter: chapter, page: matchPage });
                         }
                         if (found.length) Android.onSearchResultsPartial(JSON.stringify(found));
