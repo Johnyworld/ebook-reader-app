@@ -87,8 +87,8 @@ import java.util.zip.ZipFile
 data class TocItem(
     val label: String,
     val href: String,
-    val percentage: Float,
     val depth: Int,
+    val page: Int = 0,
     val subitems: List<TocItem> = emptyList()
 )
 
@@ -100,8 +100,8 @@ private fun parseTocJson(json: JSONArray, depth: Int = 0): List<TocItem> {
         items.add(TocItem(
             label = obj.getString("label"),
             href = obj.getString("href"),
-            percentage = obj.getDouble("percentage").toFloat(),
             depth = depth,
+            page = if (obj.has("page")) obj.getInt("page") else 0,
             subitems = subitems
         ))
     }
@@ -175,10 +175,16 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                 },
                 onTocReady = { tocJson ->
                     try {
-                        tocItems = parseTocJson(JSONArray(tocJson))
-                        locationsReady = true
+                        val newItems = parseTocJson(JSONArray(tocJson))
+                        val hasPageData = flattenToc(newItems).any { it.page > 0 }
+                        if (hasPageData || flattenToc(tocItems).none { it.page > 0 }) {
+                            tocItems = newItems
+                            locationsReady = true
+                        }
+                        if (hasPageData) {
+                            scope.launch(Dispatchers.IO) { dao.upsertTocJson(book.path, tocJson) }
+                        }
                     } catch (_: Exception) {}
-                    scope.launch(Dispatchers.IO) { dao.upsertTocJson(book.path, tocJson) }
                 },
                 onContentRendered = { isLoading = false },
                 onChapterChanged = { chapter -> chapterTitle = chapter },
@@ -342,6 +348,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                 tocItems = tocItems,
                 bookTitle = book.metadata?.title ?: book.name,
                 currentChapterTitle = chapterTitle,
+                totalBookPages = totalPages,
                 onNavigate = { href ->
                     epubWebView.value?.post {
                         epubWebView.value?.evaluateJavascript(
@@ -378,6 +385,7 @@ private fun TocPopup(
     tocItems: List<TocItem>,
     bookTitle: String,
     currentChapterTitle: String,
+    totalBookPages: Int,
     onNavigate: (String) -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -425,7 +433,7 @@ private fun TocPopup(
                                 .fillMaxWidth()
                                 .clickable { onNavigate(item.href) }
                                 .padding(
-                                    start = (16 + item.depth * 16).dp,
+                                    start = 16.dp,
                                     end = 16.dp,
                                     top = 12.dp,
                                     bottom = 12.dp
@@ -433,10 +441,25 @@ private fun TocPopup(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
+                            Box(
+                                modifier = Modifier.width(40.dp),
+                                contentAlignment = Alignment.CenterStart
+                            ) {
+                                if (item.page > 0) {
+                                    Text(
+                                        "${item.page}",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = Color(0xFFBBBBBB)
+                                    )
+                                }
+                            }
                             Text(
                                 item.label,
                                 style = if (item.depth == 0) MaterialTheme.typography.bodyLarge else MaterialTheme.typography.bodyMedium,
-                                color = if (item.label == currentChapterTitle) Color.Black else MaterialTheme.colorScheme.onSurface
+                                color = if (item.label == currentChapterTitle) Color.Black else MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .padding(start = (item.depth * 16).dp)
                             )
                         }
                         HorizontalDivider(color = Color(0xFFCCCCCC))
@@ -757,7 +780,6 @@ book.loaded.navigation.then(function(nav) {
                 result.push({
                     label: item.label.trim(),
                     href: item.href,
-                    percentage: 0,
                     depth: depth,
                     subitems: item.subitems ? buildToc(item.subitems, depth + 1) : []
                 });
@@ -798,6 +820,34 @@ function computeVisualPages() {
             _totalVisualPages = offset;
             document.body.removeChild(scanDiv);
             Android.onScanComplete(_totalVisualPages);
+            try {
+                var tocNav = book.navigation ? (book.navigation.toc || []) : [];
+                var spineItemsForToc = book.spine ? (book.spine.items || []) : [];
+                function buildTocWithPages(tocItems, depth) {
+                    var result = [];
+                    for (var ti = 0; ti < tocItems.length; ti++) {
+                        var tocItem = tocItems[ti];
+                        var hrefBase = tocItem.href.split('#')[0];
+                        var page = 0;
+                        for (var si = 0; si < spineItemsForToc.length; si++) {
+                            var siHref = (spineItemsForToc[si].href || '').split('?')[0];
+                            if (siHref === hrefBase || siHref.endsWith('/' + hrefBase) || hrefBase.endsWith('/' + siHref)) {
+                                page = (_spinePageOffsets[si] || 0) + 1;
+                                break;
+                            }
+                        }
+                        result.push({
+                            label: tocItem.label.trim(),
+                            href: tocItem.href,
+                            page: page,
+                            depth: depth,
+                            subitems: tocItem.subitems ? buildTocWithPages(tocItem.subitems, depth + 1) : []
+                        });
+                    }
+                    return result;
+                }
+                Android.onTocReady(JSON.stringify(buildTocWithPages(tocNav, 0)));
+            } catch(e) {}
             var loc = rendition.currentLocation();
             if (loc && loc.start) {
                 var idx = loc.start.index !== undefined ? loc.start.index : 0;
@@ -821,44 +871,22 @@ book.ready.then(function() {
 }).then(function() {
     try {
         var locs = book.locations._locations || [];
-        var total = locs.length || 1;
-        _totalLocations = total;
-        // Build map: spine step number -> first location index (percentage)
-        var spineStepToPct = {};
-        for (var k = 0; k < locs.length; k++) {
-            var m = locs[k].match(/epubcfi\(\/6\/(\d+)/);
-            if (m) {
-                var step = m[1];
-                if (!(step in spineStepToPct)) spineStepToPct[step] = k / total;
-            }
-        }
-        var spineItems = book.spine.items || [];
+        _totalLocations = locs.length || 1;
         var toc = book.navigation ? (book.navigation.toc || []) : [];
-        function buildTocWithPct(items, depth) {
+        function buildTocSimple(items, depth) {
             var result = [];
             for (var i = 0; i < items.length; i++) {
                 var item = items[i];
-                var hrefBase = item.href.split('#')[0];
-                var percentage = 0;
-                for (var j = 0; j < spineItems.length; j++) {
-                    var siHref = (spineItems[j].href || '').split('?')[0];
-                    if (siHref === hrefBase || siHref.endsWith('/' + hrefBase) || hrefBase.endsWith('/' + siHref)) {
-                        var spineStep = String((j + 1) * 2);
-                        percentage = (spineStep in spineStepToPct) ? spineStepToPct[spineStep] : j / (spineItems.length || 1);
-                        break;
-                    }
-                }
                 result.push({
                     label: item.label.trim(),
                     href: item.href,
-                    percentage: percentage,
                     depth: depth,
-                    subitems: item.subitems ? buildTocWithPct(item.subitems, depth + 1) : []
+                    subitems: item.subitems ? buildTocSimple(item.subitems, depth + 1) : []
                 });
             }
             return result;
         }
-        Android.onTocReady(JSON.stringify(buildTocWithPct(toc, 0)));
+        Android.onTocReady(JSON.stringify(buildTocSimple(toc, 0)));
     } catch(e) {}
 
     _locationsReady = true;
