@@ -98,6 +98,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -192,6 +193,12 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
     var totalPages by remember(book.path) { mutableStateOf(0) }
     var currentCfi by remember(book.path) { mutableStateOf("") }
     var bookmarks by remember(book.path) { mutableStateOf<List<Bookmark>>(emptyList()) }
+
+    val activity = LocalContext.current as? MainActivity
+    DisposableEffect(epubWebView.value) {
+        activity?.currentEpubWebView = epubWebView.value
+        onDispose { activity?.currentEpubWebView = null }
+    }
 
     BackHandler { onClose() }
     BackHandler(enabled = showMenu) { showMenu = false }

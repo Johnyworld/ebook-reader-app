@@ -1,6 +1,8 @@
 package com.rotein.ebookreader
 
 import android.os.Bundle
+import android.view.KeyEvent
+import android.webkit.WebView
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -31,6 +33,24 @@ import androidx.compose.ui.unit.dp
 import com.rotein.ebookreader.ui.theme.EbookReaderAppTheme
 
 class MainActivity : ComponentActivity() {
+    var currentEpubWebView: WebView? = null
+
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (event.action == KeyEvent.ACTION_DOWN) {
+            when (event.keyCode) {
+                KeyEvent.KEYCODE_DPAD_LEFT -> {
+                    currentEpubWebView?.evaluateJavascript("window._prev()", null)
+                    return true
+                }
+                KeyEvent.KEYCODE_DPAD_RIGHT -> {
+                    currentEpubWebView?.evaluateJavascript("window._next()", null)
+                    return true
+                }
+            }
+        }
+        return super.dispatchKeyEvent(event)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
