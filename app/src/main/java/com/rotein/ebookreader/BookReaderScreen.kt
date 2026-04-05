@@ -7,7 +7,14 @@ import android.util.Base64
 import android.graphics.pdf.PdfRenderer
 import android.os.ParcelFileDescriptor
 import android.util.Xml
+import android.os.SystemClock
+import android.content.Intent
+import android.view.ActionMode
+import android.view.Menu
+import android.view.MenuItem
+import android.view.GestureDetector
 import android.view.MotionEvent
+import android.view.View
 import android.view.ViewGroup
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -83,6 +90,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.offset
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.material3.TextButton
 import androidx.compose.material.icons.filled.Check
@@ -1244,12 +1252,34 @@ private fun EpubViewer(
     onPageInfoChanged: (currentPage: Int, totalPages: Int) -> Unit = { _, _ -> },
     onScanComplete: (totalPages: Int) -> Unit = {},
     onSearchResultsPartial: (resultsJson: String) -> Unit = {},
-    onSearchComplete: () -> Unit = {}
+    onSearchComplete: () -> Unit = {},
+    onTextSelected: (text: String, x: Float, y: Float, bottom: Float) -> Unit = { _, _, _, _ -> }
 ) {
     val context = LocalContext.current
     var bookDir by remember(path) { mutableStateOf<String?>(null) }
     var opfPath by remember(path) { mutableStateOf<String?>(null) }
     var error by remember(path) { mutableStateOf(false) }
+    data class SelectionState(val text: String, val x: Float, val y: Float, val bottom: Float)
+    var selectionState by remember { mutableStateOf<SelectionState?>(null) }
+    val selectionActive = remember { java.util.concurrent.atomic.AtomicBoolean(false) }
+    val webViewRef = remember { java.util.concurrent.atomic.AtomicReference<android.webkit.WebView?>(null) }
+    val clearSelection: () -> Unit = {
+        selectionActive.set(false)
+        selectionState = null
+        webViewRef.get()?.evaluateJavascript("window._clearSelection()", null)
+    }
+    val selectionOnTextSelected: (String, Float, Float, Float) -> Unit = { text, x, y, bottom ->
+        onTextSelected(text, x, y, bottom)
+        if (text.isNotEmpty()) {
+            selectionActive.set(true)
+        } else {
+            selectionActive.set(false)
+            selectionState = null
+        }
+    }
+    val selectionOnSelectionTapped: (String, Float, Float, Float) -> Unit = { text, x, y, bottom ->
+        if (text.isNotEmpty()) selectionState = SelectionState(text, x, y, bottom)
+    }
 
     LaunchedEffect(path) {
         try {
@@ -1259,6 +1289,7 @@ private fun EpubViewer(
         } catch (_: Exception) { error = true }
     }
 
+    Box(Modifier.fillMaxSize()) {
     when {
         error -> CenteredMessage("EPUB 파일을 읽을 수 없습니다.")
         bookDir == null || savedCfi == null -> LoadingIndicator()
@@ -1266,7 +1297,23 @@ private fun EpubViewer(
             factory = { ctx ->
                 // iframe 내 터치도 가로채기 위해 WebView 위에 투명 overlay View 를 배치
                 FrameLayout(ctx).apply {
-                    val webView = WebView(ctx).apply {
+                    val emptyActionModeCallback = object : ActionMode.Callback {
+                        override fun onCreateActionMode(mode: ActionMode, menu: Menu): Boolean {
+                            mode.hide(Long.MAX_VALUE) // 시각적으로 숨기되 ActionMode는 살아있음 → 선택 유지
+                            return true
+                        }
+                        override fun onPrepareActionMode(mode: ActionMode, menu: Menu): Boolean = false
+                        override fun onActionItemClicked(mode: ActionMode, item: MenuItem): Boolean = false
+                        override fun onDestroyActionMode(mode: ActionMode) {}
+                    }
+                    val webView = object : WebView(ctx) {
+                        override fun startActionMode(callback: ActionMode.Callback?): ActionMode? =
+                            super.startActionMode(emptyActionModeCallback)
+                        override fun startActionMode(callback: ActionMode.Callback?, type: Int): ActionMode? =
+                            super.startActionMode(emptyActionModeCallback, type)
+                        override fun startActionModeForChild(originalView: View?, callback: ActionMode.Callback?, type: Int): ActionMode? =
+                            super.startActionModeForChild(originalView, emptyActionModeCallback, type)
+                    }.apply {
                         settings.javaScriptEnabled = true
                         settings.allowFileAccess = true
                         @Suppress("DEPRECATION")
@@ -1277,20 +1324,80 @@ private fun EpubViewer(
                         isHorizontalScrollBarEnabled = false
                         isVerticalScrollBarEnabled = false
                         webViewClient = WebViewClient()
-                        addJavascriptInterface(EpubBridge(onLocationUpdate, onTocLoaded, onContentRendered, onChapterChanged, onTocReady, onPageInfoChanged, onScanComplete, onSearchResultsPartial, onSearchComplete), "Android")
+                        addJavascriptInterface(EpubBridge(onLocationUpdate, onTocLoaded, onContentRendered, onChapterChanged, onTocReady, onPageInfoChanged, onScanComplete, onSearchResultsPartial, onSearchComplete, selectionOnTextSelected, selectionOnSelectionTapped), "Android")
                     }
+                    webViewRef.set(webView)
                     onWebViewCreated(webView)
                     val overlay = android.view.View(ctx).apply {
-                        setOnTouchListener { v, event ->
-                            if (event.action == MotionEvent.ACTION_UP) {
-                                val x = event.x
-                                val w = v.width.toFloat()
+                        var isLongPress = false
+                        val gestureDetector = GestureDetector(ctx, object : GestureDetector.SimpleOnGestureListener() {
+                            override fun onSingleTapUp(e: MotionEvent): Boolean {
+                                if (selectionActive.get()) {
+                                    val density = ctx.resources.displayMetrics.density
+                                    val cssX = e.x / density
+                                    val cssY = e.y / density
+                                    webView.evaluateJavascript("""
+                                        (function() {
+                                            try {
+                                                var iframe = document.querySelector('iframe');
+                                                if (!iframe || !iframe.contentDocument) return;
+                                                var doc = iframe.contentDocument;
+                                                var sel = doc.getSelection();
+                                                if (!sel || sel.toString().trim().length === 0) return;
+                                                var range = sel.getRangeAt(0);
+                                                var iframeRect = iframe.getBoundingClientRect();
+                                                var docX = $cssX - iframeRect.left;
+                                                var docY = $cssY - iframeRect.top;
+                                                var rects = range.getClientRects();
+                                                for (var i = 0; i < rects.length; i++) {
+                                                    var r = rects[i];
+                                                    if (docX >= r.left && docX <= r.right && docY >= r.top && docY <= r.bottom) {
+                                                        var boundRect = range.getBoundingClientRect();
+                                                        Android.onSelectionTapped(
+                                                            sel.toString().trim(),
+                                                            boundRect.left + boundRect.width/2 + iframeRect.left,
+                                                            boundRect.top + iframeRect.top,
+                                                            boundRect.bottom + iframeRect.top
+                                                        );
+                                                        return;
+                                                    }
+                                                }
+                                                sel.removeAllRanges();
+                                                Android.onTextSelected('', 0, 0, 0);
+                                            } catch(err) {}
+                                        })()
+                                    """.trimIndent(), null)
+                                    this@apply.performClick()
+                                    return true
+                                }
+                                val x = e.x
+                                val w = this@apply.width.toFloat()
                                 when {
-                                    x < w / 3f  -> webView.evaluateJavascript("window._prev()", null)
+                                    x < w / 3f -> webView.evaluateJavascript("window._prev()", null)
                                     x > w * 2f / 3f -> webView.evaluateJavascript("window._next()", null)
                                     else -> onCenterTap()
                                 }
-                                v.performClick()
+                                this@apply.performClick()
+                                return true
+                            }
+
+                            override fun onLongPress(e: MotionEvent) {
+                                isLongPress = true
+                                val downEvent = MotionEvent.obtain(e.downTime, SystemClock.uptimeMillis(), MotionEvent.ACTION_DOWN, e.x, e.y, 0)
+                                webView.dispatchTouchEvent(downEvent)
+                                downEvent.recycle()
+                            }
+                        })
+
+                        setOnTouchListener { _, event ->
+                            gestureDetector.onTouchEvent(event)
+                            if (isLongPress) {
+                                when (event.action) {
+                                    MotionEvent.ACTION_MOVE, MotionEvent.ACTION_UP -> {
+                                        webView.dispatchTouchEvent(event)
+                                        if (event.action == MotionEvent.ACTION_UP) isLongPress = false
+                                    }
+                                }
                             }
                             true
                         }
@@ -1314,6 +1421,73 @@ private fun EpubViewer(
             },
             modifier = Modifier.fillMaxSize()
         )
+    }
+    selectionState?.let { sel ->
+        SelectionPopup(
+            selectionY = sel.y,
+            selectionBottom = sel.bottom,
+            selectionCx = sel.x,
+            onHighlight = { clearSelection() },
+            onMemo = { clearSelection() },
+            onShare = {
+                val intent = Intent(Intent.ACTION_SEND).apply {
+                    type = "text/plain"
+                    putExtra(Intent.EXTRA_TEXT, sel.text)
+                }
+                context.startActivity(Intent.createChooser(intent, null))
+                clearSelection()
+            }
+        )
+    }
+    } // Box
+}
+
+@Composable
+private fun SelectionPopup(
+    selectionY: Float,
+    selectionBottom: Float,
+    selectionCx: Float,
+    onHighlight: () -> Unit,
+    onMemo: () -> Unit,
+    onShare: () -> Unit
+) {
+    val popupHeightDp = 48.dp
+    val marginDp = 8.dp
+    val yDp = selectionY.dp
+    val bottomDp = selectionBottom.dp
+    val cxDp = selectionCx.dp
+    val showAbove = yDp > popupHeightDp + marginDp
+    val offsetY = if (showAbove) yDp - popupHeightDp - marginDp else bottomDp + marginDp
+
+    val density = LocalDensity.current
+    val screenWidthDp = LocalConfiguration.current.screenWidthDp.dp
+    var popupWidthDp by remember { mutableStateOf(0.dp) }
+
+    Box(Modifier.fillMaxSize()) {
+        Row(
+            modifier = Modifier
+                .onSizeChanged { popupWidthDp = with(density) { it.width.toDp() } }
+                .offset(
+                    x = (cxDp - popupWidthDp / 2).coerceIn(marginDp, screenWidthDp - popupWidthDp - marginDp),
+                    y = offsetY
+                )
+                .border(1.dp, Color.Black, RoundedCornerShape(8.dp))
+                .background(Color.White, RoundedCornerShape(8.dp))
+                .padding(horizontal = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            TextButton(onClick = onHighlight) {
+                Text("하이라이트", color = Color.Black, fontSize = 14.sp)
+            }
+            Box(Modifier.width(1.dp).height(20.dp).background(Color.Black))
+            TextButton(onClick = onMemo) {
+                Text("메모", color = Color.Black, fontSize = 14.sp)
+            }
+            Box(Modifier.width(1.dp).height(20.dp).background(Color.Black))
+            TextButton(onClick = onShare) {
+                Text("공유", color = Color.Black, fontSize = 14.sp)
+            }
+        }
     }
 }
 
@@ -1572,6 +1746,36 @@ book.ready.then(function() {
     computeVisualPages();
 });
 
+rendition.hooks.content.register(function(contents) {
+    var doc = contents.document;
+    var debounceTimer = null;
+    var lastSelectionTime = 0;
+    doc.addEventListener('selectionchange', function() {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(function() {
+            try {
+                var sel = doc.getSelection();
+                var text = sel ? sel.toString().trim() : '';
+                if (text.length > 0) {
+                    lastSelectionTime = Date.now();
+                    Android.onTextSelected(text, 0, 0, 0);
+                } else if (Date.now() - lastSelectionTime > 500) {
+                    Android.onTextSelected('', 0, 0, 0);
+                }
+            } catch(e) {}
+        }, 200);
+    });
+});
+
+window._clearSelection = function() {
+    try {
+        var iframe = document.querySelector('iframe');
+        if (iframe && iframe.contentDocument) {
+            iframe.contentDocument.getSelection().removeAllRanges();
+        }
+    } catch(e) {}
+};
+
 var _savedCfi = "${savedCfi.replace("\"", "\\\"")}";
 rendition.display(_savedCfi.length > 0 ? _savedCfi : undefined);
 window._prev = function() { rendition.prev(); };
@@ -1726,7 +1930,9 @@ private class EpubBridge(
     private val onPageInfoChangedCallback: (currentPage: Int, totalPages: Int) -> Unit = { _, _ -> },
     private val onScanCompleteCallback: (totalPages: Int) -> Unit = {},
     private val onSearchResultsPartialCallback: (resultsJson: String) -> Unit = {},
-    private val onSearchCompleteCallback: () -> Unit = {}
+    private val onSearchCompleteCallback: () -> Unit = {},
+    private val onTextSelectedCallback: (text: String, x: Float, y: Float, bottom: Float) -> Unit = { _, _, _, _ -> },
+    private val onSelectionTappedCallback: (text: String, x: Float, y: Float, bottom: Float) -> Unit = { _, _, _, _ -> }
 ) {
     private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
 
@@ -1773,6 +1979,16 @@ private class EpubBridge(
     @android.webkit.JavascriptInterface
     fun onSearchComplete() {
         mainHandler.post { onSearchCompleteCallback() }
+    }
+
+    @android.webkit.JavascriptInterface
+    fun onTextSelected(text: String, x: Float, y: Float, bottom: Float) {
+        mainHandler.post { onTextSelectedCallback(text, x, y, bottom) }
+    }
+
+    @android.webkit.JavascriptInterface
+    fun onSelectionTapped(text: String, x: Float, y: Float, bottom: Float) {
+        mainHandler.post { onSelectionTappedCallback(text, x, y, bottom) }
     }
 
 }
