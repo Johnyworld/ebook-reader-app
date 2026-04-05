@@ -147,10 +147,50 @@ private val MIGRATION_7_8 = object : Migration(7, 8) {
     }
 }
 
-@Database(entities = [BookReadRecord::class, Bookmark::class], version = 8)
+@Entity(tableName = "highlights", indices = [Index("bookPath")])
+data class Highlight(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val bookPath: String,
+    val cfi: String,
+    val text: String = "",
+    val chapterTitle: String = "",
+    val page: Int = 0,
+    val createdAt: Long = System.currentTimeMillis()
+)
+
+@Dao
+interface HighlightDao {
+    @Query("SELECT * FROM highlights WHERE bookPath = :bookPath ORDER BY createdAt ASC")
+    suspend fun getByBook(bookPath: String): List<Highlight>
+
+    @Insert
+    suspend fun insert(highlight: Highlight): Long
+
+    @Query("DELETE FROM highlights WHERE id = :id")
+    suspend fun deleteById(id: Long)
+}
+
+private val MIGRATION_8_9 = object : Migration(8, 9) {
+    override fun migrate(database: SupportSQLiteDatabase) {
+        database.execSQL("CREATE TABLE IF NOT EXISTS highlights (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, bookPath TEXT NOT NULL, cfi TEXT NOT NULL, text TEXT NOT NULL DEFAULT '', chapterTitle TEXT NOT NULL DEFAULT '', page INTEGER NOT NULL DEFAULT 0, createdAt INTEGER NOT NULL DEFAULT 0)")
+        database.execSQL("CREATE INDEX IF NOT EXISTS index_highlights_bookPath ON highlights (bookPath)")
+    }
+}
+
+private val MIGRATION_9_10 = object : Migration(9, 10) {
+    override fun migrate(database: SupportSQLiteDatabase) {
+        // highlights 테이블 스키마가 잘못된 경우(selectedText 컬럼 등) 재생성
+        database.execSQL("DROP TABLE IF EXISTS highlights")
+        database.execSQL("CREATE TABLE highlights (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, bookPath TEXT NOT NULL, cfi TEXT NOT NULL, text TEXT NOT NULL DEFAULT '', chapterTitle TEXT NOT NULL DEFAULT '', page INTEGER NOT NULL DEFAULT 0, createdAt INTEGER NOT NULL DEFAULT 0)")
+        database.execSQL("CREATE INDEX index_highlights_bookPath ON highlights (bookPath)")
+    }
+}
+
+@Database(entities = [BookReadRecord::class, Bookmark::class, Highlight::class], version = 10)
 abstract class BookDatabase : RoomDatabase() {
     abstract fun bookReadRecordDao(): BookReadRecordDao
     abstract fun bookmarkDao(): BookmarkDao
+    abstract fun highlightDao(): HighlightDao
 
     companion object {
         @Volatile private var INSTANCE: BookDatabase? = null
@@ -161,7 +201,7 @@ abstract class BookDatabase : RoomDatabase() {
                     context.applicationContext,
                     BookDatabase::class.java,
                     "book_database"
-                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8).build().also { INSTANCE = it }
+                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10).build().also { INSTANCE = it }
             }
     }
 }

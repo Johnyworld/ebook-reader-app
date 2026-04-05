@@ -87,6 +87,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.foundation.layout.IntrinsicSize
@@ -113,6 +114,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.xmlpull.v1.XmlPullParser
 import org.json.JSONArray
+import org.json.JSONObject
 import java.io.File
 import java.io.RandomAccessFile
 import java.text.SimpleDateFormat
@@ -183,6 +185,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
     val context = LocalContext.current
     val dao = remember { BookDatabase.getInstance(context).bookReadRecordDao() }
     val bookmarkDao = remember { BookDatabase.getInstance(context).bookmarkDao() }
+    val highlightDao = remember { BookDatabase.getInstance(context).highlightDao() }
     val scope = rememberCoroutineScope()
 
     var readingProgress by remember(book.path) { mutableStateOf(0f) }
@@ -194,6 +197,9 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
     var showTocPopup by remember { mutableStateOf(false) }
     var showSearchPopup by remember { mutableStateOf(false) }
     var showBookmarkPopup by remember { mutableStateOf(false) }
+    var showHighlightPopup by remember { mutableStateOf(false) }
+    data class HighlightActionState(val id: Long, val x: Float, val y: Float, val bottom: Float)
+    var highlightActionState by remember { mutableStateOf<HighlightActionState?>(null) }
     var searchResults by remember { mutableStateOf<List<SearchResultItem>?>(null) }
     var isSearching by remember { mutableStateOf(false) }
     val epubWebView = remember { mutableStateOf<WebView?>(null) }
@@ -201,6 +207,8 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
     var totalPages by remember(book.path) { mutableStateOf(0) }
     var currentCfi by remember(book.path) { mutableStateOf("") }
     var bookmarks by remember(book.path) { mutableStateOf<List<Bookmark>>(emptyList()) }
+    var highlights by remember(book.path) { mutableStateOf<List<Highlight>>(emptyList()) }
+    var isContentRendered by remember(book.path) { mutableStateOf(false) }
 
     val activity = LocalContext.current as? MainActivity
     DisposableEffect(epubWebView.value) {
@@ -213,6 +221,8 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
     BackHandler(enabled = showTocPopup) { showTocPopup = false }
     BackHandler(enabled = showSearchPopup) { showSearchPopup = false }
     BackHandler(enabled = showBookmarkPopup) { showBookmarkPopup = false }
+    BackHandler(enabled = showHighlightPopup) { showHighlightPopup = false }
+    BackHandler(enabled = highlightActionState != null) { highlightActionState = null }
 
     LaunchedEffect(showMenu) {
         if (showMenu) {
@@ -235,6 +245,15 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
             } catch (_: Exception) {}
         }
         bookmarks = withContext(Dispatchers.IO) { bookmarkDao.getByBook(book.path) }
+        highlights = withContext(Dispatchers.IO) { highlightDao.getByBook(book.path) }
+    }
+
+    LaunchedEffect(isContentRendered) {
+        if (!isContentRendered || highlights.isEmpty()) return@LaunchedEffect
+        val json = highlights.joinToString(",", "[", "]") {
+            """{"id":${it.id},"cfi":"${it.cfi.replace("\\", "\\\\").replace("\"", "\\\"")}"}"""
+        }
+        epubWebView.value?.evaluateJavascript("window._applyHighlights('$json')", null)
     }
 
     Box(modifier = modifier.fillMaxSize()) {
@@ -269,8 +288,32 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                         }
                     } catch (_: Exception) {}
                 },
-                onContentRendered = { isLoading = false },
+                onContentRendered = { isLoading = false; isContentRendered = true },
+                onHighlight = { text, cfi ->
+                    if (cfi.isNotEmpty()) {
+                        val pageSnapshot = currentPage
+                        val chapterSnapshot = chapterTitle
+                        scope.launch {
+                            val highlight = Highlight(
+                                bookPath = book.path,
+                                cfi = cfi,
+                                text = text,
+                                chapterTitle = chapterSnapshot,
+                                page = pageSnapshot,
+                                createdAt = System.currentTimeMillis()
+                            )
+                            val id = withContext(Dispatchers.IO) { highlightDao.insert(highlight) }
+                            val saved = highlight.copy(id = id)
+                            highlights = highlights + saved
+                            val escapedCfi = cfi.replace("\\", "\\\\").replace("\"", "\\\"")
+                            epubWebView.value?.evaluateJavascript("window._addHighlight(\"$escapedCfi\", $id)", null)
+                        }
+                    }
+                },
                 onChapterChanged = { chapter -> chapterTitle = chapter },
+                onHighlightLongPress = { id, x, y, bottom ->
+                    highlightActionState = HighlightActionState(id, x, y, bottom)
+                },
                 onWebViewCreated = { webView -> epubWebView.value = webView },
                 onPageInfoChanged = { page, _ ->
                     currentPage = page
@@ -388,7 +431,9 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                             isSearching = false
                             showSearchPopup = true
                         })
-                        ReaderMenuItem(Icons.Default.Star, "하이라이트")
+                        ReaderMenuItem(Icons.Default.Star, "하이라이트", onClick = {
+                            showHighlightPopup = true
+                        })
                         ReaderMenuItem(Icons.Default.Edit, "메모")
                         ReaderMenuItem(Icons.Default.Bookmark, "북마크", onClick = {
                             showBookmarkPopup = true
@@ -534,6 +579,57 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                     showMenu = false
                 },
                 onDismiss = { showSearchPopup = false }
+            )
+        }
+
+        // 하이라이트 팝업
+        if (showHighlightPopup) {
+            HighlightPopup(
+                highlights = highlights,
+                onNavigate = { cfi ->
+                    epubWebView.value?.post {
+                        val escaped = cfi.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n")
+                        epubWebView.value?.evaluateJavascript("window._displayCfi(\"$escaped\")", null)
+                    }
+                    showHighlightPopup = false
+                    showMenu = false
+                },
+                onDelete = { highlight ->
+                    scope.launch {
+                        withContext(Dispatchers.IO) { highlightDao.deleteById(highlight.id) }
+                        highlights = highlights.filter { it.id != highlight.id }
+                        epubWebView.value?.evaluateJavascript("window._removeHighlight(${highlight.id})", null)
+                    }
+                },
+                onDismiss = { showHighlightPopup = false }
+            )
+        }
+
+        highlightActionState?.let { state ->
+            HighlightActionPopup(
+                selectionY = state.y,
+                selectionBottom = state.bottom,
+                selectionCx = state.x,
+                onDismiss = { highlightActionState = null },
+                onDelete = {
+                    val id = state.id
+                    highlightActionState = null
+                    scope.launch {
+                        withContext(Dispatchers.IO) { highlightDao.deleteById(id) }
+                        epubWebView.value?.evaluateJavascript("window._removeHighlight($id)", null)
+                        highlights = highlights.filter { it.id != id }
+                    }
+                },
+                onMemo = { highlightActionState = null },
+                onShare = {
+                    val text = highlights.find { it.id == state.id }?.text ?: ""
+                    val intent = Intent(Intent.ACTION_SEND).apply {
+                        type = "text/plain"
+                        putExtra(Intent.EXTRA_TEXT, text)
+                    }
+                    context.startActivity(Intent.createChooser(intent, null))
+                    highlightActionState = null
+                }
             )
         }
 
@@ -1197,6 +1293,167 @@ private fun BookmarkPopup(
     }
 }
 
+@Composable
+private fun HighlightPopup(
+    highlights: List<Highlight>,
+    onNavigate: (cfi: String) -> Unit,
+    onDelete: (Highlight) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+    val density = LocalDensity.current
+    val screenHeightDp = LocalConfiguration.current.screenHeightDp
+    val statusBarHeightDp = with(density) { WindowInsets.statusBars.getTop(this).toDp().value.toInt() }
+    val itemHeightDp = 88
+    val headerHeightDp = 56
+    val paginationHeightDp = 56
+    val itemsPerPage = maxOf(1, (screenHeightDp - statusBarHeightDp - headerHeightDp - paginationHeightDp) / itemHeightDp)
+    var currentPage by remember { mutableStateOf(0) }
+    var sortOrder by remember { mutableStateOf(HighlightSortStore.load(context)) }
+    var dropdownExpanded by remember { mutableStateOf(false) }
+    var anchorHeight by remember { mutableStateOf(0) }
+    val sortedHighlights = remember(highlights, sortOrder) {
+        when (sortOrder) {
+            BookmarkSortOrder.CREATED_ASC -> highlights.sortedBy { it.createdAt }
+            BookmarkSortOrder.CREATED_DESC -> highlights.sortedByDescending { it.createdAt }
+            BookmarkSortOrder.PAGE_ASC -> highlights.sortedBy { it.page }
+        }
+    }
+    val totalPages = maxOf(1, (sortedHighlights.size + itemsPerPage - 1) / itemsPerPage)
+    val pageItems = sortedHighlights.drop(currentPage * itemsPerPage).take(itemsPerPage)
+    val dateFormat = remember { SimpleDateFormat("yyyy.MM.dd HH:mm", Locale.getDefault()) }
+
+    LaunchedEffect(sortOrder) { HighlightSortStore.save(context, sortOrder) }
+    LaunchedEffect(sortedHighlights.size) {
+        if (currentPage >= totalPages) currentPage = maxOf(0, totalPages - 1)
+    }
+
+    Surface(modifier = Modifier.fillMaxSize(), color = Color.White) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            Row(
+                modifier = Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = onDismiss) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "닫기")
+                }
+                Text("하이라이트", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                Box(modifier = Modifier.onGloballyPositioned { anchorHeight = it.size.height }) {
+                    TextButton(onClick = { dropdownExpanded = true }) {
+                        Text(sortOrder.label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurface)
+                    }
+                    if (dropdownExpanded) {
+                        Popup(
+                            alignment = Alignment.TopEnd,
+                            offset = IntOffset(0, anchorHeight),
+                            onDismissRequest = { dropdownExpanded = false },
+                            properties = PopupProperties(focusable = true)
+                        ) {
+                            Column(modifier = Modifier.width(IntrinsicSize.Max).background(Color.White).border(1.dp, Color.Black)) {
+                                BookmarkSortOrder.entries.forEachIndexed { index, order ->
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.fillMaxWidth()
+                                            .clickable { sortOrder = order; dropdownExpanded = false }
+                                            .padding(start = 16.dp, end = 12.dp, top = 12.dp, bottom = 12.dp)
+                                    ) {
+                                        Text(order.label, style = MaterialTheme.typography.bodyMedium, color = Color.Black, modifier = Modifier.weight(1f))
+                                        if (sortOrder == order) {
+                                            Spacer(Modifier.width(16.dp))
+                                            Icon(Icons.Default.Check, contentDescription = null, tint = Color.Black, modifier = Modifier.size(16.dp))
+                                        }
+                                    }
+                                    if (index < BookmarkSortOrder.entries.lastIndex) HorizontalDivider(color = Color(0xFFE0E0E0))
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            HorizontalDivider(color = Color.Black)
+
+            Box(modifier = Modifier.weight(1f)) {
+                if (highlights.isEmpty()) {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text("하이라이트가 없습니다.", style = MaterialTheme.typography.bodyMedium)
+                    }
+                } else {
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        pageItems.forEachIndexed { index, highlight ->
+                            if (index > 0) HorizontalDivider(color = Color(0xFFCCCCCC))
+                            Row(
+                                modifier = Modifier.fillMaxWidth().height(88.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(
+                                    modifier = Modifier
+                                        .weight(1f).fillMaxHeight()
+                                        .clickable { onNavigate(highlight.cfi) }
+                                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        if (highlight.page > 0) {
+                                            Text("p.${highlight.page}", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold), color = Color.Black)
+                                        }
+                                        Text(
+                                            highlight.chapterTitle,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = Color(0xFFBBBBBB),
+                                            modifier = Modifier.weight(1f).padding(start = if (highlight.page > 0) 8.dp else 0.dp),
+                                            maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.End
+                                        )
+                                    }
+                                    Text(
+                                        highlight.text,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        maxLines = 1, overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.padding(bottom = 4.dp)
+                                    )
+                                    Text(dateFormat.format(Date(highlight.createdAt)), style = MaterialTheme.typography.labelSmall, color = Color(0xFFBBBBBB))
+                                }
+                                IconButton(onClick = { onDelete(highlight) }) {
+                                    Icon(Icons.Default.Close, contentDescription = "삭제", modifier = Modifier.size(18.dp))
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            Column {
+                if (sortedHighlights.isNotEmpty()) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().height(56.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            modifier = Modifier.clickable(enabled = currentPage > 0) { currentPage-- }.padding(horizontal = 16.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "이전", modifier = Modifier.height(16.dp), tint = if (currentPage > 0) Color.Black else Color(0xFFCCCCCC))
+                            Text("이전", style = MaterialTheme.typography.bodyMedium, color = if (currentPage > 0) Color.Black else Color(0xFFCCCCCC))
+                        }
+                        Text("${currentPage + 1}/$totalPages (${sortedHighlights.size}건)", style = MaterialTheme.typography.bodyMedium)
+                        Row(
+                            modifier = Modifier.clickable(enabled = currentPage < totalPages - 1) { currentPage++ }.padding(horizontal = 16.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text("다음", style = MaterialTheme.typography.bodyMedium, color = if (currentPage < totalPages - 1) Color.Black else Color(0xFFCCCCCC))
+                            Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = "다음", modifier = Modifier.height(16.dp), tint = if (currentPage < totalPages - 1) Color.Black else Color(0xFFCCCCCC))
+                        }
+                    }
+                }
+                HorizontalDivider(color = Color.Black)
+            }
+        }
+    }
+}
+
 // ─── TXT ─────────────────────────────────────────────────────────────────────
 
 @Composable
@@ -1253,16 +1510,20 @@ private fun EpubViewer(
     onScanComplete: (totalPages: Int) -> Unit = {},
     onSearchResultsPartial: (resultsJson: String) -> Unit = {},
     onSearchComplete: () -> Unit = {},
-    onTextSelected: (text: String, x: Float, y: Float, bottom: Float) -> Unit = { _, _, _, _ -> }
+    onTextSelected: (text: String, x: Float, y: Float, bottom: Float) -> Unit = { _, _, _, _ -> },
+    onHighlight: (text: String, cfi: String) -> Unit = { _, _ -> },
+    onHighlightLongPress: (id: Long, x: Float, y: Float, bottom: Float) -> Unit = { _, _, _, _ -> }
 ) {
     val context = LocalContext.current
     var bookDir by remember(path) { mutableStateOf<String?>(null) }
     var opfPath by remember(path) { mutableStateOf<String?>(null) }
     var error by remember(path) { mutableStateOf(false) }
-    data class SelectionState(val text: String, val x: Float, val y: Float, val bottom: Float)
+    data class SelectionState(val text: String, val x: Float, val y: Float, val bottom: Float, val cfi: String = "")
     var selectionState by remember { mutableStateOf<SelectionState?>(null) }
     val selectionActive = remember { java.util.concurrent.atomic.AtomicBoolean(false) }
     val webViewRef = remember { java.util.concurrent.atomic.AtomicReference<android.webkit.WebView?>(null) }
+    val onHighlightLongPressRef = remember { java.util.concurrent.atomic.AtomicReference<((Long, Float, Float, Float) -> Unit)?>(null) }
+    onHighlightLongPressRef.set(onHighlightLongPress)
     val clearSelection: () -> Unit = {
         selectionActive.set(false)
         selectionState = null
@@ -1277,8 +1538,8 @@ private fun EpubViewer(
             selectionState = null
         }
     }
-    val selectionOnSelectionTapped: (String, Float, Float, Float) -> Unit = { text, x, y, bottom ->
-        if (text.isNotEmpty()) selectionState = SelectionState(text, x, y, bottom)
+    val selectionOnSelectionTapped: (String, Float, Float, Float, String) -> Unit = { text, x, y, bottom, cfi ->
+        if (text.isNotEmpty()) selectionState = SelectionState(text, x, y, bottom, cfi)
     }
 
     LaunchedEffect(path) {
@@ -1353,11 +1614,13 @@ private fun EpubViewer(
                                                     var r = rects[i];
                                                     if (docX >= r.left && docX <= r.right && docY >= r.top && docY <= r.bottom) {
                                                         var boundRect = range.getBoundingClientRect();
+                                                        var cfi = typeof window._getCfiFromSelection === 'function' ? (window._getCfiFromSelection() || '') : '';
                                                         Android.onSelectionTapped(
                                                             sel.toString().trim(),
                                                             boundRect.left + boundRect.width/2 + iframeRect.left,
                                                             boundRect.top + iframeRect.top,
-                                                            boundRect.bottom + iframeRect.top
+                                                            boundRect.bottom + iframeRect.top,
+                                                            cfi
                                                         );
                                                         return;
                                                     }
@@ -1382,10 +1645,31 @@ private fun EpubViewer(
                             }
 
                             override fun onLongPress(e: MotionEvent) {
-                                isLongPress = true
-                                val downEvent = MotionEvent.obtain(e.downTime, SystemClock.uptimeMillis(), MotionEvent.ACTION_DOWN, e.x, e.y, 0)
-                                webView.dispatchTouchEvent(downEvent)
-                                downEvent.recycle()
+                                val density = ctx.resources.displayMetrics.density
+                                val cssX = e.x / density
+                                val cssY = e.y / density
+                                val ex = e.x; val ey = e.y; val eDownTime = e.downTime
+                                webView.evaluateJavascript("window._getHighlightAtPoint($cssX, $cssY)") { result ->
+                                    val cleaned = result?.trim()?.let { r ->
+                                        if (r == "null" || r == "\"null\"") null
+                                        else r.removeSurrounding("\"").replace("\\\"", "\"").replace("\\\\", "\\")
+                                    }
+                                    val hitData = try {
+                                        if (cleaned != null) JSONObject(cleaned) else null
+                                    } catch (_: Exception) { null }
+                                    if (hitData != null) {
+                                        val id = hitData.getLong("id")
+                                        val cx = hitData.getDouble("cx").toFloat()
+                                        val y = hitData.getDouble("y").toFloat()
+                                        val bottom = hitData.getDouble("bottom").toFloat()
+                                        onHighlightLongPressRef.get()?.invoke(id, cx, y, bottom)
+                                    } else {
+                                        isLongPress = true
+                                        val downEvent = MotionEvent.obtain(eDownTime, SystemClock.uptimeMillis(), MotionEvent.ACTION_DOWN, ex, ey, 0)
+                                        webView.dispatchTouchEvent(downEvent)
+                                        downEvent.recycle()
+                                    }
+                                }
                             }
                         })
 
@@ -1427,7 +1711,7 @@ private fun EpubViewer(
             selectionY = sel.y,
             selectionBottom = sel.bottom,
             selectionCx = sel.x,
-            onHighlight = { clearSelection() },
+            onHighlight = { onHighlight(sel.text, sel.cfi); clearSelection() },
             onMemo = { clearSelection() },
             onShare = {
                 val intent = Intent(Intent.ACTION_SEND).apply {
@@ -1436,7 +1720,8 @@ private fun EpubViewer(
                 }
                 context.startActivity(Intent.createChooser(intent, null))
                 clearSelection()
-            }
+            },
+            onDismiss = { clearSelection() }
         )
     }
     } // Box
@@ -1449,7 +1734,8 @@ private fun SelectionPopup(
     selectionCx: Float,
     onHighlight: () -> Unit,
     onMemo: () -> Unit,
-    onShare: () -> Unit
+    onShare: () -> Unit,
+    onDismiss: () -> Unit
 ) {
     val popupHeightDp = 48.dp
     val marginDp = 8.dp
@@ -1463,21 +1749,75 @@ private fun SelectionPopup(
     val screenWidthDp = LocalConfiguration.current.screenWidthDp.dp
     var popupWidthDp by remember { mutableStateOf(0.dp) }
 
-    Box(Modifier.fillMaxSize()) {
+    Box(Modifier.fillMaxSize().pointerInput(Unit) { detectTapGestures { onDismiss() } }) {
         Row(
             modifier = Modifier
                 .onSizeChanged { popupWidthDp = with(density) { it.width.toDp() } }
+                .alpha(if (popupWidthDp == 0.dp) 0f else 1f)
                 .offset(
                     x = (cxDp - popupWidthDp / 2).coerceIn(marginDp, screenWidthDp - popupWidthDp - marginDp),
                     y = offsetY
                 )
                 .border(1.dp, Color.Black, RoundedCornerShape(8.dp))
                 .background(Color.White, RoundedCornerShape(8.dp))
-                .padding(horizontal = 4.dp),
+                .padding(horizontal = 4.dp)
+                .pointerInput(Unit) { detectTapGestures { } },
             verticalAlignment = Alignment.CenterVertically
         ) {
             TextButton(onClick = onHighlight) {
                 Text("하이라이트", color = Color.Black, fontSize = 14.sp)
+            }
+            Box(Modifier.width(1.dp).height(20.dp).background(Color.Black))
+            TextButton(onClick = onMemo) {
+                Text("메모", color = Color.Black, fontSize = 14.sp)
+            }
+            Box(Modifier.width(1.dp).height(20.dp).background(Color.Black))
+            TextButton(onClick = onShare) {
+                Text("공유", color = Color.Black, fontSize = 14.sp)
+            }
+        }
+    }
+}
+
+@Composable
+private fun HighlightActionPopup(
+    selectionY: Float,
+    selectionBottom: Float,
+    selectionCx: Float,
+    onDelete: () -> Unit,
+    onMemo: () -> Unit,
+    onShare: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val popupHeightDp = 48.dp
+    val marginDp = 8.dp
+    val yDp = selectionY.dp
+    val bottomDp = selectionBottom.dp
+    val cxDp = selectionCx.dp
+    val showAbove = yDp > popupHeightDp + marginDp
+    val offsetY = if (showAbove) yDp - popupHeightDp - marginDp else bottomDp + marginDp
+
+    val density = LocalDensity.current
+    val screenWidthDp = LocalConfiguration.current.screenWidthDp.dp
+    var popupWidthDp by remember { mutableStateOf(0.dp) }
+
+    Box(Modifier.fillMaxSize().pointerInput(Unit) { detectTapGestures { onDismiss() } }) {
+        Row(
+            modifier = Modifier
+                .onSizeChanged { popupWidthDp = with(density) { it.width.toDp() } }
+                .alpha(if (popupWidthDp == 0.dp) 0f else 1f)
+                .offset(
+                    x = (cxDp - popupWidthDp / 2).coerceIn(marginDp, screenWidthDp - popupWidthDp - marginDp),
+                    y = offsetY
+                )
+                .border(1.dp, Color.Black, RoundedCornerShape(8.dp))
+                .background(Color.White, RoundedCornerShape(8.dp))
+                .padding(horizontal = 4.dp)
+                .pointerInput(Unit) { detectTapGestures { } },
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            TextButton(onClick = onDelete) {
+                Text("하이라이트 삭제", color = Color.Black, fontSize = 14.sp)
             }
             Box(Modifier.width(1.dp).height(20.dp).background(Color.Black))
             TextButton(onClick = onMemo) {
@@ -1544,6 +1884,7 @@ private fun buildEpubJsHtml(opfPath: String, savedCfi: String) = """<!DOCTYPE ht
 * { margin: 0; padding: 0; box-sizing: border-box; }
 html, body { width: 100%; height: 100%; overflow: hidden; background: #fff; }
 #viewer { width: 100%; height: 100%; }
+.epub-view svg { mix-blend-mode: multiply; }
 </style>
 </head>
 <body>
@@ -1750,6 +2091,13 @@ rendition.hooks.content.register(function(contents) {
     var doc = contents.document;
     var debounceTimer = null;
     var lastSelectionTime = 0;
+    window._getCfiFromSelection = function() {
+        try {
+            var sel = doc.getSelection();
+            if (!sel || sel.rangeCount === 0) return '';
+            return contents.cfiFromRange(sel.getRangeAt(0)) || '';
+        } catch(e) { return ''; }
+    };
     doc.addEventListener('selectionchange', function() {
         clearTimeout(debounceTimer);
         debounceTimer = setTimeout(function() {
@@ -1774,6 +2122,55 @@ window._clearSelection = function() {
             iframe.contentDocument.getSelection().removeAllRanges();
         }
     } catch(e) {}
+};
+
+var _highlightCfiMap = {};
+window._addHighlight = function(cfi, id) {
+    try {
+        _highlightCfiMap[id] = cfi;
+        rendition.annotations.add("highlight", cfi, {id: id}, null, "epub-hl-" + id, {
+            "background": "#d0d0d0",
+            "border": "none"
+        });
+    } catch(e) {}
+};
+window._removeHighlight = function(id) {
+    try {
+        var cfi = _highlightCfiMap[id];
+        if (cfi) {
+            rendition.annotations.remove(cfi, "highlight");
+            delete _highlightCfiMap[id];
+        }
+    } catch(e) {}
+};
+window._applyHighlights = function(json) {
+    try {
+        var hl = JSON.parse(json);
+        for (var i = 0; i < hl.length; i++) {
+            window._addHighlight(hl[i].cfi, hl[i].id);
+        }
+    } catch(e) {}
+};
+window._getHighlightAtPoint = function(x, y) {
+    try {
+        var groups = document.querySelectorAll('[class^="epub-hl-"]');
+        for (var i = 0; i < groups.length; i++) {
+            var g = groups[i];
+            var rects = g.querySelectorAll('rect');
+            for (var j = 0; j < rects.length; j++) {
+                var br = rects[j].getBoundingClientRect();
+                if (x >= br.left && x <= br.right && y >= br.top && y <= br.bottom) {
+                    var className = g.getAttribute('class') || '';
+                    var match = className.match(/epub-hl-(\d+)/);
+                    if (match) {
+                        var gbr = g.getBoundingClientRect();
+                        return JSON.stringify({id: parseInt(match[1]), cx: gbr.left + gbr.width/2, y: gbr.top, bottom: gbr.bottom});
+                    }
+                }
+            }
+        }
+    } catch(e) {}
+    return 'null';
 };
 
 var _savedCfi = "${savedCfi.replace("\"", "\\\"")}";
@@ -1932,7 +2329,7 @@ private class EpubBridge(
     private val onSearchResultsPartialCallback: (resultsJson: String) -> Unit = {},
     private val onSearchCompleteCallback: () -> Unit = {},
     private val onTextSelectedCallback: (text: String, x: Float, y: Float, bottom: Float) -> Unit = { _, _, _, _ -> },
-    private val onSelectionTappedCallback: (text: String, x: Float, y: Float, bottom: Float) -> Unit = { _, _, _, _ -> }
+    private val onSelectionTappedCallback: (text: String, x: Float, y: Float, bottom: Float, cfi: String) -> Unit = { _, _, _, _, _ -> }
 ) {
     private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
 
@@ -1987,8 +2384,8 @@ private class EpubBridge(
     }
 
     @android.webkit.JavascriptInterface
-    fun onSelectionTapped(text: String, x: Float, y: Float, bottom: Float) {
-        mainHandler.post { onSelectionTappedCallback(text, x, y, bottom) }
+    fun onSelectionTapped(text: String, x: Float, y: Float, bottom: Float, cfi: String) {
+        mainHandler.post { onSelectionTappedCallback(text, x, y, bottom, cfi) }
     }
 
 }
