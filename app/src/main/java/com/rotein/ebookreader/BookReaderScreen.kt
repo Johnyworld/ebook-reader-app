@@ -3619,7 +3619,8 @@ private fun ReaderViewerTab(settings: ReaderSettings, onSettingsChange: (ReaderS
                 options = ReaderPageFlip.entries,
                 selected = settings.pageFlip,
                 onSelect = { onSettingsChange(settings.copy(pageFlip = it)) },
-                labelFor = { it.label }
+                labelFor = { it.label },
+                forceAbove = true
             )
         }
         HorizontalDivider(color = Color(0xFFE0E0E0))
@@ -3720,9 +3721,11 @@ private fun <T> ReaderCycleSelectorField(
     options: List<T>,
     selected: T,
     onSelect: (T) -> Unit,
-    labelFor: (T) -> String
+    labelFor: (T) -> String,
+    forceAbove: Boolean = false
 ) {
     var dropdownOpen by remember { mutableStateOf(false) }
+    var currentPage by remember { mutableStateOf(0) }
     val currentIndex = options.indexOf(selected)
     val density = LocalDensity.current
     val screenHeightPx = with(density) { LocalConfiguration.current.screenHeightDp.dp.toPx() }
@@ -3756,7 +3759,7 @@ private fun <T> ReaderCycleSelectorField(
                 labelFor(selected),
                 modifier = Modifier
                     .weight(1f)
-                    .clickable { dropdownOpen = true },
+                    .clickable { dropdownOpen = true; currentPage = 0 },
                 style = MaterialTheme.typography.bodyMedium,
                 textAlign = TextAlign.Center
             )
@@ -3774,9 +3777,24 @@ private fun <T> ReaderCycleSelectorField(
 
         if (dropdownOpen) {
             val itemHeightPx = with(density) { 44.dp.toPx() }
-            val estimatedDropdownHeightPx = (options.size * itemHeightPx).toInt()
+            val paginationHeightPx = with(density) { 44.dp.toPx() }
+            val maxDropdownHeightPx = screenHeightPx * 0.6f
+            val needsPagination = options.size * itemHeightPx > maxDropdownHeightPx
+            val itemsPerPage = if (needsPagination) {
+                ((maxDropdownHeightPx - paginationHeightPx) / itemHeightPx).toInt().coerceAtLeast(1)
+            } else {
+                options.size
+            }
+            val totalPages = if (needsPagination) {
+                (options.size + itemsPerPage - 1) / itemsPerPage
+            } else 1
+            val pageStart = currentPage * itemsPerPage
+            val pageEnd = minOf(pageStart + itemsPerPage, options.size)
+            val visibleOptions = options.subList(pageStart, pageEnd)
+
+            val estimatedDropdownHeightPx = if (needsPagination) maxDropdownHeightPx.toInt() else (options.size * itemHeightPx).toInt()
             val spaceBelow = screenHeightPx - buttonPositionY - buttonHeightPx
-            val showAbove = spaceBelow < estimatedDropdownHeightPx
+            val showAbove = forceAbove || spaceBelow < estimatedDropdownHeightPx
             val offsetY = if (showAbove) {
                 -(if (dropdownHeightPx > 0) dropdownHeightPx else estimatedDropdownHeightPx)
             } else {
@@ -3796,7 +3814,7 @@ private fun <T> ReaderCycleSelectorField(
                         .border(1.dp, Color.Black)
                         .onGloballyPositioned { dropdownHeightPx = it.size.height }
                 ) {
-                    options.forEachIndexed { index, option ->
+                    visibleOptions.forEachIndexed { index, option ->
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier
@@ -3818,8 +3836,47 @@ private fun <T> ReaderCycleSelectorField(
                                 )
                             }
                         }
-                        if (index < options.lastIndex) {
+                        if (index < visibleOptions.lastIndex || needsPagination) {
                             HorizontalDivider(color = Color(0xFFE0E0E0))
+                        }
+                    }
+                    if (needsPagination) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(44.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            IconButton(
+                                onClick = { if (currentPage > 0) currentPage-- },
+                                modifier = Modifier.size(44.dp),
+                                enabled = currentPage > 0
+                            ) {
+                                Icon(
+                                    Icons.AutoMirrored.Filled.ArrowBack,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp),
+                                    tint = if (currentPage > 0) Color.Black else Color(0xFFBBBBBB)
+                                )
+                            }
+                            Text(
+                                "${currentPage + 1} / $totalPages",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color.Black
+                            )
+                            IconButton(
+                                onClick = { if (currentPage < totalPages - 1) currentPage++ },
+                                modifier = Modifier.size(44.dp),
+                                enabled = currentPage < totalPages - 1
+                            ) {
+                                Icon(
+                                    Icons.AutoMirrored.Filled.ArrowForward,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp),
+                                    tint = if (currentPage < totalPages - 1) Color.Black else Color(0xFFBBBBBB)
+                                )
+                            }
                         }
                     }
                 }

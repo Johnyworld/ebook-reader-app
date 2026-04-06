@@ -1,6 +1,8 @@
 package com.rotein.ebookreader
 
 import android.content.Context
+import android.graphics.fonts.SystemFonts
+import android.os.Build
 
 enum class BookmarkSortOrder(val label: String) {
     CREATED_ASC("등록순"),
@@ -92,6 +94,53 @@ object SortPreferenceStore {
 }
 
 val READER_FONT_FAMILIES = listOf("기본", "나눔고딕", "나눔명조", "본고딕", "본명조")
+
+const val FONT_EPUB_ORIGINAL = "epub_original"
+
+fun getSystemFontFamilies(): List<String> {
+    val families = mutableListOf("시스템 폰트", FONT_EPUB_ORIGINAL)
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+        SystemFonts.getAvailableFonts()
+            .mapNotNull { it.file?.nameWithoutExtension }
+            .map { extractFontFamilyName(it) }
+            .filter { it.isNotBlank() }
+            .distinct()
+            .sorted()
+            .forEach { families.add(it) }
+    }
+    return families
+}
+
+fun getSystemFontFileMap(): Map<String, String> {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return emptyMap()
+    val result = mutableMapOf<String, String>()
+    SystemFonts.getAvailableFonts().forEach { font ->
+        val file = font.file ?: return@forEach
+        val name = extractFontFamilyName(file.nameWithoutExtension)
+        if (name.isNotBlank() && !result.containsKey(name)) {
+            result[name] = file.absolutePath
+        }
+    }
+    return result
+}
+
+private fun extractFontFamilyName(fileName: String): String {
+    val weightStyleSuffixes = listOf(
+        "-Regular", "-Bold", "-Italic", "-Light", "-Medium", "-SemiBold",
+        "-ExtraBold", "-Black", "-Thin", "-Condensed", "-Expanded",
+        "-BoldItalic", "-LightItalic", "-MediumItalic", "-ThinItalic",
+        "-Variable", "-VF"
+    )
+    var name = fileName
+    for (suffix in weightStyleSuffixes) {
+        if (name.endsWith(suffix, ignoreCase = true)) {
+            name = name.dropLast(suffix.length)
+            break
+        }
+    }
+    // CamelCase → "Camel Case"
+    return name.replace(Regex("(?<=[a-z])(?=[A-Z])"), " ").trim()
+}
 
 enum class ReaderTextAlign(val label: String) {
     JUSTIFY("양쪽"), LEFT("왼쪽"), RIGHT("오른쪽"), CENTER("가운데")
