@@ -113,6 +113,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -226,6 +227,14 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
     var isContentRendered by remember(book.path) { mutableStateOf(false) }
     var showSettingsPopup by remember { mutableStateOf(false) }
     var readerSettings by remember { mutableStateOf(ReaderSettingsStore.load(context)) }
+    var currentTime by remember { mutableStateOf("") }
+    LaunchedEffect(Unit) {
+        val sdf = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault())
+        while (true) {
+            currentTime = sdf.format(java.util.Date())
+            delay(60_000L - System.currentTimeMillis() % 60_000L)
+        }
+    }
 
     val activity = LocalContext.current as? MainActivity
     DisposableEffect(epubWebView.value) {
@@ -391,6 +400,24 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
             "pdf"  -> PdfViewer(book.path, onCenterTap)
             "mobi" -> MobiViewer(book.path, onCenterTap)
             else   -> CenteredMessage("지원하지 않는 형식입니다.")
+        }
+
+        // 하단 정보 오버레이
+        if (!showMenu && isContentRendered) {
+            val leftText = readerBottomInfoText(readerSettings.leftInfo, book, chapterTitle, currentPage, totalPages, readingProgress, currentTime)
+            val rightText = readerBottomInfoText(readerSettings.rightInfo, book, chapterTitle, currentPage, totalPages, readingProgress, currentTime)
+            if (leftText != null || rightText != null) {
+                Row(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .padding(horizontal = maxOf(readerSettings.paddingHorizontal, 4).dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(leftText ?: "", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                    Text(rightText ?: "", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                }
+            }
         }
 
         // 로딩 오버레이
@@ -2076,7 +2103,8 @@ private fun EpubViewer(
     onHighlight: (text: String, cfi: String) -> Unit = { _, _ -> },
     onMemo: (text: String, cfi: String) -> Unit = { _, _ -> },
     onHighlightLongPress: (id: Long, x: Float, y: Float, bottom: Float) -> Unit = { _, _, _, _ -> },
-    onMemoLongPress: (id: Long, x: Float, y: Float, bottom: Float) -> Unit = { _, _, _, _ -> }
+    onMemoLongPress: (id: Long, x: Float, y: Float, bottom: Float) -> Unit = { _, _, _, _ -> },
+    readerSettings: ReaderSettings = ReaderSettings()
 ) {
     val context = LocalContext.current
     var bookDir by remember(path) { mutableStateOf<String?>(null) }
@@ -2265,7 +2293,7 @@ private fun EpubViewer(
                     val webView = frameLayout.getChildAt(0) as WebView
                     webView.loadDataWithBaseURL(
                         "file://${bookDir}/",
-                        buildEpubJsHtml(opfPath!!, savedCfi),
+                        buildEpubJsHtml(opfPath!!, savedCfi, readerSettings),
                         "text/html",
                         "UTF-8",
                         null
@@ -2558,7 +2586,24 @@ private fun findOpfPath(dir: File): String? {
     return null
 }
 
-private fun buildEpubJsHtml(opfPath: String, savedCfi: String) = """<!DOCTYPE html>
+private fun readerBottomInfoText(
+    info: ReaderBottomInfo,
+    book: BookFile,
+    chapterTitle: String,
+    currentPage: Int,
+    totalPages: Int,
+    readingProgress: Float,
+    currentTime: String
+): String? = when (info) {
+    ReaderBottomInfo.NONE -> null
+    ReaderBottomInfo.BOOK_TITLE -> book.metadata?.title ?: book.name
+    ReaderBottomInfo.CHAPTER_TITLE -> chapterTitle.ifEmpty { null }
+    ReaderBottomInfo.PAGE -> if (totalPages > 0) "$currentPage / $totalPages" else null
+    ReaderBottomInfo.CLOCK -> currentTime.ifEmpty { null }
+    ReaderBottomInfo.PROGRESS -> "${(readingProgress * 100).toInt()}%"
+}
+
+private fun buildEpubJsHtml(opfPath: String, savedCfi: String, settings: ReaderSettings) = """<!DOCTYPE html>
 <html>
 <head>
 <meta charset='UTF-8'/>
@@ -2566,7 +2611,7 @@ private fun buildEpubJsHtml(opfPath: String, savedCfi: String) = """<!DOCTYPE ht
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 html, body { width: 100%; height: 100%; overflow: hidden; background: #fff; }
-#viewer { width: 100%; height: 100%; }
+#viewer { position: absolute; top: ${settings.paddingVertical}px; left: ${settings.paddingHorizontal}px; right: ${settings.paddingHorizontal}px; bottom: ${settings.paddingVertical + 16}px; }
 .epub-view svg { mix-blend-mode: multiply; }
 </style>
 </head>
@@ -2576,8 +2621,8 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: #fff; }
 <script>
 var book = ePub("$opfPath");
 var rendition = book.renderTo("viewer", {
-    width: window.innerWidth,
-    height: window.innerHeight,
+    width: window.innerWidth - ${settings.paddingHorizontal * 2},
+    height: window.innerHeight - ${settings.paddingVertical * 2 + 16},
     spread: "none",
     flow: "paginated",
     manager: "default",
@@ -2671,6 +2716,9 @@ book.loaded.navigation.then(function(nav) {
 function computeVisualPages() {
     var items = book.spine ? (book.spine.items || []) : [];
     if (items.length === 0) return;
+    var s = window._readerSettings;
+    var scanW = window.innerWidth - s.paddingHorizontal * 2;
+    var scanH = window.innerHeight - s.paddingVertical * 2 - 16;
     var scanDiv = document.createElement('div');
     scanDiv.style.cssText = 'position:fixed;left:-' + (window.innerWidth + 10) + 'px;top:0;width:' + window.innerWidth + 'px;height:' + window.innerHeight + 'px;overflow:hidden;';
     document.body.appendChild(scanDiv);
@@ -3028,6 +3076,56 @@ window._search = function(query) {
     if (count === 0) { Android.onSearchComplete(); return; }
     activeChains = count;
     for (var c = 0; c < count; c++) next();
+};
+
+window._readerSettings = {
+    fontFamily: ${if (settings.fontIndex > 0) "\"${READER_FONT_FAMILIES[settings.fontIndex]}\"" else "\"\""},
+    fontSize: ${settings.fontSize},
+    textAlign: "${settings.textAlign.name.lowercase()}",
+    lineHeight: ${settings.lineHeight},
+    paragraphSpacing: ${settings.paragraphSpacing},
+    paddingVertical: ${settings.paddingVertical},
+    paddingHorizontal: ${settings.paddingHorizontal}
+};
+
+function _buildReaderCss(s) {
+    var ff = s.fontFamily ? ("'" + s.fontFamily + "',") : '';
+    return 'html, body, p, div, span, li, td, blockquote, h1, h2, h3, h4, h5, h6 {' +
+        'font-family: ' + ff + 'sans-serif !important;' +
+        'font-size: ' + s.fontSize + 'px !important;' +
+        'line-height: ' + s.lineHeight + ' !important;' +
+        '}' +
+        (s.paragraphSpacing > 0 ? 'p { margin-bottom: ' + s.paragraphSpacing + 'px !important; }' : '');
+}
+
+function _injectReaderStyle(doc) {
+    try {
+        var style = doc.getElementById('_rs');
+        if (!style) {
+            style = doc.createElement('style');
+            style.id = '_rs';
+            doc.head.appendChild(style);
+        }
+        style.textContent = _buildReaderCss(window._readerSettings);
+    } catch(e) {}
+}
+
+var _rescanTimer = null;
+window._applyReaderSettings = function(fontFamily, fontSize, textAlign, lineHeight, paragraphSpacing, paddingVertical, paddingHorizontal) {
+    window._readerSettings = { fontFamily: fontFamily, fontSize: fontSize, textAlign: textAlign, lineHeight: lineHeight, paragraphSpacing: paragraphSpacing, paddingVertical: paddingVertical, paddingHorizontal: paddingHorizontal };
+    try {
+        var viewer = document.getElementById('viewer');
+        viewer.style.top = paddingVertical + 'px';
+        viewer.style.left = paddingHorizontal + 'px';
+        viewer.style.right = paddingHorizontal + 'px';
+        viewer.style.bottom = (paddingVertical + 16) + 'px';
+        rendition.resize(window.innerWidth - paddingHorizontal * 2, window.innerHeight - paddingVertical * 2 - 16);
+    } catch(e) {}
+    try {
+        rendition.getContents().forEach(function(c) { _injectReaderStyle(c.document); });
+    } catch(e) {}
+    clearTimeout(_rescanTimer);
+    _rescanTimer = setTimeout(function() { computeVisualPages(); }, 500);
 };
 </script>
 </body>
