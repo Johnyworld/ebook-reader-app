@@ -20,8 +20,7 @@ data class BookReadRecord(
     @PrimaryKey val bookPath: String,
     val lastReadAt: Long,
     val lastCfi: String = "",
-    val tocJson: String = "",
-    val totalPages: Int = 0
+    val tocJson: String = ""
 )
 
 @Dao
@@ -44,9 +43,6 @@ interface BookReadRecordDao {
     @Query("UPDATE book_read_records SET tocJson = :tocJson WHERE bookPath = :bookPath")
     suspend fun updateTocJson(bookPath: String, tocJson: String)
 
-    @Query("UPDATE book_read_records SET totalPages = :totalPages WHERE bookPath = :bookPath")
-    suspend fun updateTotalPages(bookPath: String, totalPages: Int)
-
     @Transaction
     suspend fun upsertLastReadAt(bookPath: String, lastReadAt: Long) {
         insertIfNotExists(BookReadRecord(bookPath = bookPath, lastReadAt = lastReadAt))
@@ -65,11 +61,6 @@ interface BookReadRecordDao {
         updateTocJson(bookPath, tocJson)
     }
 
-    @Transaction
-    suspend fun upsertTotalPages(bookPath: String, totalPages: Int) {
-        insertIfNotExists(BookReadRecord(bookPath = bookPath, lastReadAt = 0L))
-        updateTotalPages(bookPath, totalPages)
-    }
 }
 
 private val MIGRATION_1_2 = object : Migration(1, 2) {
@@ -108,7 +99,6 @@ data class Bookmark(
     val bookPath: String,
     val cfi: String,
     val chapterTitle: String = "",
-    val page: Int = 0,
     val excerpt: String = "",
     val createdAt: Long = System.currentTimeMillis()
 )
@@ -154,7 +144,6 @@ data class Highlight(
     val cfi: String,
     val text: String = "",
     val chapterTitle: String = "",
-    val page: Int = 0,
     val createdAt: Long = System.currentTimeMillis()
 )
 
@@ -194,7 +183,6 @@ data class Memo(
     val text: String = "",
     val note: String = "",
     val chapterTitle: String = "",
-    val page: Int = 0,
     val createdAt: Long = System.currentTimeMillis()
 )
 
@@ -223,7 +211,35 @@ private val MIGRATION_10_11 = object : Migration(10, 11) {
     }
 }
 
-@Database(entities = [BookReadRecord::class, Bookmark::class, Highlight::class, Memo::class], version = 11)
+private val MIGRATION_11_12 = object : Migration(11, 12) {
+    override fun migrate(database: SupportSQLiteDatabase) {
+        // book_read_records: totalPages 컬럼 제거
+        database.execSQL("CREATE TABLE book_read_records_new (bookPath TEXT NOT NULL PRIMARY KEY, lastReadAt INTEGER NOT NULL, lastCfi TEXT NOT NULL DEFAULT '', tocJson TEXT NOT NULL DEFAULT '')")
+        database.execSQL("INSERT INTO book_read_records_new SELECT bookPath, lastReadAt, lastCfi, tocJson FROM book_read_records")
+        database.execSQL("DROP TABLE book_read_records")
+        database.execSQL("ALTER TABLE book_read_records_new RENAME TO book_read_records")
+        // bookmarks: page 컬럼 제거
+        database.execSQL("CREATE TABLE bookmarks_new (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, bookPath TEXT NOT NULL, cfi TEXT NOT NULL, chapterTitle TEXT NOT NULL DEFAULT '', excerpt TEXT NOT NULL DEFAULT '', createdAt INTEGER NOT NULL DEFAULT 0)")
+        database.execSQL("INSERT INTO bookmarks_new SELECT id, bookPath, cfi, chapterTitle, excerpt, createdAt FROM bookmarks")
+        database.execSQL("DROP TABLE bookmarks")
+        database.execSQL("ALTER TABLE bookmarks_new RENAME TO bookmarks")
+        database.execSQL("CREATE INDEX index_bookmarks_bookPath ON bookmarks (bookPath)")
+        // highlights: page 컬럼 제거
+        database.execSQL("CREATE TABLE highlights_new (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, bookPath TEXT NOT NULL, cfi TEXT NOT NULL, text TEXT NOT NULL DEFAULT '', chapterTitle TEXT NOT NULL DEFAULT '', createdAt INTEGER NOT NULL DEFAULT 0)")
+        database.execSQL("INSERT INTO highlights_new SELECT id, bookPath, cfi, text, chapterTitle, createdAt FROM highlights")
+        database.execSQL("DROP TABLE highlights")
+        database.execSQL("ALTER TABLE highlights_new RENAME TO highlights")
+        database.execSQL("CREATE INDEX index_highlights_bookPath ON highlights (bookPath)")
+        // memos: page 컬럼 제거
+        database.execSQL("CREATE TABLE memos_new (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, bookPath TEXT NOT NULL, cfi TEXT NOT NULL, text TEXT NOT NULL DEFAULT '', note TEXT NOT NULL DEFAULT '', chapterTitle TEXT NOT NULL DEFAULT '', createdAt INTEGER NOT NULL DEFAULT 0)")
+        database.execSQL("INSERT INTO memos_new SELECT id, bookPath, cfi, text, note, chapterTitle, createdAt FROM memos")
+        database.execSQL("DROP TABLE memos")
+        database.execSQL("ALTER TABLE memos_new RENAME TO memos")
+        database.execSQL("CREATE INDEX index_memos_bookPath ON memos (bookPath)")
+    }
+}
+
+@Database(entities = [BookReadRecord::class, Bookmark::class, Highlight::class, Memo::class], version = 12)
 abstract class BookDatabase : RoomDatabase() {
     abstract fun bookReadRecordDao(): BookReadRecordDao
     abstract fun bookmarkDao(): BookmarkDao
@@ -239,7 +255,7 @@ abstract class BookDatabase : RoomDatabase() {
                     context.applicationContext,
                     BookDatabase::class.java,
                     "book_database"
-                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11).build().also { INSTANCE = it }
+                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12).build().also { INSTANCE = it }
             }
     }
 }

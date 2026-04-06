@@ -225,6 +225,8 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
     var bookmarks by remember(book.path) { mutableStateOf<List<Bookmark>>(emptyList()) }
     var highlights by remember(book.path) { mutableStateOf<List<Highlight>>(emptyList()) }
     var isContentRendered by remember(book.path) { mutableStateOf(false) }
+    var isScanning by remember(book.path) { mutableStateOf(false) }
+    var spinePageOffsets by remember(book.path) { mutableStateOf<Map<Int, Int>>(emptyMap()) }
     var showSettingsPopup by remember { mutableStateOf(false) }
     var readerSettings by remember { mutableStateOf(ReaderSettingsStore.load(context)) }
     var currentTime by remember { mutableStateOf("") }
@@ -271,7 +273,6 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
     LaunchedEffect(book.path) {
         val record = withContext(Dispatchers.IO) { dao.getByPath(book.path) }
         savedCfi = record?.lastCfi ?: ""
-        totalPages = record?.totalPages ?: 0
         val cachedToc = record?.tocJson.orEmpty()
         if (cachedToc.isNotEmpty()) {
             try {
@@ -332,10 +333,9 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                         }
                     } catch (_: Exception) {}
                 },
-                onContentRendered = { isLoading = false; isContentRendered = true },
+                onContentRendered = { isLoading = false; isContentRendered = true; isScanning = true },
                 onHighlight = { text, cfi ->
                     if (cfi.isNotEmpty()) {
-                        val pageSnapshot = currentPage
                         val chapterSnapshot = chapterTitle
                         scope.launch {
                             val highlight = Highlight(
@@ -343,7 +343,6 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                                 cfi = cfi,
                                 text = text,
                                 chapterTitle = chapterSnapshot,
-                                page = pageSnapshot,
                                 createdAt = System.currentTimeMillis()
                             )
                             val id = withContext(Dispatchers.IO) { highlightDao.insert(highlight) }
@@ -387,7 +386,15 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                     if (scannedTotal != totalPages) {
                         totalPages = scannedTotal
                     }
-                    scope.launch(Dispatchers.IO) { dao.upsertTotalPages(book.path, scannedTotal) }
+                    isScanning = false
+                    epubWebView.value?.evaluateJavascript("_spinePageOffsets || {}") { result ->
+                        try {
+                            val obj = org.json.JSONObject(result)
+                            val map = mutableMapOf<Int, Int>()
+                            obj.keys().forEach { key -> map[key.toInt()] = obj.getInt(key) }
+                            spinePageOffsets = map
+                        } catch (_: Exception) {}
+                    }
                 },
                 onSearchResultsPartial = { json ->
                     try {
@@ -451,6 +458,16 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                         .pointerInput(Unit) { detectTapGestures {} },
                     color = Color.White
                 ) {
+                    if (isScanning) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 16.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("도서 정보를 읽고 있습니다.", style = MaterialTheme.typography.bodyMedium)
+                        }
+                    } else {
                     Column(modifier = Modifier.fillMaxWidth()) {
                         // 진행 상황
                         Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
@@ -535,6 +552,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
 
                         Spacer(Modifier.height(2.dp))
                     }
+                    } // else
                 }
             }
         }
@@ -577,14 +595,12 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                                 }
                             } else {
                                 val wv = epubWebView.value
-                                val pageSnapshot = currentPage
                                 val saveBookmark = { cfi: String, excerpt: String ->
                                     scope.launch {
                                         val bookmark = Bookmark(
                                             bookPath = book.path,
                                             cfi = cfi,
                                             chapterTitle = chapterTitle,
-                                            page = pageSnapshot,
                                             excerpt = excerpt,
                                             createdAt = System.currentTimeMillis()
                                         )
@@ -679,6 +695,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
         if (showHighlightPopup) {
             HighlightPopup(
                 highlights = highlights,
+                spinePageOffsets = spinePageOffsets,
                 onNavigate = { cfi ->
                     epubWebView.value?.post {
                         val escaped = cfi.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n")
@@ -793,7 +810,6 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                 onHighlight = {
                     memoActionState = null
                     if (memo != null) {
-                        val pageSnapshot = currentPage
                         val chapterSnapshot = chapterTitle
                         scope.launch {
                             val highlight = Highlight(
@@ -801,7 +817,6 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                                 cfi = memo.cfi,
                                 text = memo.text,
                                 chapterTitle = chapterSnapshot,
-                                page = pageSnapshot,
                                 createdAt = System.currentTimeMillis()
                             )
                             val id = withContext(Dispatchers.IO) { highlightDao.insert(highlight) }
@@ -846,6 +861,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
         if (showMemoListPopup) {
             MemoListPopup(
                 memos = memos,
+                spinePageOffsets = spinePageOffsets,
                 onNavigate = { memo ->
                     epubWebView.value?.post {
                         val escaped = memo.cfi.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n")
@@ -885,7 +901,6 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                             editingMemo = null
                         }
                     } else if (pendingMemoCfi.isNotEmpty()) {
-                        val pageSnapshot = currentPage
                         val chapterSnapshot = chapterTitle
                         scope.launch {
                             val newMemo = Memo(
@@ -894,7 +909,6 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                                 text = pendingMemoText,
                                 note = note,
                                 chapterTitle = chapterSnapshot,
-                                page = pageSnapshot,
                                 createdAt = System.currentTimeMillis()
                             )
                             val id = withContext(Dispatchers.IO) { memoDao.insert(newMemo) }
@@ -965,6 +979,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
         if (showBookmarkPopup) {
             BookmarkPopup(
                 bookmarks = bookmarks,
+                spinePageOffsets = spinePageOffsets,
                 onNavigate = { cfi ->
                     epubWebView.value?.post {
                         val escaped = cfi.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n")
@@ -1388,6 +1403,7 @@ private fun SearchPopup(
 @Composable
 private fun BookmarkPopup(
     bookmarks: List<Bookmark>,
+    spinePageOffsets: Map<Int, Int>,
     onNavigate: (cfi: String) -> Unit,
     onDelete: (Bookmark) -> Unit,
     onDismiss: () -> Unit
@@ -1408,7 +1424,7 @@ private fun BookmarkPopup(
         when (sortOrder) {
             BookmarkSortOrder.CREATED_ASC -> bookmarks.sortedBy { it.createdAt }
             BookmarkSortOrder.CREATED_DESC -> bookmarks.sortedByDescending { it.createdAt }
-            BookmarkSortOrder.PAGE_ASC -> bookmarks.sortedBy { it.page }
+            BookmarkSortOrder.PAGE_ASC -> bookmarks.sortedBy { cfiToPage(it.cfi, spinePageOffsets) }
         }
     }
     val totalPages = maxOf(1, (sortedBookmarks.size + itemsPerPage - 1) / itemsPerPage)
@@ -1522,9 +1538,10 @@ private fun BookmarkPopup(
                                         horizontalArrangement = Arrangement.SpaceBetween,
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        if (bookmark.page > 0) {
+                                        val bookmarkPage = cfiToPage(bookmark.cfi, spinePageOffsets)
+                                        if (bookmarkPage > 0) {
                                             Text(
-                                                "p.${bookmark.page}",
+                                                "p.$bookmarkPage",
                                                 style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                                                 color = Color.Black
                                             )
@@ -1533,7 +1550,7 @@ private fun BookmarkPopup(
                                             bookmark.chapterTitle,
                                             style = MaterialTheme.typography.labelSmall,
                                             color = Color(0xFFBBBBBB),
-                                            modifier = Modifier.weight(1f).padding(start = if (bookmark.page > 0) 8.dp else 0.dp),
+                                            modifier = Modifier.weight(1f).padding(start = if (bookmarkPage > 0) 8.dp else 0.dp),
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis,
                                             textAlign = TextAlign.End
@@ -1625,6 +1642,7 @@ private fun BookmarkPopup(
 @Composable
 private fun HighlightPopup(
     highlights: List<Highlight>,
+    spinePageOffsets: Map<Int, Int>,
     onNavigate: (cfi: String) -> Unit,
     onDelete: (Highlight) -> Unit,
     onDismiss: () -> Unit
@@ -1645,7 +1663,7 @@ private fun HighlightPopup(
         when (sortOrder) {
             BookmarkSortOrder.CREATED_ASC -> highlights.sortedBy { it.createdAt }
             BookmarkSortOrder.CREATED_DESC -> highlights.sortedByDescending { it.createdAt }
-            BookmarkSortOrder.PAGE_ASC -> highlights.sortedBy { it.page }
+            BookmarkSortOrder.PAGE_ASC -> highlights.sortedBy { cfiToPage(it.cfi, spinePageOffsets) }
         }
     }
     val totalPages = maxOf(1, (sortedHighlights.size + itemsPerPage - 1) / itemsPerPage)
@@ -1725,14 +1743,15 @@ private fun HighlightPopup(
                                         horizontalArrangement = Arrangement.SpaceBetween,
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        if (highlight.page > 0) {
-                                            Text("p.${highlight.page}", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold), color = Color.Black)
+                                        val highlightPage = cfiToPage(highlight.cfi, spinePageOffsets)
+                                        if (highlightPage > 0) {
+                                            Text("p.$highlightPage", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold), color = Color.Black)
                                         }
                                         Text(
                                             highlight.chapterTitle,
                                             style = MaterialTheme.typography.labelSmall,
                                             color = Color(0xFFBBBBBB),
-                                            modifier = Modifier.weight(1f).padding(start = if (highlight.page > 0) 8.dp else 0.dp),
+                                            modifier = Modifier.weight(1f).padding(start = if (highlightPage > 0) 8.dp else 0.dp),
                                             maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.End
                                         )
                                     }
@@ -1875,6 +1894,7 @@ private fun MemoEditorScreen(
 @Composable
 private fun MemoListPopup(
     memos: List<Memo>,
+    spinePageOffsets: Map<Int, Int>,
     onNavigate: (Memo) -> Unit,
     onEdit: (Memo) -> Unit,
     onDelete: (Memo) -> Unit,
@@ -1896,7 +1916,7 @@ private fun MemoListPopup(
         when (sortOrder) {
             BookmarkSortOrder.CREATED_ASC -> memos.sortedBy { it.createdAt }
             BookmarkSortOrder.CREATED_DESC -> memos.sortedByDescending { it.createdAt }
-            BookmarkSortOrder.PAGE_ASC -> memos.sortedBy { it.page }
+            BookmarkSortOrder.PAGE_ASC -> memos.sortedBy { cfiToPage(it.cfi, spinePageOffsets) }
         }
     }
     val totalPages = maxOf(1, (sortedMemos.size + itemsPerPage - 1) / itemsPerPage)
@@ -1976,14 +1996,15 @@ private fun MemoListPopup(
                                         horizontalArrangement = Arrangement.SpaceBetween,
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        if (memo.page > 0) {
-                                            Text("p.${memo.page}", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold), color = Color.Black)
+                                        val memoPage = cfiToPage(memo.cfi, spinePageOffsets)
+                                        if (memoPage > 0) {
+                                            Text("p.$memoPage", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold), color = Color.Black)
                                         }
                                         Text(
                                             memo.chapterTitle,
                                             style = MaterialTheme.typography.labelSmall,
                                             color = Color(0xFFBBBBBB),
-                                            modifier = Modifier.weight(1f).padding(start = if (memo.page > 0) 8.dp else 0.dp),
+                                            modifier = Modifier.weight(1f).padding(start = if (memoPage > 0) 8.dp else 0.dp),
                                             maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.End
                                         )
                                     }
@@ -3883,6 +3904,13 @@ private fun <T> ReaderCycleSelectorField(
             }
         }
     }
+}
+
+private fun cfiToPage(cfi: String, spinePageOffsets: Map<Int, Int>): Int {
+    if (spinePageOffsets.isEmpty() || cfi.isEmpty()) return 0
+    val step = Regex("/6/(\\d+)").find(cfi)?.groupValues?.get(1)?.toIntOrNull() ?: return 0
+    val spineIndex = (step / 2 - 1).coerceAtLeast(0)
+    return (spinePageOffsets[spineIndex] ?: 0) + 1
 }
 
 @Composable
