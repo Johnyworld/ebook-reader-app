@@ -2136,6 +2136,22 @@ private fun EpubViewer(
         if (text.isNotEmpty()) selectionState = SelectionState(text, x, y, bottom, cfi)
     }
 
+    LaunchedEffect(readerSettings) {
+        val fontFamily = if (readerSettings.fontIndex > 0) READER_FONT_FAMILIES[readerSettings.fontIndex] else ""
+        val js = """window._applyReaderSettings(
+            ${if (fontFamily.isNotEmpty()) "\"${fontFamily}\"" else "\"\""},
+            ${readerSettings.fontSize},
+            "${readerSettings.textAlign.name.lowercase()}",
+            ${readerSettings.lineHeight},
+            ${readerSettings.paragraphSpacing},
+            ${readerSettings.paddingVertical},
+            ${readerSettings.paddingHorizontal},
+            ${readerSettings.dualPage}
+        )"""
+        webViewRef.get()?.evaluateJavascript(js, null)
+    }
+
+
     LaunchedEffect(path) {
         try {
             val result = withContext(Dispatchers.IO) { extractEpub(context, path) }
@@ -2619,14 +2635,31 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: #fff; }
 <div id="viewer"></div>
 <script src="epub.min.js"></script>
 <script>
+var _dualPage = ${settings.dualPage};
+function _getSpreadMode() {
+    return (_dualPage && window.innerWidth > window.innerHeight) ? "always" : "none";
+}
 var book = ePub("$opfPath");
 var rendition = book.renderTo("viewer", {
     width: window.innerWidth - ${settings.paddingHorizontal * 2},
     height: window.innerHeight - ${settings.paddingVertical * 2 + 16},
-    spread: "none",
+    spread: _getSpreadMode(),
     flow: "paginated",
     manager: "default",
-    minSpreadWidth: 9999
+    minSpreadWidth: 0
+});
+window.addEventListener('resize', function() {
+    if (!window._readerSettings) return;
+    var s = window._readerSettings;
+    rendition.spread(_getSpreadMode(), 0);
+    rendition.resize(window.innerWidth - s.paddingHorizontal * 2, window.innerHeight - s.paddingVertical * 2 - 16);
+    var viewer = document.getElementById('viewer');
+    if (viewer) {
+        viewer.style.top = s.paddingVertical + 'px';
+        viewer.style.left = s.paddingHorizontal + 'px';
+        viewer.style.right = s.paddingHorizontal + 'px';
+        viewer.style.bottom = (s.paddingVertical + 16) + 'px';
+    }
 });
 
 function findTocEntry(href, items) {
@@ -3111,14 +3144,16 @@ function _injectReaderStyle(doc) {
 }
 
 var _rescanTimer = null;
-window._applyReaderSettings = function(fontFamily, fontSize, textAlign, lineHeight, paragraphSpacing, paddingVertical, paddingHorizontal) {
+window._applyReaderSettings = function(fontFamily, fontSize, textAlign, lineHeight, paragraphSpacing, paddingVertical, paddingHorizontal, dualPage) {
     window._readerSettings = { fontFamily: fontFamily, fontSize: fontSize, textAlign: textAlign, lineHeight: lineHeight, paragraphSpacing: paragraphSpacing, paddingVertical: paddingVertical, paddingHorizontal: paddingHorizontal };
+    _dualPage = !!dualPage;
     try {
         var viewer = document.getElementById('viewer');
         viewer.style.top = paddingVertical + 'px';
         viewer.style.left = paddingHorizontal + 'px';
         viewer.style.right = paddingHorizontal + 'px';
         viewer.style.bottom = (paddingVertical + 16) + 'px';
+        rendition.spread(_getSpreadMode(), 0);
         rendition.resize(window.innerWidth - paddingHorizontal * 2, window.innerHeight - paddingVertical * 2 - 16);
     } catch(e) {}
     try {
