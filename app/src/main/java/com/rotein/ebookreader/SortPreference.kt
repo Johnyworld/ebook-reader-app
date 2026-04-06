@@ -25,6 +25,23 @@ object BookmarkSortStore {
     }
 }
 
+object MemoSortStore {
+    private const val PREF_NAME = "memo_sort_pref"
+    private const val KEY_ORDER = "sort_order"
+
+    fun load(context: Context): BookmarkSortOrder {
+        val prefs = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
+        return BookmarkSortOrder.entries.firstOrNull { it.name == prefs.getString(KEY_ORDER, null) }
+            ?: BookmarkSortOrder.CREATED_ASC
+    }
+
+    fun save(context: Context, order: BookmarkSortOrder) {
+        context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE).edit()
+            .putString(KEY_ORDER, order.name)
+            .apply()
+    }
+}
+
 object HighlightSortStore {
     private const val PREF_NAME = "highlight_sort_pref"
     private const val KEY_ORDER = "sort_order"

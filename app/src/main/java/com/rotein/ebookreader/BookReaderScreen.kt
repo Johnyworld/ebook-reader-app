@@ -54,6 +54,7 @@ import androidx.compose.material.icons.filled.FormatListBulleted
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.BookmarkBorder
+import androidx.compose.material.icons.filled.ModeComment
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -200,6 +201,17 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
     var showHighlightPopup by remember { mutableStateOf(false) }
     data class HighlightActionState(val id: Long, val x: Float, val y: Float, val bottom: Float)
     var highlightActionState by remember { mutableStateOf<HighlightActionState?>(null) }
+    val memoDao = remember { BookDatabase.getInstance(context).memoDao() }
+    var memos by remember(book.path) { mutableStateOf<List<Memo>>(emptyList()) }
+    var showMemoListPopup by remember { mutableStateOf(false) }
+    var showMemoEditor by remember { mutableStateOf(false) }
+    var editingMemo by remember { mutableStateOf<Memo?>(null) }
+    var pendingMemoText by remember { mutableStateOf("") }
+    var pendingMemoCfi by remember { mutableStateOf("") }
+    data class MemoActionState(val id: Long, val x: Float, val y: Float, val bottom: Float)
+    var memoActionState by remember { mutableStateOf<MemoActionState?>(null) }
+    data class CombinedAnnotationState(val highlightId: Long, val memoId: Long, val x: Float, val y: Float, val bottom: Float)
+    var combinedAnnotationState by remember { mutableStateOf<CombinedAnnotationState?>(null) }
     var searchResults by remember { mutableStateOf<List<SearchResultItem>?>(null) }
     var isSearching by remember { mutableStateOf(false) }
     val epubWebView = remember { mutableStateOf<WebView?>(null) }
@@ -223,6 +235,10 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
     BackHandler(enabled = showBookmarkPopup) { showBookmarkPopup = false }
     BackHandler(enabled = showHighlightPopup) { showHighlightPopup = false }
     BackHandler(enabled = highlightActionState != null) { highlightActionState = null }
+    BackHandler(enabled = showMemoListPopup) { showMemoListPopup = false }
+    BackHandler(enabled = showMemoEditor) { showMemoEditor = false }
+    BackHandler(enabled = memoActionState != null) { memoActionState = null }
+    BackHandler(enabled = combinedAnnotationState != null) { combinedAnnotationState = null }
 
     LaunchedEffect(showMenu) {
         if (showMenu) {
@@ -246,14 +262,23 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
         }
         bookmarks = withContext(Dispatchers.IO) { bookmarkDao.getByBook(book.path) }
         highlights = withContext(Dispatchers.IO) { highlightDao.getByBook(book.path) }
+        memos = withContext(Dispatchers.IO) { memoDao.getByBook(book.path) }
     }
 
     LaunchedEffect(isContentRendered) {
-        if (!isContentRendered || highlights.isEmpty()) return@LaunchedEffect
-        val json = highlights.joinToString(",", "[", "]") {
-            """{"id":${it.id},"cfi":"${it.cfi.replace("\\", "\\\\").replace("\"", "\\\"")}"}"""
+        if (!isContentRendered) return@LaunchedEffect
+        if (highlights.isNotEmpty()) {
+            val json = highlights.joinToString(",", "[", "]") {
+                """{"id":${it.id},"cfi":"${it.cfi.replace("\\", "\\\\").replace("\"", "\\\"")}"}"""
+            }
+            epubWebView.value?.evaluateJavascript("window._applyHighlights('$json')", null)
         }
-        epubWebView.value?.evaluateJavascript("window._applyHighlights('$json')", null)
+        if (memos.isNotEmpty()) {
+            val json = memos.joinToString(",", "[", "]") {
+                """{"id":${it.id},"cfi":"${it.cfi.replace("\\", "\\\\").replace("\"", "\\\"")}"}"""
+            }
+            epubWebView.value?.evaluateJavascript("window._applyMemos('$json')", null)
+        }
     }
 
     Box(modifier = modifier.fillMaxSize()) {
@@ -311,8 +336,29 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                     }
                 },
                 onChapterChanged = { chapter -> chapterTitle = chapter },
+                onMemo = { text, cfi ->
+                    pendingMemoText = text
+                    pendingMemoCfi = cfi
+                    editingMemo = memos.find { it.cfi == cfi }
+                    showMemoEditor = true
+                },
                 onHighlightLongPress = { id, x, y, bottom ->
-                    highlightActionState = HighlightActionState(id, x, y, bottom)
+                    val cfi = highlights.find { it.id == id }?.cfi
+                    val overlappingMemo = if (cfi != null) memos.find { it.cfi == cfi } else null
+                    if (overlappingMemo != null) {
+                        combinedAnnotationState = CombinedAnnotationState(id, overlappingMemo.id, x, y, bottom)
+                    } else {
+                        highlightActionState = HighlightActionState(id, x, y, bottom)
+                    }
+                },
+                onMemoLongPress = { id, x, y, bottom ->
+                    val cfi = memos.find { it.id == id }?.cfi
+                    val overlappingHighlight = if (cfi != null) highlights.find { it.cfi == cfi } else null
+                    if (overlappingHighlight != null) {
+                        combinedAnnotationState = CombinedAnnotationState(overlappingHighlight.id, id, x, y, bottom)
+                    } else {
+                        memoActionState = MemoActionState(id, x, y, bottom)
+                    }
                 },
                 onWebViewCreated = { webView -> epubWebView.value = webView },
                 onPageInfoChanged = { page, _ ->
@@ -434,7 +480,9 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                         ReaderMenuItem(Icons.Default.Star, "하이라이트", onClick = {
                             showHighlightPopup = true
                         })
-                        ReaderMenuItem(Icons.Default.Edit, "메모")
+                        ReaderMenuItem(Icons.Default.Edit, "메모", onClick = {
+                            showMemoListPopup = true
+                        })
                         ReaderMenuItem(Icons.Default.Bookmark, "북마크", onClick = {
                             showBookmarkPopup = true
                         })
@@ -620,7 +668,14 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                         highlights = highlights.filter { it.id != id }
                     }
                 },
-                onMemo = { highlightActionState = null },
+                onMemo = {
+                    val hl = highlights.find { it.id == state.id }
+                    pendingMemoText = hl?.text ?: ""
+                    pendingMemoCfi = hl?.cfi ?: ""
+                    editingMemo = memos.find { it.cfi == pendingMemoCfi }
+                    showMemoEditor = true
+                    highlightActionState = null
+                },
                 onShare = {
                     val text = highlights.find { it.id == state.id }?.text ?: ""
                     val intent = Intent(Intent.ACTION_SEND).apply {
@@ -630,6 +685,205 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                     context.startActivity(Intent.createChooser(intent, null))
                     highlightActionState = null
                 }
+            )
+        }
+
+        combinedAnnotationState?.let { state ->
+            CombinedAnnotationPopup(
+                selectionY = state.y,
+                selectionBottom = state.bottom,
+                selectionCx = state.x,
+                onDeleteHighlight = {
+                    val hid = state.highlightId
+                    combinedAnnotationState = null
+                    scope.launch {
+                        withContext(Dispatchers.IO) { highlightDao.deleteById(hid) }
+                        epubWebView.value?.evaluateJavascript("window._removeHighlight($hid)", null)
+                        highlights = highlights.filter { it.id != hid }
+                    }
+                },
+                onEditMemo = {
+                    val memo = memos.find { it.id == state.memoId }
+                    combinedAnnotationState = null
+                    if (memo != null) {
+                        editingMemo = memo
+                        pendingMemoText = memo.text
+                        pendingMemoCfi = memo.cfi
+                        showMemoEditor = true
+                    }
+                },
+                onDeleteMemo = {
+                    val mid = state.memoId
+                    combinedAnnotationState = null
+                    scope.launch {
+                        withContext(Dispatchers.IO) { memoDao.deleteById(mid) }
+                        epubWebView.value?.evaluateJavascript("window._removeMemo($mid)", null)
+                        memos = memos.filter { it.id != mid }
+                    }
+                },
+                onShare = {
+                    val hl = highlights.find { it.id == state.highlightId }
+                    val memo = memos.find { it.id == state.memoId }
+                    val text = buildString {
+                        hl?.text?.let { append(it) }
+                        memo?.note?.takeIf { it.isNotEmpty() }?.let { append("\n\n$it") }
+                    }
+                    val intent = Intent(Intent.ACTION_SEND).apply {
+                        type = "text/plain"
+                        putExtra(Intent.EXTRA_TEXT, text)
+                    }
+                    context.startActivity(Intent.createChooser(intent, null))
+                    combinedAnnotationState = null
+                },
+                onDismiss = { combinedAnnotationState = null }
+            )
+        }
+
+        memoActionState?.let { state ->
+            val memo = memos.find { it.id == state.id }
+            MemoActionPopup(
+                selectionY = state.y,
+                selectionBottom = state.bottom,
+                selectionCx = state.x,
+                onHighlight = {
+                    memoActionState = null
+                    if (memo != null) {
+                        val pageSnapshot = currentPage
+                        val chapterSnapshot = chapterTitle
+                        scope.launch {
+                            val highlight = Highlight(
+                                bookPath = book.path,
+                                cfi = memo.cfi,
+                                text = memo.text,
+                                chapterTitle = chapterSnapshot,
+                                page = pageSnapshot,
+                                createdAt = System.currentTimeMillis()
+                            )
+                            val id = withContext(Dispatchers.IO) { highlightDao.insert(highlight) }
+                            val saved = highlight.copy(id = id)
+                            highlights = highlights + saved
+                            val escapedCfi = memo.cfi.replace("\\", "\\\\").replace("\"", "\\\"")
+                            epubWebView.value?.evaluateJavascript("window._addHighlight(\"$escapedCfi\", $id)", null)
+                        }
+                    }
+                },
+                onEdit = {
+                    memoActionState = null
+                    if (memo != null) {
+                        editingMemo = memo
+                        pendingMemoText = memo.text
+                        pendingMemoCfi = memo.cfi
+                        showMemoEditor = true
+                    }
+                },
+                onDelete = {
+                    val id = state.id
+                    memoActionState = null
+                    scope.launch {
+                        withContext(Dispatchers.IO) { memoDao.deleteById(id) }
+                        epubWebView.value?.evaluateJavascript("window._removeMemo($id)", null)
+                        memos = memos.filter { it.id != id }
+                    }
+                },
+                onShare = {
+                    val text = memo?.let { "${it.text}\n\n${it.note}" } ?: ""
+                    val intent = Intent(Intent.ACTION_SEND).apply {
+                        type = "text/plain"
+                        putExtra(Intent.EXTRA_TEXT, text)
+                    }
+                    context.startActivity(Intent.createChooser(intent, null))
+                    memoActionState = null
+                },
+                onDismiss = { memoActionState = null }
+            )
+        }
+
+        if (showMemoListPopup) {
+            MemoListPopup(
+                memos = memos,
+                onNavigate = { memo ->
+                    epubWebView.value?.post {
+                        val escaped = memo.cfi.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n")
+                        epubWebView.value?.evaluateJavascript("window._displayCfi(\"$escaped\")", null)
+                    }
+                    showMemoListPopup = false
+                    showMenu = false
+                },
+                onEdit = { memo ->
+                    editingMemo = memo
+                    pendingMemoText = memo.text
+                    pendingMemoCfi = memo.cfi
+                    showMemoEditor = true
+                },
+                onDelete = { memo ->
+                    scope.launch {
+                        withContext(Dispatchers.IO) { memoDao.deleteById(memo.id) }
+                        epubWebView.value?.evaluateJavascript("window._removeMemo(${memo.id})", null)
+                        memos = memos.filter { it.id != memo.id }
+                    }
+                },
+                onDismiss = { showMemoListPopup = false }
+            )
+        }
+
+        if (showMemoEditor) {
+            MemoEditorScreen(
+                selectedText = editingMemo?.text ?: pendingMemoText,
+                initialNote = editingMemo?.note ?: "",
+                onSave = { note ->
+                    val existing = editingMemo
+                    if (existing != null) {
+                        scope.launch {
+                            withContext(Dispatchers.IO) { memoDao.updateNote(existing.id, note) }
+                            memos = memos.map { if (it.id == existing.id) it.copy(note = note) else it }
+                            showMemoEditor = false
+                            editingMemo = null
+                        }
+                    } else if (pendingMemoCfi.isNotEmpty()) {
+                        val pageSnapshot = currentPage
+                        val chapterSnapshot = chapterTitle
+                        scope.launch {
+                            val newMemo = Memo(
+                                bookPath = book.path,
+                                cfi = pendingMemoCfi,
+                                text = pendingMemoText,
+                                note = note,
+                                chapterTitle = chapterSnapshot,
+                                page = pageSnapshot,
+                                createdAt = System.currentTimeMillis()
+                            )
+                            val id = withContext(Dispatchers.IO) { memoDao.insert(newMemo) }
+                            val saved = newMemo.copy(id = id)
+                            memos = memos + saved
+                            val escapedCfi = pendingMemoCfi.replace("\\", "\\\\").replace("\"", "\\\"")
+                            epubWebView.value?.evaluateJavascript("window._addMemo(\"$escapedCfi\", $id)", null)
+                            showMemoEditor = false
+                        }
+                    } else {
+                        showMemoEditor = false
+                    }
+                },
+                onCancel = { showMemoEditor = false; editingMemo = null },
+                onDelete = if (editingMemo != null) ({
+                    val id = editingMemo!!.id
+                    showMemoEditor = false
+                    editingMemo = null
+                    scope.launch {
+                        withContext(Dispatchers.IO) { memoDao.deleteById(id) }
+                        epubWebView.value?.evaluateJavascript("window._removeMemo($id)", null)
+                        memos = memos.filter { it.id != id }
+                    }
+                }) else null,
+                onNavigate = if (editingMemo != null) ({
+                    val cfi = editingMemo!!.cfi
+                    showMemoEditor = false
+                    showMenu = false
+                    editingMemo = null
+                    epubWebView.value?.post {
+                        val escaped = cfi.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n")
+                        epubWebView.value?.evaluateJavascript("window._displayCfi(\"$escaped\")", null)
+                    }
+                }) else null
             )
         }
 
@@ -1454,6 +1708,267 @@ private fun HighlightPopup(
     }
 }
 
+@Composable
+private fun MemoEditorScreen(
+    selectedText: String,
+    initialNote: String,
+    onSave: (note: String) -> Unit,
+    onCancel: () -> Unit,
+    onDelete: (() -> Unit)? = null,
+    onNavigate: (() -> Unit)? = null
+) {
+    var note by remember { mutableStateOf(initialNote) }
+
+    Surface(modifier = Modifier.fillMaxSize(), color = Color.White) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            Row(
+                modifier = Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = onCancel) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "취소")
+                }
+                Text("메모", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                TextButton(onClick = { onSave(note) }) {
+                    Text("저장", color = Color.Black)
+                }
+            }
+            HorizontalDivider(color = Color.Black)
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                if (selectedText.isNotEmpty()) {
+                    Text(
+                        selectedText,
+                        style = MaterialTheme.typography.bodyMedium,
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .border(1.dp, Color(0xFFCCCCCC), RoundedCornerShape(4.dp))
+                            .padding(12.dp)
+                    )
+                }
+                BasicTextField(
+                    value = note,
+                    onValueChange = { note = it },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .border(1.dp, Color(0xFFCCCCCC), RoundedCornerShape(4.dp))
+                        .padding(12.dp),
+                    textStyle = MaterialTheme.typography.bodyMedium.copy(color = Color.Black),
+                    decorationBox = { inner ->
+                        Box {
+                            if (note.isEmpty()) {
+                                Text("메모를 입력하세요.", style = MaterialTheme.typography.bodyMedium, color = Color(0xFFAAAAAA))
+                            }
+                            inner()
+                        }
+                    }
+                )
+            }
+            if (onDelete != null || onNavigate != null) {
+                HorizontalDivider(color = Color.Black)
+                Row(
+                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (onDelete != null) {
+                        TextButton(onClick = onDelete, modifier = Modifier.weight(1f)) {
+                            Text("삭제", color = Color.Black)
+                        }
+                    }
+                    if (onDelete != null && onNavigate != null) {
+                        Box(Modifier.width(1.dp).height(20.dp).background(Color.Black))
+                    }
+                    if (onNavigate != null) {
+                        TextButton(onClick = onNavigate, modifier = Modifier.weight(1f)) {
+                            Text("페이지로 이동", color = Color.Black)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MemoListPopup(
+    memos: List<Memo>,
+    onNavigate: (Memo) -> Unit,
+    onEdit: (Memo) -> Unit,
+    onDelete: (Memo) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+    val density = LocalDensity.current
+    val screenHeightDp = LocalConfiguration.current.screenHeightDp
+    val statusBarHeightDp = with(density) { WindowInsets.statusBars.getTop(this).toDp().value.toInt() }
+    val itemHeightDp = 112
+    val headerHeightDp = 56
+    val paginationHeightDp = 56
+    val itemsPerPage = maxOf(1, (screenHeightDp - statusBarHeightDp - headerHeightDp - paginationHeightDp) / itemHeightDp)
+    var currentPage by remember { mutableStateOf(0) }
+    var sortOrder by remember { mutableStateOf(MemoSortStore.load(context)) }
+    var dropdownExpanded by remember { mutableStateOf(false) }
+    var anchorHeight by remember { mutableStateOf(0) }
+    val sortedMemos = remember(memos, sortOrder) {
+        when (sortOrder) {
+            BookmarkSortOrder.CREATED_ASC -> memos.sortedBy { it.createdAt }
+            BookmarkSortOrder.CREATED_DESC -> memos.sortedByDescending { it.createdAt }
+            BookmarkSortOrder.PAGE_ASC -> memos.sortedBy { it.page }
+        }
+    }
+    val totalPages = maxOf(1, (sortedMemos.size + itemsPerPage - 1) / itemsPerPage)
+    val pageItems = sortedMemos.drop(currentPage * itemsPerPage).take(itemsPerPage)
+    val dateFormat = remember { SimpleDateFormat("yyyy.MM.dd HH:mm", java.util.Locale.getDefault()) }
+
+    LaunchedEffect(sortOrder) { MemoSortStore.save(context, sortOrder) }
+    LaunchedEffect(sortedMemos.size) {
+        if (currentPage >= totalPages) currentPage = maxOf(0, totalPages - 1)
+    }
+
+    Surface(modifier = Modifier.fillMaxSize(), color = Color.White) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            Row(
+                modifier = Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = onDismiss) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "닫기")
+                }
+                Text("메모", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                Box(modifier = Modifier.onGloballyPositioned { anchorHeight = it.size.height }) {
+                    TextButton(onClick = { dropdownExpanded = true }) {
+                        Text(sortOrder.label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurface)
+                    }
+                    if (dropdownExpanded) {
+                        Popup(
+                            alignment = Alignment.TopEnd,
+                            offset = IntOffset(0, anchorHeight),
+                            onDismissRequest = { dropdownExpanded = false },
+                            properties = PopupProperties(focusable = true)
+                        ) {
+                            Column(modifier = Modifier.width(IntrinsicSize.Max).background(Color.White).border(1.dp, Color.Black)) {
+                                BookmarkSortOrder.entries.forEachIndexed { index, order ->
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.fillMaxWidth()
+                                            .clickable { sortOrder = order; dropdownExpanded = false }
+                                            .padding(start = 16.dp, end = 12.dp, top = 12.dp, bottom = 12.dp)
+                                    ) {
+                                        Text(order.label, style = MaterialTheme.typography.bodyMedium, color = Color.Black, modifier = Modifier.weight(1f))
+                                        if (sortOrder == order) {
+                                            Spacer(Modifier.width(16.dp))
+                                            Icon(Icons.Default.Check, contentDescription = null, tint = Color.Black, modifier = Modifier.size(16.dp))
+                                        }
+                                    }
+                                    if (index < BookmarkSortOrder.entries.lastIndex) HorizontalDivider(color = Color(0xFFE0E0E0))
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            HorizontalDivider(color = Color.Black)
+
+            Box(modifier = Modifier.weight(1f)) {
+                if (memos.isEmpty()) {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text("메모가 없습니다.", style = MaterialTheme.typography.bodyMedium)
+                    }
+                } else {
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        pageItems.forEachIndexed { index, memo ->
+                            if (index > 0) HorizontalDivider(color = Color(0xFFCCCCCC))
+                            Row(
+                                modifier = Modifier.fillMaxWidth().height(112.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(
+                                    modifier = Modifier
+                                        .weight(1f).fillMaxHeight()
+                                        .clickable { onNavigate(memo); onEdit(memo) }
+                                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        if (memo.page > 0) {
+                                            Text("p.${memo.page}", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold), color = Color.Black)
+                                        }
+                                        Text(
+                                            memo.chapterTitle,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = Color(0xFFBBBBBB),
+                                            modifier = Modifier.weight(1f).padding(start = if (memo.page > 0) 8.dp else 0.dp),
+                                            maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.End
+                                        )
+                                    }
+                                    Text(
+                                        memo.text,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        maxLines = 1, overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.padding(bottom = 4.dp)
+                                    )
+                                    if (memo.note.isNotEmpty()) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                            modifier = Modifier.padding(bottom = 4.dp)
+                                        ) {
+                                            Icon(Icons.Default.ModeComment, contentDescription = null, modifier = Modifier.size(12.dp), tint = Color(0xFF888888))
+                                            Text(memo.note, style = MaterialTheme.typography.labelSmall, color = Color(0xFF888888), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                        }
+                                    }
+                                    Text(dateFormat.format(Date(memo.createdAt)), style = MaterialTheme.typography.labelSmall, color = Color(0xFFBBBBBB))
+                                }
+                                IconButton(onClick = { onDelete(memo) }) {
+                                    Icon(Icons.Default.Close, contentDescription = "삭제", modifier = Modifier.size(18.dp))
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            Column {
+                if (sortedMemos.isNotEmpty()) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().height(56.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            modifier = Modifier.clickable(enabled = currentPage > 0) { currentPage-- }.padding(horizontal = 16.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "이전", modifier = Modifier.height(16.dp), tint = if (currentPage > 0) Color.Black else Color(0xFFCCCCCC))
+                            Text("이전", style = MaterialTheme.typography.bodyMedium, color = if (currentPage > 0) Color.Black else Color(0xFFCCCCCC))
+                        }
+                        Text("${currentPage + 1}/$totalPages (${sortedMemos.size}건)", style = MaterialTheme.typography.bodyMedium)
+                        Row(
+                            modifier = Modifier.clickable(enabled = currentPage < totalPages - 1) { currentPage++ }.padding(horizontal = 16.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text("다음", style = MaterialTheme.typography.bodyMedium, color = if (currentPage < totalPages - 1) Color.Black else Color(0xFFCCCCCC))
+                            Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = "다음", modifier = Modifier.height(16.dp), tint = if (currentPage < totalPages - 1) Color.Black else Color(0xFFCCCCCC))
+                        }
+                    }
+                }
+                HorizontalDivider(color = Color.Black)
+            }
+        }
+    }
+}
+
 // ─── TXT ─────────────────────────────────────────────────────────────────────
 
 @Composable
@@ -1512,7 +2027,9 @@ private fun EpubViewer(
     onSearchComplete: () -> Unit = {},
     onTextSelected: (text: String, x: Float, y: Float, bottom: Float) -> Unit = { _, _, _, _ -> },
     onHighlight: (text: String, cfi: String) -> Unit = { _, _ -> },
-    onHighlightLongPress: (id: Long, x: Float, y: Float, bottom: Float) -> Unit = { _, _, _, _ -> }
+    onMemo: (text: String, cfi: String) -> Unit = { _, _ -> },
+    onHighlightLongPress: (id: Long, x: Float, y: Float, bottom: Float) -> Unit = { _, _, _, _ -> },
+    onMemoLongPress: (id: Long, x: Float, y: Float, bottom: Float) -> Unit = { _, _, _, _ -> }
 ) {
     val context = LocalContext.current
     var bookDir by remember(path) { mutableStateOf<String?>(null) }
@@ -1524,6 +2041,8 @@ private fun EpubViewer(
     val webViewRef = remember { java.util.concurrent.atomic.AtomicReference<android.webkit.WebView?>(null) }
     val onHighlightLongPressRef = remember { java.util.concurrent.atomic.AtomicReference<((Long, Float, Float, Float) -> Unit)?>(null) }
     onHighlightLongPressRef.set(onHighlightLongPress)
+    val onMemoLongPressRef = remember { java.util.concurrent.atomic.AtomicReference<((Long, Float, Float, Float) -> Unit)?>(null) }
+    onMemoLongPressRef.set(onMemoLongPress)
     val clearSelection: () -> Unit = {
         selectionActive.set(false)
         selectionState = null
@@ -1649,7 +2168,7 @@ private fun EpubViewer(
                                 val cssX = e.x / density
                                 val cssY = e.y / density
                                 val ex = e.x; val ey = e.y; val eDownTime = e.downTime
-                                webView.evaluateJavascript("window._getHighlightAtPoint($cssX, $cssY)") { result ->
+                                webView.evaluateJavascript("window._getAnnotationAtPoint($cssX, $cssY)") { result ->
                                     val cleaned = result?.trim()?.let { r ->
                                         if (r == "null" || r == "\"null\"") null
                                         else r.removeSurrounding("\"").replace("\\\"", "\"").replace("\\\\", "\\")
@@ -1662,7 +2181,10 @@ private fun EpubViewer(
                                         val cx = hitData.getDouble("cx").toFloat()
                                         val y = hitData.getDouble("y").toFloat()
                                         val bottom = hitData.getDouble("bottom").toFloat()
-                                        onHighlightLongPressRef.get()?.invoke(id, cx, y, bottom)
+                                        when (hitData.getString("type")) {
+                                            "highlight" -> onHighlightLongPressRef.get()?.invoke(id, cx, y, bottom)
+                                            "memo" -> onMemoLongPressRef.get()?.invoke(id, cx, y, bottom)
+                                        }
                                     } else {
                                         isLongPress = true
                                         val downEvent = MotionEvent.obtain(eDownTime, SystemClock.uptimeMillis(), MotionEvent.ACTION_DOWN, ex, ey, 0)
@@ -1712,7 +2234,7 @@ private fun EpubViewer(
             selectionBottom = sel.bottom,
             selectionCx = sel.x,
             onHighlight = { onHighlight(sel.text, sel.cfi); clearSelection() },
-            onMemo = { clearSelection() },
+            onMemo = { onMemo(sel.text, sel.cfi); clearSelection() },
             onShare = {
                 val intent = Intent(Intent.ACTION_SEND).apply {
                     type = "text/plain"
@@ -1822,6 +2344,120 @@ private fun HighlightActionPopup(
             Box(Modifier.width(1.dp).height(20.dp).background(Color.Black))
             TextButton(onClick = onMemo) {
                 Text("메모", color = Color.Black, fontSize = 14.sp)
+            }
+            Box(Modifier.width(1.dp).height(20.dp).background(Color.Black))
+            TextButton(onClick = onShare) {
+                Text("공유", color = Color.Black, fontSize = 14.sp)
+            }
+        }
+    }
+}
+
+@Composable
+private fun MemoActionPopup(
+    selectionY: Float,
+    selectionBottom: Float,
+    selectionCx: Float,
+    onHighlight: () -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
+    onShare: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val popupHeightDp = 48.dp
+    val marginDp = 8.dp
+    val yDp = selectionY.dp
+    val bottomDp = selectionBottom.dp
+    val cxDp = selectionCx.dp
+    val showAbove = yDp > popupHeightDp + marginDp
+    val offsetY = if (showAbove) yDp - popupHeightDp - marginDp else bottomDp + marginDp
+
+    val density = LocalDensity.current
+    val screenWidthDp = LocalConfiguration.current.screenWidthDp.dp
+    var popupWidthDp by remember { mutableStateOf(0.dp) }
+
+    Box(Modifier.fillMaxSize().pointerInput(Unit) { detectTapGestures { onDismiss() } }) {
+        Row(
+            modifier = Modifier
+                .onSizeChanged { popupWidthDp = with(density) { it.width.toDp() } }
+                .alpha(if (popupWidthDp == 0.dp) 0f else 1f)
+                .offset(
+                    x = (cxDp - popupWidthDp / 2).coerceIn(marginDp, screenWidthDp - popupWidthDp - marginDp),
+                    y = offsetY
+                )
+                .border(1.dp, Color.Black, RoundedCornerShape(8.dp))
+                .background(Color.White, RoundedCornerShape(8.dp))
+                .padding(horizontal = 4.dp)
+                .pointerInput(Unit) { detectTapGestures { } },
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            TextButton(onClick = onHighlight) {
+                Text("하이라이트", color = Color.Black, fontSize = 14.sp)
+            }
+            Box(Modifier.width(1.dp).height(20.dp).background(Color.Black))
+            TextButton(onClick = onEdit) {
+                Text("메모 편집", color = Color.Black, fontSize = 14.sp)
+            }
+            Box(Modifier.width(1.dp).height(20.dp).background(Color.Black))
+            TextButton(onClick = onDelete) {
+                Text("메모 삭제", color = Color.Black, fontSize = 14.sp)
+            }
+            Box(Modifier.width(1.dp).height(20.dp).background(Color.Black))
+            TextButton(onClick = onShare) {
+                Text("공유", color = Color.Black, fontSize = 14.sp)
+            }
+        }
+    }
+}
+
+@Composable
+private fun CombinedAnnotationPopup(
+    selectionY: Float,
+    selectionBottom: Float,
+    selectionCx: Float,
+    onDeleteHighlight: () -> Unit,
+    onEditMemo: () -> Unit,
+    onDeleteMemo: () -> Unit,
+    onShare: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val popupHeightDp = 48.dp
+    val marginDp = 8.dp
+    val yDp = selectionY.dp
+    val bottomDp = selectionBottom.dp
+    val cxDp = selectionCx.dp
+    val showAbove = yDp > popupHeightDp + marginDp
+    val offsetY = if (showAbove) yDp - popupHeightDp - marginDp else bottomDp + marginDp
+
+    val density = LocalDensity.current
+    val screenWidthDp = LocalConfiguration.current.screenWidthDp.dp
+    var popupWidthDp by remember { mutableStateOf(0.dp) }
+
+    Box(Modifier.fillMaxSize().pointerInput(Unit) { detectTapGestures { onDismiss() } }) {
+        Row(
+            modifier = Modifier
+                .onSizeChanged { popupWidthDp = with(density) { it.width.toDp() } }
+                .alpha(if (popupWidthDp == 0.dp) 0f else 1f)
+                .offset(
+                    x = (cxDp - popupWidthDp / 2).coerceIn(marginDp, screenWidthDp - popupWidthDp - marginDp),
+                    y = offsetY
+                )
+                .border(1.dp, Color.Black, RoundedCornerShape(8.dp))
+                .background(Color.White, RoundedCornerShape(8.dp))
+                .padding(horizontal = 4.dp)
+                .pointerInput(Unit) { detectTapGestures { } },
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            TextButton(onClick = onDeleteHighlight) {
+                Text("하이라이트 삭제", color = Color.Black, fontSize = 14.sp)
+            }
+            Box(Modifier.width(1.dp).height(20.dp).background(Color.Black))
+            TextButton(onClick = onEditMemo) {
+                Text("메모 편집", color = Color.Black, fontSize = 14.sp)
+            }
+            Box(Modifier.width(1.dp).height(20.dp).background(Color.Black))
+            TextButton(onClick = onDeleteMemo) {
+                Text("메모 삭제", color = Color.Black, fontSize = 14.sp)
             }
             Box(Modifier.width(1.dp).height(20.dp).background(Color.Black))
             TextButton(onClick = onShare) {
@@ -2151,21 +2787,53 @@ window._applyHighlights = function(json) {
         }
     } catch(e) {}
 };
-window._getHighlightAtPoint = function(x, y) {
+var _memoCfiMap = {};
+window._addMemo = function(cfi, id) {
     try {
-        var groups = document.querySelectorAll('[class^="epub-hl-"]');
-        for (var i = 0; i < groups.length; i++) {
-            var g = groups[i];
+        _memoCfiMap[id] = cfi;
+        rendition.annotations.add("underline", cfi, {id: id}, null, "epub-memo-" + id, {
+            "fill": "#000000",
+            "stroke": "none"
+        });
+    } catch(e) {}
+};
+window._removeMemo = function(id) {
+    try {
+        var cfi = _memoCfiMap[id];
+        if (cfi) { rendition.annotations.remove(cfi, "underline"); delete _memoCfiMap[id]; }
+    } catch(e) {}
+};
+window._applyMemos = function(json) {
+    try {
+        var items = JSON.parse(json);
+        for (var i = 0; i < items.length; i++) { window._addMemo(items[i].cfi, items[i].id); }
+    } catch(e) {}
+};
+window._getAnnotationAtPoint = function(x, y) {
+    try {
+        var hlGroups = document.querySelectorAll('[class^="epub-hl-"]');
+        for (var i = 0; i < hlGroups.length; i++) {
+            var g = hlGroups[i];
             var rects = g.querySelectorAll('rect');
             for (var j = 0; j < rects.length; j++) {
                 var br = rects[j].getBoundingClientRect();
                 if (x >= br.left && x <= br.right && y >= br.top && y <= br.bottom) {
-                    var className = g.getAttribute('class') || '';
-                    var match = className.match(/epub-hl-(\d+)/);
+                    var match = (g.getAttribute('class') || '').match(/epub-hl-(\d+)/);
                     if (match) {
                         var gbr = g.getBoundingClientRect();
-                        return JSON.stringify({id: parseInt(match[1]), cx: gbr.left + gbr.width/2, y: gbr.top, bottom: gbr.bottom});
+                        return JSON.stringify({type: 'highlight', id: parseInt(match[1]), cx: gbr.left + gbr.width/2, y: gbr.top, bottom: gbr.bottom});
                     }
+                }
+            }
+        }
+        var memoGroups = document.querySelectorAll('[class^="epub-memo-"]');
+        for (var i = 0; i < memoGroups.length; i++) {
+            var g = memoGroups[i];
+            var gbr = g.getBoundingClientRect();
+            if (x >= gbr.left && x <= gbr.right && y >= gbr.top - 20 && y <= gbr.bottom + 10) {
+                var match = (g.getAttribute('class') || '').match(/epub-memo-(\d+)/);
+                if (match) {
+                    return JSON.stringify({type: 'memo', id: parseInt(match[1]), cx: gbr.left + gbr.width/2, y: gbr.top, bottom: gbr.bottom});
                 }
             }
         }

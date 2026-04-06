@@ -186,11 +186,49 @@ private val MIGRATION_9_10 = object : Migration(9, 10) {
     }
 }
 
-@Database(entities = [BookReadRecord::class, Bookmark::class, Highlight::class], version = 10)
+@Entity(tableName = "memos", indices = [Index("bookPath")])
+data class Memo(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val bookPath: String,
+    val cfi: String,
+    val text: String = "",
+    val note: String = "",
+    val chapterTitle: String = "",
+    val page: Int = 0,
+    val createdAt: Long = System.currentTimeMillis()
+)
+
+@Dao
+interface MemoDao {
+    @Query("SELECT * FROM memos WHERE bookPath = :bookPath ORDER BY createdAt ASC")
+    suspend fun getByBook(bookPath: String): List<Memo>
+
+    @Query("SELECT * FROM memos WHERE bookPath = :bookPath AND cfi = :cfi LIMIT 1")
+    suspend fun getByCfi(bookPath: String, cfi: String): Memo?
+
+    @Insert
+    suspend fun insert(memo: Memo): Long
+
+    @Query("UPDATE memos SET note = :note WHERE id = :id")
+    suspend fun updateNote(id: Long, note: String)
+
+    @Query("DELETE FROM memos WHERE id = :id")
+    suspend fun deleteById(id: Long)
+}
+
+private val MIGRATION_10_11 = object : Migration(10, 11) {
+    override fun migrate(database: SupportSQLiteDatabase) {
+        database.execSQL("CREATE TABLE memos (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, bookPath TEXT NOT NULL, cfi TEXT NOT NULL, text TEXT NOT NULL DEFAULT '', note TEXT NOT NULL DEFAULT '', chapterTitle TEXT NOT NULL DEFAULT '', page INTEGER NOT NULL DEFAULT 0, createdAt INTEGER NOT NULL DEFAULT 0)")
+        database.execSQL("CREATE INDEX index_memos_bookPath ON memos (bookPath)")
+    }
+}
+
+@Database(entities = [BookReadRecord::class, Bookmark::class, Highlight::class, Memo::class], version = 11)
 abstract class BookDatabase : RoomDatabase() {
     abstract fun bookReadRecordDao(): BookReadRecordDao
     abstract fun bookmarkDao(): BookmarkDao
     abstract fun highlightDao(): HighlightDao
+    abstract fun memoDao(): MemoDao
 
     companion object {
         @Volatile private var INSTANCE: BookDatabase? = null
@@ -201,7 +239,7 @@ abstract class BookDatabase : RoomDatabase() {
                     context.applicationContext,
                     BookDatabase::class.java,
                     "book_database"
-                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10).build().also { INSTANCE = it }
+                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11).build().also { INSTANCE = it }
             }
     }
 }
