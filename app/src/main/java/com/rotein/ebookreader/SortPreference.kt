@@ -90,3 +90,76 @@ object SortPreferenceStore {
             .apply()
     }
 }
+
+val READER_FONT_FAMILIES = listOf("기본", "나눔고딕", "나눔명조", "본고딕", "본명조")
+
+enum class ReaderTextAlign(val label: String) {
+    JUSTIFY("양쪽"), LEFT("왼쪽"), RIGHT("오른쪽"), CENTER("가운데")
+}
+
+enum class ReaderPageFlip(val label: String) {
+    LR_PREV_NEXT("좌우\n이전/다음"),
+    LR_NEXT_PREV("좌우\n다음/이전"),
+    TB_PREV_NEXT("상하\n이전/다음"),
+    TB_NEXT_PREV("상하\n다음/이전")
+}
+
+enum class ReaderBottomInfo(val label: String) {
+    NONE("없음"),
+    BOOK_TITLE("책 제목"),
+    CHAPTER_TITLE("챕터 제목"),
+    PAGE("페이지 수"),
+    CLOCK("시계"),
+    PROGRESS("독서 진행률")
+}
+
+data class ReaderSettings(
+    val fontIndex: Int = 0,
+    val fontSize: Int = 16,
+    val textAlign: ReaderTextAlign = ReaderTextAlign.JUSTIFY,
+    val lineHeight: Float = 1.5f,
+    val paragraphSpacing: Int = 0,
+    val paddingVertical: Int = 20,
+    val paddingHorizontal: Int = 20,
+    val pageFlip: ReaderPageFlip = ReaderPageFlip.LR_PREV_NEXT,
+    val leftInfo: ReaderBottomInfo = ReaderBottomInfo.NONE,
+    val rightInfo: ReaderBottomInfo = ReaderBottomInfo.PAGE,
+    val dualPage: Boolean = false
+)
+
+object ReaderSettingsStore {
+    private const val PREF_NAME = "reader_settings"
+
+    fun load(context: Context): ReaderSettings {
+        val prefs = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
+        return ReaderSettings(
+            fontIndex = prefs.getInt("fontIndex", 0).coerceIn(0, READER_FONT_FAMILIES.lastIndex),
+            fontSize = prefs.getInt("fontSize", 16),
+            textAlign = ReaderTextAlign.entries.firstOrNull { it.name == prefs.getString("textAlign", null) } ?: ReaderTextAlign.JUSTIFY,
+            lineHeight = prefs.getFloat("lineHeight", 1.5f),
+            paragraphSpacing = prefs.getInt("paragraphSpacing", 0),
+            paddingVertical = prefs.getInt("paddingVertical", 20),
+            paddingHorizontal = prefs.getInt("paddingHorizontal", 20),
+            pageFlip = ReaderPageFlip.entries.firstOrNull { it.name == prefs.getString("pageFlip", null) } ?: ReaderPageFlip.LR_PREV_NEXT,
+            leftInfo = ReaderBottomInfo.entries.firstOrNull { it.name == prefs.getString("leftInfo", null) } ?: ReaderBottomInfo.NONE,
+            rightInfo = ReaderBottomInfo.entries.firstOrNull { it.name == prefs.getString("rightInfo", null) } ?: ReaderBottomInfo.PAGE,
+            dualPage = prefs.getBoolean("dualPage", false)
+        )
+    }
+
+    fun save(context: Context, settings: ReaderSettings) {
+        context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE).edit()
+            .putInt("fontIndex", settings.fontIndex)
+            .putInt("fontSize", settings.fontSize)
+            .putString("textAlign", settings.textAlign.name)
+            .putFloat("lineHeight", settings.lineHeight)
+            .putInt("paragraphSpacing", settings.paragraphSpacing)
+            .putInt("paddingVertical", settings.paddingVertical)
+            .putInt("paddingHorizontal", settings.paddingHorizontal)
+            .putString("pageFlip", settings.pageFlip.name)
+            .putString("leftInfo", settings.leftInfo.name)
+            .putString("rightInfo", settings.rightInfo.name)
+            .putBoolean("dualPage", settings.dualPage)
+            .apply()
+    }
+}

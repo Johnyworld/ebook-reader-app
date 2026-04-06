@@ -91,9 +91,12 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.TextButton
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.ui.window.Popup
@@ -221,6 +224,8 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
     var bookmarks by remember(book.path) { mutableStateOf<List<Bookmark>>(emptyList()) }
     var highlights by remember(book.path) { mutableStateOf<List<Highlight>>(emptyList()) }
     var isContentRendered by remember(book.path) { mutableStateOf(false) }
+    var showSettingsPopup by remember { mutableStateOf(false) }
+    var readerSettings by remember { mutableStateOf(ReaderSettingsStore.load(context)) }
 
     val activity = LocalContext.current as? MainActivity
     DisposableEffect(epubWebView.value) {
@@ -239,6 +244,11 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
     BackHandler(enabled = showMemoEditor) { showMemoEditor = false }
     BackHandler(enabled = memoActionState != null) { memoActionState = null }
     BackHandler(enabled = combinedAnnotationState != null) { combinedAnnotationState = null }
+    BackHandler(enabled = showSettingsPopup) { showSettingsPopup = false }
+
+    LaunchedEffect(readerSettings) {
+        withContext(Dispatchers.IO) { ReaderSettingsStore.save(context, readerSettings) }
+    }
 
     LaunchedEffect(showMenu) {
         if (showMenu) {
@@ -477,18 +487,25 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                             isSearching = false
                             showSearchPopup = true
                         })
+                        HorizontalDivider(color = Color(0xFFCCCCCC))
                         ReaderMenuItem(Icons.Default.Star, "하이라이트", onClick = {
                             showHighlightPopup = true
                         })
+                        HorizontalDivider(color = Color(0xFFCCCCCC))
                         ReaderMenuItem(Icons.Default.Edit, "메모", onClick = {
                             showMemoListPopup = true
                         })
+                        HorizontalDivider(color = Color(0xFFCCCCCC))
                         ReaderMenuItem(Icons.Default.Bookmark, "북마크", onClick = {
                             showBookmarkPopup = true
                         })
-                        ReaderMenuItem(Icons.Default.Settings, "설정")
+                        HorizontalDivider(color = Color(0xFFCCCCCC))
+                        ReaderMenuItem(Icons.Default.Settings, "설정", onClick = {
+                            showSettingsPopup = true
+                            showMenu = false
+                        })
 
-                        Spacer(Modifier.height(16.dp))
+                        Spacer(Modifier.height(2.dp))
                     }
                 }
             }
@@ -887,6 +904,35 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
             )
         }
 
+        // 설정 바텀시트
+        if (showSettingsPopup) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .pointerInput(Unit) { detectTapGestures { showSettingsPopup = false } }
+            )
+            Column(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 16.dp)
+            ) {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(1.dp, Color.Black)
+                        .pointerInput(Unit) { detectTapGestures {} },
+                    color = Color.White
+                ) {
+                    ReaderSettingsBottomSheet(
+                        settings = readerSettings,
+                        onSettingsChange = { readerSettings = it },
+                        onDismiss = { showSettingsPopup = false }
+                    )
+                }
+            }
+        }
+
         // 북마크 팝업
         if (showBookmarkPopup) {
             BookmarkPopup(
@@ -916,13 +962,14 @@ private fun ReaderMenuItem(icon: ImageVector, label: String, onClick: () -> Unit
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .height(52.dp)
             .clickable { onClick() }
-            .padding(horizontal = 16.dp, vertical = 14.dp),
+            .padding(horizontal = 16.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Icon(icon, contentDescription = null)
-        Text(label, style = MaterialTheme.typography.bodyLarge)
+        Text(label, style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp))
     }
 }
 
@@ -3291,6 +3338,340 @@ private fun mobiInt(b: ByteArray, off: Int) =
     (b[off + 3].toInt() and 0xFF)
 
 // ─── Shared helpers ───────────────────────────────────────────────────────────
+
+@Composable
+private fun ReaderSettingsBottomSheet(
+    settings: ReaderSettings,
+    onSettingsChange: (ReaderSettings) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var selectedTab by remember { mutableStateOf(0) }
+    val tabLabels = listOf("글자", "여백", "뷰어")
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier.fillMaxWidth().height(56.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                tabLabels.forEachIndexed { index, label ->
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                            .clickable { selectedTab = index },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            label,
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = if (selectedTab == index) FontWeight.Bold else FontWeight.Normal
+                        )
+                    }
+                }
+                IconButton(onClick = onDismiss, modifier = Modifier.size(56.dp)) {
+                    Icon(Icons.Default.Close, contentDescription = "닫기")
+                }
+            }
+            Row(modifier = Modifier.fillMaxWidth()) {
+                tabLabels.forEachIndexed { index, _ ->
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(2.dp)
+                            .background(if (selectedTab == index) Color.Black else Color.Transparent)
+                    )
+                }
+                Spacer(modifier = Modifier.width(56.dp))
+            }
+        }
+        HorizontalDivider(color = Color.Black)
+
+        Box(modifier = Modifier.fillMaxWidth().height(230.dp)) {
+            when (selectedTab) {
+                0 -> ReaderGlyphTab(settings, onSettingsChange)
+                1 -> ReaderMarginTab(settings, onSettingsChange)
+                2 -> ReaderViewerTab(settings, onSettingsChange)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ReaderGlyphTab(settings: ReaderSettings, onSettingsChange: (ReaderSettings) -> Unit) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        ReaderSettingRow("폰트") {
+            ReaderCycleSelectorField(
+                options = READER_FONT_FAMILIES,
+                selected = READER_FONT_FAMILIES[settings.fontIndex],
+                onSelect = { onSettingsChange(settings.copy(fontIndex = READER_FONT_FAMILIES.indexOf(it))) },
+                labelFor = { it }
+            )
+        }
+        HorizontalDivider(color = Color(0xFFE0E0E0))
+        ReaderSettingRow("글자 크기") {
+            ReaderStepperField(
+                value = settings.fontSize.toString(),
+                onDecrement = { if (settings.fontSize > 8) onSettingsChange(settings.copy(fontSize = settings.fontSize - 1)) },
+                onIncrement = { if (settings.fontSize < 32) onSettingsChange(settings.copy(fontSize = settings.fontSize + 1)) }
+            )
+        }
+    }
+}
+
+@Composable
+private fun ReaderMarginTab(settings: ReaderSettings, onSettingsChange: (ReaderSettings) -> Unit) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        ReaderSettingRow("줄 간격") {
+            ReaderStepperField(
+                value = "%.1f".format(settings.lineHeight),
+                onDecrement = { if (settings.lineHeight > 1.0f) onSettingsChange(settings.copy(lineHeight = (Math.round(settings.lineHeight * 10) - 1) / 10f)) },
+                onIncrement = { if (settings.lineHeight < 3.0f) onSettingsChange(settings.copy(lineHeight = (Math.round(settings.lineHeight * 10) + 1) / 10f)) }
+            )
+        }
+        HorizontalDivider(color = Color(0xFFE0E0E0))
+        ReaderSettingRow("문단 간격") {
+            ReaderStepperField(
+                value = settings.paragraphSpacing.toString(),
+                onDecrement = { if (settings.paragraphSpacing > 0) onSettingsChange(settings.copy(paragraphSpacing = settings.paragraphSpacing - 1)) },
+                onIncrement = { if (settings.paragraphSpacing < 40) onSettingsChange(settings.copy(paragraphSpacing = settings.paragraphSpacing + 1)) }
+            )
+        }
+        HorizontalDivider(color = Color(0xFFE0E0E0))
+        ReaderSettingRow("상하 여백") {
+            ReaderStepperField(
+                value = settings.paddingVertical.toString(),
+                onDecrement = { if (settings.paddingVertical > 0) onSettingsChange(settings.copy(paddingVertical = settings.paddingVertical - 2)) },
+                onIncrement = { if (settings.paddingVertical < 80) onSettingsChange(settings.copy(paddingVertical = settings.paddingVertical + 2)) }
+            )
+        }
+        HorizontalDivider(color = Color(0xFFE0E0E0))
+        ReaderSettingRow("좌우 여백") {
+            ReaderStepperField(
+                value = settings.paddingHorizontal.toString(),
+                onDecrement = { if (settings.paddingHorizontal > 0) onSettingsChange(settings.copy(paddingHorizontal = settings.paddingHorizontal - 2)) },
+                onIncrement = { if (settings.paddingHorizontal < 80) onSettingsChange(settings.copy(paddingHorizontal = settings.paddingHorizontal + 2)) }
+            )
+        }
+    }
+}
+
+@Composable
+private fun ReaderViewerTab(settings: ReaderSettings, onSettingsChange: (ReaderSettings) -> Unit) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        ReaderSettingRow("페이지 넘김") {
+            ReaderCycleSelectorField(
+                options = ReaderPageFlip.entries,
+                selected = settings.pageFlip,
+                onSelect = { onSettingsChange(settings.copy(pageFlip = it)) },
+                labelFor = { it.label }
+            )
+        }
+        HorizontalDivider(color = Color(0xFFE0E0E0))
+        ReaderSettingRow("왼쪽 하단 정보") {
+            ReaderCycleSelectorField(
+                options = ReaderBottomInfo.entries,
+                selected = settings.leftInfo,
+                onSelect = { onSettingsChange(settings.copy(leftInfo = it)) },
+                labelFor = { it.label }
+            )
+        }
+        HorizontalDivider(color = Color(0xFFE0E0E0))
+        ReaderSettingRow("오른쪽 하단 정보") {
+            ReaderCycleSelectorField(
+                options = ReaderBottomInfo.entries,
+                selected = settings.rightInfo,
+                onSelect = { onSettingsChange(settings.copy(rightInfo = it)) },
+                labelFor = { it.label }
+            )
+        }
+        HorizontalDivider(color = Color(0xFFE0E0E0))
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                "가로모드 두 쪽 보기",
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.weight(1f)
+            )
+            Switch(
+                checked = settings.dualPage,
+                onCheckedChange = { onSettingsChange(settings.copy(dualPage = it)) },
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = Color.White,
+                    checkedTrackColor = Color.Black,
+                    uncheckedThumbColor = Color.Black,
+                    uncheckedTrackColor = Color.White,
+                    uncheckedBorderColor = Color.Black
+                )
+            )
+        }
+    }
+}
+
+@Composable
+private fun ReaderSettingRow(label: String, field: @Composable () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+        field()
+    }
+}
+
+@Composable
+private fun ReaderStepperField(
+    value: String,
+    onDecrement: () -> Unit,
+    onIncrement: () -> Unit
+) {
+    Row(
+        modifier = Modifier.width(160.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        IconButton(onClick = onDecrement, modifier = Modifier.size(40.dp)) {
+            Icon(
+                Icons.AutoMirrored.Filled.ArrowBack,
+                contentDescription = null,
+                modifier = Modifier.size(16.dp)
+            )
+        }
+        Text(
+            value,
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.weight(1f),
+            textAlign = TextAlign.Center,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        IconButton(onClick = onIncrement, modifier = Modifier.size(40.dp)) {
+            Icon(
+                Icons.AutoMirrored.Filled.ArrowForward,
+                contentDescription = null,
+                modifier = Modifier.size(16.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun <T> ReaderCycleSelectorField(
+    options: List<T>,
+    selected: T,
+    onSelect: (T) -> Unit,
+    labelFor: (T) -> String
+) {
+    var dropdownOpen by remember { mutableStateOf(false) }
+    val currentIndex = options.indexOf(selected)
+    val density = LocalDensity.current
+    val screenHeightPx = with(density) { LocalConfiguration.current.screenHeightDp.dp.toPx() }
+    var buttonPositionY by remember { mutableStateOf(0f) }
+    var buttonHeightPx by remember { mutableStateOf(0f) }
+    var dropdownHeightPx by remember { mutableStateOf(0) }
+
+    Box(
+        modifier = Modifier
+            .width(160.dp)
+            .onGloballyPositioned { coords ->
+                buttonPositionY = coords.positionInRoot().y
+                buttonHeightPx = coords.size.height.toFloat()
+            }
+    ) {
+        Row(
+            modifier = Modifier.width(160.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(
+                onClick = { onSelect(options[(currentIndex - 1 + options.size) % options.size]) },
+                modifier = Modifier.size(40.dp)
+            ) {
+                Icon(
+                    Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp)
+                )
+            }
+            Text(
+                labelFor(selected),
+                modifier = Modifier
+                    .weight(1f)
+                    .clickable { dropdownOpen = true },
+                style = MaterialTheme.typography.bodyMedium,
+                textAlign = TextAlign.Center
+            )
+            IconButton(
+                onClick = { onSelect(options[(currentIndex + 1) % options.size]) },
+                modifier = Modifier.size(40.dp)
+            ) {
+                Icon(
+                    Icons.AutoMirrored.Filled.ArrowForward,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp)
+                )
+            }
+        }
+
+        if (dropdownOpen) {
+            val itemHeightPx = with(density) { 44.dp.toPx() }
+            val estimatedDropdownHeightPx = (options.size * itemHeightPx).toInt()
+            val spaceBelow = screenHeightPx - buttonPositionY - buttonHeightPx
+            val showAbove = spaceBelow < estimatedDropdownHeightPx
+            val offsetY = if (showAbove) {
+                -(if (dropdownHeightPx > 0) dropdownHeightPx else estimatedDropdownHeightPx)
+            } else {
+                buttonHeightPx.toInt()
+            }
+
+            Popup(
+                alignment = Alignment.TopStart,
+                offset = IntOffset(0, offsetY),
+                onDismissRequest = { dropdownOpen = false },
+                properties = PopupProperties(focusable = true)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .width(160.dp)
+                        .background(Color.White)
+                        .border(1.dp, Color.Black)
+                        .onGloballyPositioned { dropdownHeightPx = it.size.height }
+                ) {
+                    options.forEachIndexed { index, option ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onSelect(option); dropdownOpen = false }
+                                .padding(horizontal = 12.dp, vertical = 12.dp)
+                        ) {
+                            Text(
+                                labelFor(option),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = Color.Black,
+                                modifier = Modifier.weight(1f)
+                            )
+                            if (option == selected) {
+                                Icon(
+                                    Icons.Default.Check,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
+                        if (index < options.lastIndex) {
+                            HorizontalDivider(color = Color(0xFFE0E0E0))
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
 
 @Composable
 private fun CenteredMessage(text: String) {
