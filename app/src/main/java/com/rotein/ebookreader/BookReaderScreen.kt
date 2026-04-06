@@ -395,7 +395,8 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                         searchResults = (searchResults ?: emptyList()) + partial
                     } catch (_: Exception) {}
                 },
-                onSearchComplete = { isSearching = false }
+                onSearchComplete = { isSearching = false },
+                readerSettings = readerSettings
             )
             "pdf"  -> PdfViewer(book.path, onCenterTap)
             "mobi" -> MobiViewer(book.path, onCenterTap)
@@ -2118,6 +2119,8 @@ private fun EpubViewer(
     onHighlightLongPressRef.set(onHighlightLongPress)
     val onMemoLongPressRef = remember { java.util.concurrent.atomic.AtomicReference<((Long, Float, Float, Float) -> Unit)?>(null) }
     onMemoLongPressRef.set(onMemoLongPress)
+    val pageFlipRef = remember { java.util.concurrent.atomic.AtomicReference(readerSettings.pageFlip) }
+    pageFlipRef.set(readerSettings.pageFlip)
     val clearSelection: () -> Unit = {
         selectionActive.set(false)
         selectionState = null
@@ -2244,11 +2247,30 @@ private fun EpubViewer(
                                     return true
                                 }
                                 val x = e.x
+                                val y = e.y
                                 val w = this@apply.width.toFloat()
-                                when {
-                                    x < w / 3f -> webView.evaluateJavascript("window._prev()", null)
-                                    x > w * 2f / 3f -> webView.evaluateJavascript("window._next()", null)
-                                    else -> onCenterTap()
+                                val h = this@apply.height.toFloat()
+                                when (pageFlipRef.get()) {
+                                    ReaderPageFlip.LR_PREV_NEXT -> when {
+                                        x < w / 3f -> webView.evaluateJavascript("window._prev()", null)
+                                        x > w * 2f / 3f -> webView.evaluateJavascript("window._next()", null)
+                                        else -> onCenterTap()
+                                    }
+                                    ReaderPageFlip.LR_NEXT_PREV -> when {
+                                        x < w / 3f -> webView.evaluateJavascript("window._next()", null)
+                                        x > w * 2f / 3f -> webView.evaluateJavascript("window._prev()", null)
+                                        else -> onCenterTap()
+                                    }
+                                    ReaderPageFlip.TB_PREV_NEXT -> when {
+                                        y < h / 3f -> webView.evaluateJavascript("window._prev()", null)
+                                        y > h * 2f / 3f -> webView.evaluateJavascript("window._next()", null)
+                                        else -> onCenterTap()
+                                    }
+                                    ReaderPageFlip.TB_NEXT_PREV -> when {
+                                        y < h / 3f -> webView.evaluateJavascript("window._next()", null)
+                                        y > h * 2f / 3f -> webView.evaluateJavascript("window._prev()", null)
+                                        else -> onCenterTap()
+                                    }
                                 }
                                 this@apply.performClick()
                                 return true
