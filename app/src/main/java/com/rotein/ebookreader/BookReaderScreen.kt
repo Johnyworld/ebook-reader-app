@@ -2683,9 +2683,13 @@ function _getSpreadMode() {
     return (_dualPage && window.innerWidth > window.innerHeight) ? "always" : "none";
 }
 var book = ePub("$opfPath");
+var _viewerEl = document.getElementById('viewer');
+var _viewerRect = _viewerEl ? _viewerEl.getBoundingClientRect() : null;
+var _viewerW = (_viewerRect && _viewerRect.width > 0) ? _viewerRect.width : (window.innerWidth - ${settings.paddingHorizontal * 2});
+var _viewerH = (_viewerRect && _viewerRect.height > 0) ? _viewerRect.height : (window.innerHeight - ${settings.paddingVertical * 2 + 16});
 var rendition = book.renderTo("viewer", {
-    width: window.innerWidth - ${settings.paddingHorizontal * 2},
-    height: window.innerHeight - ${settings.paddingVertical * 2 + 16},
+    width: _viewerW,
+    height: _viewerH,
     spread: _getSpreadMode(),
     flow: "paginated",
     manager: "default",
@@ -2736,6 +2740,18 @@ function reportLocation(location) {
         if (_totalVisualPages > 0 && location.start) {
             var idx = location.start.index !== undefined ? location.start.index : 0;
             var pg = location.start.displayed ? location.start.displayed.page : 1;
+            var total = location.start.displayed ? location.start.displayed.total : 0;
+            try {
+                var view = rendition.manager && rendition.manager.views && rendition.manager.views.first && rendition.manager.views.first();
+                var pos = view && view.position ? view.position() : null;
+                var curX = pos ? (pos.x || pos.left || 0) : 0;
+                var iframeDoc = view && view.iframe && (view.iframe.contentDocument || (view.iframe.contentWindow && view.iframe.contentWindow.document));
+                var scrollW = iframeDoc ? iframeDoc.documentElement.scrollWidth : 0;
+                if (scrollW > 0 && total > 0) {
+                    var actualCW = scrollW / total;
+                    pg = Math.round(Math.abs(curX) / actualCW) + 1;
+                }
+            } catch(e) {}
             Android.onPageInfoChanged((_spinePageOffsets[idx] || 0) + pg, _totalVisualPages);
         }
     } catch(e) {}
@@ -2747,6 +2763,7 @@ var _spinePageOffsets = {};
 var _totalVisualPages = 0;
 var _locationsReady = false;
 var _rendered = false;
+var _pendingLocation = null;
 window._currentCfi = "";
 rendition.on("relocated", function(location) {
     if (!_rendered) { _rendered = true; Android.onContentRendered(); }
@@ -2761,7 +2778,11 @@ rendition.on("relocated", function(location) {
         var cfi = (location.start && location.start.cfi) ? location.start.cfi : "";
         if (cfi) { window._currentCfi = cfi; Android.onLocationChanged(0, cfi, ""); }
     } catch(e) {}
-    if (_locationsReady) reportLocation(location);
+    if (_locationsReady) {
+        reportLocation(location);
+    } else {
+        _pendingLocation = location;
+    }
 });
 
 book.loaded.navigation.then(function(nav) {
@@ -2790,77 +2811,84 @@ book.loaded.navigation.then(function(nav) {
 });
 
 function computeVisualPages() {
-    var items = book.spine ? (book.spine.items || []) : [];
-    if (items.length === 0) return;
     var s = window._readerSettings;
     var scanW = window.innerWidth - s.paddingHorizontal * 2;
     var scanH = window.innerHeight - s.paddingVertical * 2 - 16;
     var scanDiv = document.createElement('div');
-    scanDiv.style.cssText = 'position:fixed;left:-' + (window.innerWidth + 10) + 'px;top:0;width:' + window.innerWidth + 'px;height:' + window.innerHeight + 'px;overflow:hidden;';
+    scanDiv.style.cssText = 'position:fixed;left:-' + (scanW + 10) + 'px;top:0;width:' + scanW + 'px;height:' + scanH + 'px;overflow:hidden;';
     document.body.appendChild(scanDiv);
-    var scanRendition = book.renderTo(scanDiv, {
-        width: window.innerWidth,
-        height: window.innerHeight,
+    var scanBook = ePub("$opfPath");
+    var scanRendition = scanBook.renderTo(scanDiv, {
+        width: scanW,
+        height: scanH,
         spread: "none",
         flow: "paginated",
         manager: "default",
         minSpreadWidth: 9999
     });
-    var i = 0;
-    function next() {
-        if (i >= items.length) {
-            var offset = 0;
-            for (var j = 0; j < items.length; j++) {
-                _spinePageOffsets[j] = offset;
-                offset += (_spinePageCounts[j] || 1);
-            }
-            _totalVisualPages = offset;
+    scanBook.ready.then(function() {
+        var items = scanBook.spine ? (scanBook.spine.items || []) : [];
+        if (items.length === 0) {
             document.body.removeChild(scanDiv);
-            Android.onScanComplete(_totalVisualPages);
-            try {
-                var tocNav = book.navigation ? (book.navigation.toc || []) : [];
-                var spineItemsForToc = book.spine ? (book.spine.items || []) : [];
-                function buildTocWithPages(tocItems, depth) {
-                    var result = [];
-                    for (var ti = 0; ti < tocItems.length; ti++) {
-                        var tocItem = tocItems[ti];
-                        var hrefBase = tocItem.href.split('#')[0];
-                        var page = 0;
-                        for (var si = 0; si < spineItemsForToc.length; si++) {
-                            var siHref = (spineItemsForToc[si].href || '').split('?')[0];
-                            if (siHref === hrefBase || siHref.endsWith('/' + hrefBase) || hrefBase.endsWith('/' + siHref)) {
-                                page = (_spinePageOffsets[si] || 0) + 1;
-                                break;
-                            }
-                        }
-                        result.push({
-                            label: tocItem.label.trim(),
-                            href: tocItem.href,
-                            page: page,
-                            depth: depth,
-                            subitems: tocItem.subitems ? buildTocWithPages(tocItem.subitems, depth + 1) : []
-                        });
-                    }
-                    return result;
-                }
-                Android.onTocReady(JSON.stringify(buildTocWithPages(tocNav, 0)));
-            } catch(e) {}
-            var loc = rendition.currentLocation();
-            if (loc && loc.start) {
-                var idx = loc.start.index !== undefined ? loc.start.index : 0;
-                var pg = loc.start.displayed ? loc.start.displayed.page : 1;
-                Android.onPageInfoChanged((_spinePageOffsets[idx] || 0) + pg, _totalVisualPages);
-            }
             return;
         }
-        scanRendition.display(items[i].href).then(function() {
-            var loc = scanRendition.currentLocation();
-            _spinePageCounts[i] = (loc && loc.start && loc.start.displayed) ? loc.start.displayed.total : 1;
-            i++;
-            next();
-        });
-    }
-    next();
+        var i = 0;
+        function next() {
+            if (i >= items.length) {
+                var offset = 0;
+                for (var j = 0; j < items.length; j++) {
+                    _spinePageOffsets[j] = offset;
+                    offset += (_spinePageCounts[j] || 1);
+                }
+                _totalVisualPages = offset;
+                document.body.removeChild(scanDiv);
+                Android.onScanComplete(_totalVisualPages);
+                try {
+                    var tocNav = book.navigation ? (book.navigation.toc || []) : [];
+                    var spineItemsForToc = book.spine ? (book.spine.items || []) : [];
+                    function buildTocWithPages(tocItems, depth) {
+                        var result = [];
+                        for (var ti = 0; ti < tocItems.length; ti++) {
+                            var tocItem = tocItems[ti];
+                            var hrefBase = tocItem.href.split('#')[0];
+                            var page = 0;
+                            for (var si = 0; si < spineItemsForToc.length; si++) {
+                                var siHref = (spineItemsForToc[si].href || '').split('?')[0];
+                                if (siHref === hrefBase || siHref.endsWith('/' + hrefBase) || hrefBase.endsWith('/' + siHref)) {
+                                    page = (_spinePageOffsets[si] || 0) + 1;
+                                    break;
+                                }
+                            }
+                            result.push({
+                                label: tocItem.label.trim(),
+                                href: tocItem.href,
+                                page: page,
+                                depth: depth,
+                                subitems: tocItem.subitems ? buildTocWithPages(tocItem.subitems, depth + 1) : []
+                            });
+                        }
+                        return result;
+                    }
+                    Android.onTocReady(JSON.stringify(buildTocWithPages(tocNav, 0)));
+                } catch(e) {}
+                _pendingLocation = null;
+                var loc = rendition.currentLocation();
+                if (loc && loc.start) {
+                    var idx = loc.start.index !== undefined ? loc.start.index : 0;
+                    var pg = loc.start.displayed ? loc.start.displayed.page : 1;
+                    Android.onPageInfoChanged((_spinePageOffsets[idx] || 0) + pg, _totalVisualPages);
+                }
+                return;
+            }
+            scanRendition.display(items[i].href).then(function() {
+                var loc = scanRendition.currentLocation();
+                _spinePageCounts[i] = (loc && loc.start && loc.start.displayed) ? loc.start.displayed.total : 1;
+                i++;
+                next();
+            });
+        }
+        next();
+    });
 }
 
 book.ready.then(function() {
@@ -2887,10 +2915,12 @@ book.ready.then(function() {
     } catch(e) {}
 
     _locationsReady = true;
-    var loc = rendition.currentLocation();
-    if (loc && loc.start) {
-        reportLocation(loc);
-    }
+    var _r = document.getElementById('viewer');
+    var _rb = _r ? _r.getBoundingClientRect() : null;
+    var _s = window._readerSettings;
+    var _rw = (_rb && _rb.width > 0) ? _rb.width : (window.innerWidth - _s.paddingHorizontal * 2);
+    var _rh = (_rb && _rb.height > 0) ? _rb.height : (window.innerHeight - _s.paddingVertical * 2 - 16);
+    rendition.resize(_rw, _rh);
     computeVisualPages();
 });
 
