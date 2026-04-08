@@ -3866,7 +3866,7 @@ private fun ReaderMarginTab(settings: ReaderSettings, onSettingsChange: (ReaderS
         ReaderSettingRow("상하 여백") {
             ReaderStepperField(
                 value = settings.paddingVertical.toString(),
-                onDecrement = { if (settings.paddingVertical > 0) onSettingsChange(settings.copy(paddingVertical = settings.paddingVertical - 2)) },
+                onDecrement = { if (settings.paddingVertical > -16) onSettingsChange(settings.copy(paddingVertical = settings.paddingVertical - 2)) },
                 onIncrement = { if (settings.paddingVertical < 80) onSettingsChange(settings.copy(paddingVertical = settings.paddingVertical + 2)) }
             )
         }
@@ -3874,7 +3874,7 @@ private fun ReaderMarginTab(settings: ReaderSettings, onSettingsChange: (ReaderS
         ReaderSettingRow("좌우 여백") {
             ReaderStepperField(
                 value = settings.paddingHorizontal.toString(),
-                onDecrement = { if (settings.paddingHorizontal > 0) onSettingsChange(settings.copy(paddingHorizontal = settings.paddingHorizontal - 2)) },
+                onDecrement = { if (settings.paddingHorizontal > -16) onSettingsChange(settings.copy(paddingHorizontal = settings.paddingHorizontal - 2)) },
                 onIncrement = { if (settings.paddingHorizontal < 80) onSettingsChange(settings.copy(paddingHorizontal = settings.paddingHorizontal + 2)) }
             )
         }
