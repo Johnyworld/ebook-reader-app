@@ -3,6 +3,9 @@ package com.rotein.ebookreader
 import android.content.Context
 import android.graphics.fonts.SystemFonts
 import android.os.Build
+import java.io.File
+import org.json.JSONArray
+import org.json.JSONObject
 
 enum class BookmarkSortOrder(val label: String) {
     CREATED_ASC("등록순"),
@@ -93,9 +96,68 @@ object SortPreferenceStore {
     }
 }
 
-val READER_FONT_FAMILIES = listOf("기본", "나눔고딕", "나눔명조", "본고딕", "본명조")
+val READER_BUILTIN_FONT_NAMES = emptyList<String>()
 
 const val FONT_EPUB_ORIGINAL = "epub_original"
+const val FONT_SYSTEM = "시스템 글꼴"
+
+fun fontDisplayName(fontName: String): String = when (fontName) {
+    FONT_EPUB_ORIGINAL -> "전자책 글꼴"
+    FONT_SYSTEM -> "시스템 글꼴"
+    else -> fontName
+}
+
+enum class FontSortOrder(val label: String) {
+    NAME_ASC("이름순 A-Z"),
+    NAME_DESC("이름순 Z-A"),
+    CREATED_DESC("최신순"),
+    IMPORTED("가져온순")
+}
+
+enum class SystemFontSortOrder(val label: String) {
+    NAME_ASC("이름순 A-Z"),
+    NAME_DESC("이름순 Z-A")
+}
+
+object ImportedFontStore {
+    private const val PREF_NAME = "imported_fonts"
+    private const val KEY_FONTS = "font_entries"
+
+    data class FontEntry(val name: String, val filePath: String)
+
+    fun load(context: Context): List<FontEntry> {
+        val prefs = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
+        val json = prefs.getString(KEY_FONTS, "[]") ?: "[]"
+        return try {
+            val arr = JSONArray(json)
+            (0 until arr.length()).map {
+                val obj = arr.getJSONObject(it)
+                FontEntry(obj.getString("name"), obj.getString("path"))
+            }
+        } catch (e: Exception) { emptyList() }
+    }
+
+    fun add(context: Context, name: String, filePath: String) {
+        val current = load(context).toMutableList()
+        if (current.none { it.name == name }) current.add(FontEntry(name, filePath))
+        val arr = JSONArray()
+        current.forEach { arr.put(JSONObject().put("name", it.name).put("path", it.filePath)) }
+        context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE).edit()
+            .putString(KEY_FONTS, arr.toString()).apply()
+    }
+
+    fun remove(context: Context, name: String) {
+        val current = load(context).filter { it.name != name }
+        val arr = JSONArray()
+        current.forEach { arr.put(JSONObject().put("name", it.name).put("path", it.filePath)) }
+        context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE).edit()
+            .putString(KEY_FONTS, arr.toString()).apply()
+    }
+
+    fun contains(context: Context, name: String): Boolean = load(context).any { it.name == name }
+
+    fun getDir(context: Context): File = File(context.filesDir, "fonts").also { it.mkdirs() }
+}
 
 fun getSystemFontFamilies(): List<String> {
     val families = mutableListOf("시스템 폰트", FONT_EPUB_ORIGINAL)
@@ -163,7 +225,7 @@ enum class ReaderBottomInfo(val label: String) {
 }
 
 data class ReaderSettings(
-    val fontIndex: Int = 0,
+    val fontName: String = FONT_EPUB_ORIGINAL,
     val fontSize: Int = 16,
     val textAlign: ReaderTextAlign = ReaderTextAlign.JUSTIFY,
     val lineHeight: Float = 1.5f,
@@ -182,7 +244,7 @@ object ReaderSettingsStore {
     fun load(context: Context): ReaderSettings {
         val prefs = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
         return ReaderSettings(
-            fontIndex = prefs.getInt("fontIndex", 0).coerceIn(0, READER_FONT_FAMILIES.lastIndex),
+            fontName = prefs.getString("fontName", FONT_EPUB_ORIGINAL) ?: FONT_EPUB_ORIGINAL,
             fontSize = prefs.getInt("fontSize", 16),
             textAlign = ReaderTextAlign.entries.firstOrNull { it.name == prefs.getString("textAlign", null) } ?: ReaderTextAlign.JUSTIFY,
             lineHeight = prefs.getFloat("lineHeight", 1.5f),
@@ -198,7 +260,7 @@ object ReaderSettingsStore {
 
     fun save(context: Context, settings: ReaderSettings) {
         context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE).edit()
-            .putInt("fontIndex", settings.fontIndex)
+            .putString("fontName", settings.fontName)
             .putInt("fontSize", settings.fontSize)
             .putString("textAlign", settings.textAlign.name)
             .putFloat("lineHeight", settings.lineHeight)

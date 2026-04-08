@@ -61,6 +61,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -103,6 +104,8 @@ import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -228,6 +231,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
     var isScanning by remember(book.path) { mutableStateOf(false) }
     var spinePageOffsets by remember(book.path) { mutableStateOf<Map<Int, Int>>(emptyMap()) }
     var showSettingsPopup by remember { mutableStateOf(false) }
+    var showFontPopup by remember { mutableStateOf(false) }
     var readerSettings by remember { mutableStateOf(ReaderSettingsStore.load(context)) }
     var currentTime by remember { mutableStateOf("") }
     LaunchedEffect(Unit) {
@@ -256,6 +260,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
     BackHandler(enabled = memoActionState != null) { memoActionState = null }
     BackHandler(enabled = combinedAnnotationState != null) { combinedAnnotationState = null }
     BackHandler(enabled = showSettingsPopup) { showSettingsPopup = false }
+    BackHandler(enabled = showFontPopup) { showFontPopup = false }
 
     LaunchedEffect(readerSettings) {
         withContext(Dispatchers.IO) { ReaderSettingsStore.save(context, readerSettings) }
@@ -969,10 +974,22 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                     ReaderSettingsBottomSheet(
                         settings = readerSettings,
                         onSettingsChange = { readerSettings = it },
-                        onDismiss = { showSettingsPopup = false }
+                        onDismiss = { showSettingsPopup = false },
+                        onOpenFontPopup = { showFontPopup = true }
                     )
                 }
             }
+        }
+
+        // 글꼴 팝업
+        if (showFontPopup) {
+            FontLayerPopup(
+                currentFontName = readerSettings.fontName,
+                onSelect = { readerSettings = readerSettings.copy(fontName = it); showFontPopup = false },
+                onFontChanged = { readerSettings = readerSettings.copy(fontName = it) },
+                onFontImported = {},
+                onDismiss = { showFontPopup = false }
+            )
         }
 
         // 북마크 팝업
@@ -2161,9 +2178,11 @@ private fun EpubViewer(
     }
 
     LaunchedEffect(readerSettings) {
-        val fontFamily = if (readerSettings.fontIndex > 0) READER_FONT_FAMILIES[readerSettings.fontIndex] else ""
+        val fontFamily = fontFamilyForJs(readerSettings.fontName)
+        val fontFilePath = ImportedFontStore.load(context).find { it.name == readerSettings.fontName }?.filePath ?: ""
         val js = """window._applyReaderSettings(
-            ${if (fontFamily.isNotEmpty()) "\"${fontFamily}\"" else "\"\""},
+            "$fontFamily",
+            "$fontFilePath",
             ${readerSettings.fontSize},
             "${readerSettings.textAlign.name.lowercase()}",
             ${readerSettings.lineHeight},
@@ -2350,9 +2369,11 @@ private fun EpubViewer(
                 if (frameLayout.tag != path) {
                     frameLayout.tag = path
                     val webView = frameLayout.getChildAt(0) as WebView
+                    val fontFilePath = ImportedFontStore.load(context)
+                        .find { it.name == readerSettings.fontName }?.filePath ?: ""
                     webView.loadDataWithBaseURL(
                         "file://${bookDir}/",
-                        buildEpubJsHtml(opfPath!!, savedCfi, readerSettings),
+                        buildEpubJsHtml(opfPath!!, savedCfi, readerSettings, fontFilePath),
                         "text/html",
                         "UTF-8",
                         null
@@ -2662,7 +2683,13 @@ private fun readerBottomInfoText(
     ReaderBottomInfo.PROGRESS -> "${(readingProgress * 100).toInt()}%"
 }
 
-private fun buildEpubJsHtml(opfPath: String, savedCfi: String, settings: ReaderSettings) = """<!DOCTYPE html>
+private fun fontFamilyForJs(fontName: String): String = when (fontName) {
+    FONT_EPUB_ORIGINAL -> FONT_EPUB_ORIGINAL
+    FONT_SYSTEM -> ""
+    else -> fontName
+}
+
+private fun buildEpubJsHtml(opfPath: String, savedCfi: String, settings: ReaderSettings, fontFilePath: String = "") = """<!DOCTYPE html>
 <html>
 <head>
 <meta charset='UTF-8'/>
@@ -2676,6 +2703,18 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: #fff; }
 </head>
 <body>
 <div id="viewer"></div>
+<script>
+(function() {
+    var _RO = window.ResizeObserver;
+    if (!_RO) return;
+    window.ResizeObserver = function(callback) {
+        return new _RO(function(entries, observer) {
+            requestAnimationFrame(function() { callback(entries, observer); });
+        });
+    };
+    window.ResizeObserver.prototype = _RO.prototype;
+})();
+</script>
 <script src="epub.min.js"></script>
 <script>
 var _dualPage = ${settings.dualPage};
@@ -3185,7 +3224,8 @@ window._search = function(query) {
 };
 
 window._readerSettings = {
-    fontFamily: ${if (settings.fontIndex > 0) "\"${READER_FONT_FAMILIES[settings.fontIndex]}\"" else "\"\""},
+    fontFamily: "${fontFamilyForJs(settings.fontName)}",
+    fontFilePath: "$fontFilePath",
     fontSize: ${settings.fontSize},
     textAlign: "${settings.textAlign.name.lowercase()}",
     lineHeight: ${settings.lineHeight},
@@ -3195,13 +3235,20 @@ window._readerSettings = {
 };
 
 function _buildReaderCss(s) {
-    var ff = s.fontFamily ? ("'" + s.fontFamily + "',") : '';
-    return 'html, body, p, div, span, li, td, blockquote, h1, h2, h3, h4, h5, h6 {' +
-        'font-family: ' + ff + 'sans-serif !important;' +
-        'font-size: ' + s.fontSize + 'px !important;' +
-        'line-height: ' + s.lineHeight + ' !important;' +
-        '}' +
-        (s.paragraphSpacing > 0 ? 'p { margin-bottom: ' + s.paragraphSpacing + 'px !important; }' : '');
+    var baseRule = 'font-size: ' + s.fontSize + 'px !important; line-height: ' + s.lineHeight + ' !important;';
+    var paragraphRule = s.paragraphSpacing > 0 ? 'p { margin-bottom: ' + s.paragraphSpacing + 'px !important; }' : '';
+    if (s.fontFamily === 'epub_original') {
+        return 'html, body, p, div, span, li, td, blockquote, h1, h2, h3, h4, h5, h6 {' + baseRule + '}' + paragraphRule;
+    }
+    var fontFaceDecl = '';
+    var ff;
+    if (s.fontFilePath) {
+        fontFaceDecl = '@font-face { font-family: "_imported_"; src: url("' + s.fontFilePath + '"); }';
+        ff = "'_imported_', sans-serif";
+    } else {
+        ff = s.fontFamily ? ("'" + s.fontFamily + "', sans-serif") : 'sans-serif';
+    }
+    return fontFaceDecl + 'html, body, p, div, span, li, td, blockquote, h1, h2, h3, h4, h5, h6 {font-family: ' + ff + ' !important; ' + baseRule + '}' + paragraphRule;
 }
 
 function _injectReaderStyle(doc) {
@@ -3217,8 +3264,8 @@ function _injectReaderStyle(doc) {
 }
 
 var _rescanTimer = null;
-window._applyReaderSettings = function(fontFamily, fontSize, textAlign, lineHeight, paragraphSpacing, paddingVertical, paddingHorizontal, dualPage) {
-    window._readerSettings = { fontFamily: fontFamily, fontSize: fontSize, textAlign: textAlign, lineHeight: lineHeight, paragraphSpacing: paragraphSpacing, paddingVertical: paddingVertical, paddingHorizontal: paddingHorizontal };
+window._applyReaderSettings = function(fontFamily, fontFilePath, fontSize, textAlign, lineHeight, paragraphSpacing, paddingVertical, paddingHorizontal, dualPage) {
+    window._readerSettings = { fontFamily: fontFamily, fontFilePath: fontFilePath, fontSize: fontSize, textAlign: textAlign, lineHeight: lineHeight, paragraphSpacing: paragraphSpacing, paddingVertical: paddingVertical, paddingHorizontal: paddingHorizontal };
     _dualPage = !!dualPage;
     try {
         var viewer = document.getElementById('viewer');
@@ -3549,7 +3596,8 @@ private fun mobiInt(b: ByteArray, off: Int) =
 private fun ReaderSettingsBottomSheet(
     settings: ReaderSettings,
     onSettingsChange: (ReaderSettings) -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    onOpenFontPopup: () -> Unit = {}
 ) {
     var selectedTab by remember { mutableStateOf(0) }
     val tabLabels = listOf("글자", "여백", "뷰어")
@@ -3595,7 +3643,7 @@ private fun ReaderSettingsBottomSheet(
 
         Box(modifier = Modifier.fillMaxWidth().height(230.dp)) {
             when (selectedTab) {
-                0 -> ReaderGlyphTab(settings, onSettingsChange)
+                0 -> ReaderGlyphTab(settings, onSettingsChange, onOpenFontPopup)
                 1 -> ReaderMarginTab(settings, onSettingsChange)
                 2 -> ReaderViewerTab(settings, onSettingsChange)
             }
@@ -3604,15 +3652,45 @@ private fun ReaderSettingsBottomSheet(
 }
 
 @Composable
-private fun ReaderGlyphTab(settings: ReaderSettings, onSettingsChange: (ReaderSettings) -> Unit) {
+private fun ReaderGlyphTab(
+    settings: ReaderSettings,
+    onSettingsChange: (ReaderSettings) -> Unit,
+    onOpenFontPopup: () -> Unit = {}
+) {
+    val context = LocalContext.current
+    val importedFonts = remember { ImportedFontStore.load(context) }
+    val allFonts = remember(importedFonts) {
+        listOf(FONT_EPUB_ORIGINAL, FONT_SYSTEM) + READER_BUILTIN_FONT_NAMES + importedFonts.map { it.name }
+    }
+    val currentIndex = allFonts.indexOf(settings.fontName).coerceAtLeast(0)
+
     Column(modifier = Modifier.fillMaxWidth()) {
-        ReaderSettingRow("폰트") {
-            ReaderCycleSelectorField(
-                options = READER_FONT_FAMILIES,
-                selected = READER_FONT_FAMILIES[settings.fontIndex],
-                onSelect = { onSettingsChange(settings.copy(fontIndex = READER_FONT_FAMILIES.indexOf(it))) },
-                labelFor = { it }
-            )
+        ReaderSettingRow("글꼴") {
+            Row(
+                modifier = Modifier.width(160.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(
+                    onClick = { onSettingsChange(settings.copy(fontName = allFonts[(currentIndex - 1 + allFonts.size) % allFonts.size])) },
+                    modifier = Modifier.size(40.dp)
+                ) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, modifier = Modifier.size(16.dp))
+                }
+                Text(
+                    fontDisplayName(settings.fontName),
+                    modifier = Modifier.weight(1f).clickable { onOpenFontPopup() },
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = TextAlign.Center,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                IconButton(
+                    onClick = { onSettingsChange(settings.copy(fontName = allFonts[(currentIndex + 1) % allFonts.size])) },
+                    modifier = Modifier.size(40.dp)
+                ) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, modifier = Modifier.size(16.dp))
+                }
+            }
         }
         HorizontalDivider(color = Color(0xFFE0E0E0))
         ReaderSettingRow("글자 크기") {
@@ -3931,6 +4009,277 @@ private fun <T> ReaderCycleSelectorField(
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun FontLayerPopup(
+    currentFontName: String,
+    onSelect: (String) -> Unit,
+    onFontChanged: (String) -> Unit = {},
+    onFontImported: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+    val density = LocalDensity.current
+    val screenHeightDp = LocalConfiguration.current.screenHeightDp
+    val statusBarHeightDp = with(density) { WindowInsets.statusBars.getTop(this).toDp().value.toInt() }
+    var selectedTab by remember { mutableStateOf(0) }
+    var fontSortOrder by remember { mutableStateOf(FontSortOrder.NAME_ASC) }
+    var systemFontSortOrder by remember { mutableStateOf(SystemFontSortOrder.NAME_ASC) }
+    var sortDropdownExpanded by remember { mutableStateOf(false) }
+    var sortAnchorHeight by remember { mutableStateOf(0) }
+    var currentPage by remember { mutableStateOf(0) }
+    var confirmImportFont by remember { mutableStateOf<Pair<String, String>?>(null) }
+    var confirmDeleteFont by remember { mutableStateOf<String?>(null) }
+    var importedFonts by remember { mutableStateOf(ImportedFontStore.load(context)) }
+
+    val itemHeightDp = 56
+    val headerHeightDp = 56 + 44 + 2 // header(56) + tabs(44) + tab underline(2)
+    val paginationHeightDp = 56
+    val itemsPerPage = maxOf(1, (screenHeightDp - statusBarHeightDp - headerHeightDp - paginationHeightDp) / itemHeightDp)
+
+    val pinnedFonts = listOf(FONT_EPUB_ORIGINAL, FONT_SYSTEM)
+    val appFonts = remember(fontSortOrder, importedFonts) {
+        val all = READER_BUILTIN_FONT_NAMES + importedFonts.map { it.name }
+        when (fontSortOrder) {
+            FontSortOrder.NAME_ASC -> all.sortedBy { it }
+            FontSortOrder.NAME_DESC -> all.sortedByDescending { it }
+            FontSortOrder.CREATED_DESC -> (READER_BUILTIN_FONT_NAMES + importedFonts.reversed().map { it.name })
+            FontSortOrder.IMPORTED -> all
+        }
+    }
+
+    val systemFontFileMap = remember { getSystemFontFileMap() }
+    val systemFonts = remember(systemFontSortOrder, importedFonts) {
+        val importedNames = importedFonts.map { it.name }.toSet()
+        systemFontFileMap.keys.filter { it !in importedNames }.let { keys ->
+            when (systemFontSortOrder) {
+                SystemFontSortOrder.NAME_ASC -> keys.sortedBy { it }
+                SystemFontSortOrder.NAME_DESC -> keys.sortedByDescending { it }
+            }
+        }
+    }
+
+    val currentItems: List<String> = if (selectedTab == 0) pinnedFonts + appFonts else systemFonts
+    val totalPages = maxOf(1, (currentItems.size + itemsPerPage - 1) / itemsPerPage)
+    val pageItems = currentItems.drop(currentPage * itemsPerPage).take(itemsPerPage)
+
+    LaunchedEffect(selectedTab) { currentPage = 0 }
+    LaunchedEffect(currentItems.size) {
+        if (currentPage >= totalPages) currentPage = maxOf(0, totalPages - 1)
+    }
+
+    confirmImportFont?.let { (fontName, filePath) ->
+        AlertDialog(
+            onDismissRequest = { confirmImportFont = null },
+            title = { Text("글꼴 가져오기") },
+            text = { Text("${fontName} 글꼴을 가져올까요?") },
+            confirmButton = {
+                TextButton(onClick = {
+                    try {
+                        val srcFile = File(filePath)
+                        val destFile = File(ImportedFontStore.getDir(context), srcFile.name)
+                        if (!destFile.exists()) srcFile.copyTo(destFile)
+                        ImportedFontStore.add(context, fontName, destFile.absolutePath)
+                        importedFonts = ImportedFontStore.load(context)
+                        onFontImported()
+                    } catch (e: Exception) { /* ignore */ }
+                    confirmImportFont = null
+                }) { Text("예") }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmImportFont = null }) { Text("아니오") }
+            }
+        )
+    }
+
+    confirmDeleteFont?.let { fontName ->
+        AlertDialog(
+            onDismissRequest = { confirmDeleteFont = null },
+            title = { Text("글꼴 삭제") },
+            text = { Text("${fontName} 글꼴을 삭제할까요?") },
+            confirmButton = {
+                TextButton(onClick = {
+                    ImportedFontStore.remove(context, fontName)
+                    importedFonts = ImportedFontStore.load(context)
+                    onFontImported()
+                    if (fontName == currentFontName) onFontChanged(FONT_EPUB_ORIGINAL)
+                    confirmDeleteFont = null
+                }) { Text("예") }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmDeleteFont = null }) { Text("아니오") }
+            }
+        )
+    }
+
+    Surface(modifier = Modifier.fillMaxSize(), color = Color.White) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            // Header
+            Row(
+                modifier = Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = onDismiss) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "닫기")
+                }
+                Text("글꼴", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                Box(modifier = Modifier.onGloballyPositioned { sortAnchorHeight = it.size.height }) {
+                    TextButton(onClick = { sortDropdownExpanded = true }) {
+                        Text(
+                            if (selectedTab == 0) fontSortOrder.label else systemFontSortOrder.label,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                    if (sortDropdownExpanded) {
+                        Popup(
+                            alignment = Alignment.TopEnd,
+                            offset = IntOffset(0, sortAnchorHeight),
+                            onDismissRequest = { sortDropdownExpanded = false },
+                            properties = PopupProperties(focusable = true)
+                        ) {
+                            Column(modifier = Modifier.width(IntrinsicSize.Max).background(Color.White).border(1.dp, Color.Black)) {
+                                if (selectedTab == 0) {
+                                    FontSortOrder.entries.forEachIndexed { i, order ->
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            modifier = Modifier.fillMaxWidth()
+                                                .clickable { fontSortOrder = order; sortDropdownExpanded = false }
+                                                .padding(start = 16.dp, end = 12.dp, top = 12.dp, bottom = 12.dp)
+                                        ) {
+                                            Text(order.label, style = MaterialTheme.typography.bodyMedium, color = Color.Black, modifier = Modifier.weight(1f))
+                                            if (fontSortOrder == order) {
+                                                Spacer(Modifier.width(16.dp))
+                                                Icon(Icons.Default.Check, contentDescription = null, tint = Color.Black, modifier = Modifier.size(16.dp))
+                                            }
+                                        }
+                                        if (i < FontSortOrder.entries.lastIndex) HorizontalDivider(color = Color(0xFFE0E0E0))
+                                    }
+                                } else {
+                                    SystemFontSortOrder.entries.forEachIndexed { i, order ->
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            modifier = Modifier.fillMaxWidth()
+                                                .clickable { systemFontSortOrder = order; sortDropdownExpanded = false }
+                                                .padding(start = 16.dp, end = 12.dp, top = 12.dp, bottom = 12.dp)
+                                        ) {
+                                            Text(order.label, style = MaterialTheme.typography.bodyMedium, color = Color.Black, modifier = Modifier.weight(1f))
+                                            if (systemFontSortOrder == order) {
+                                                Spacer(Modifier.width(16.dp))
+                                                Icon(Icons.Default.Check, contentDescription = null, tint = Color.Black, modifier = Modifier.size(16.dp))
+                                            }
+                                        }
+                                        if (i < SystemFontSortOrder.entries.lastIndex) HorizontalDivider(color = Color(0xFFE0E0E0))
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            // Tabs
+            Row(modifier = Modifier.fillMaxWidth().height(44.dp)) {
+                listOf("글꼴", "글꼴 가져오기").forEachIndexed { index, label ->
+                    Box(
+                        modifier = Modifier.weight(1f).fillMaxHeight().clickable { selectedTab = index },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            label,
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = if (selectedTab == index) FontWeight.Bold else FontWeight.Normal
+                        )
+                    }
+                }
+            }
+            // Tab underline
+            Row(modifier = Modifier.fillMaxWidth().height(2.dp)) {
+                Box(modifier = Modifier.weight(1f).fillMaxHeight().background(if (selectedTab == 0) Color.Black else Color.Transparent))
+                Box(modifier = Modifier.weight(1f).fillMaxHeight().background(if (selectedTab == 1) Color.Black else Color.Transparent))
+            }
+            HorizontalDivider(color = Color.Black)
+
+            // Content
+            Box(modifier = Modifier.weight(1f)) {
+                if (currentItems.isEmpty()) {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text(
+                            if (selectedTab == 0) "글꼴이 없습니다." else "기기에 글꼴이 없습니다.",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+                } else {
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        pageItems.forEachIndexed { index, fontName ->
+                            if (index > 0) HorizontalDivider(color = Color(0xFFCCCCCC))
+                            val isImported = selectedTab == 0 && importedFonts.any { it.name == fontName }
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(56.dp)
+                                    .clickable {
+                                        if (selectedTab == 0) {
+                                            onSelect(fontName)
+                                        } else {
+                                            val filePath = systemFontFileMap[fontName] ?: ""
+                                            if (filePath.isNotEmpty()) confirmImportFont = Pair(fontName, filePath)
+                                        }
+                                    }
+                                    .padding(start = 16.dp, end = if (isImported) 4.dp else 16.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    fontDisplayName(fontName),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                if (selectedTab == 0 && fontName == currentFontName) {
+                                    Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
+                                }
+                                if (isImported) {
+                                    IconButton(
+                                        onClick = { confirmDeleteFont = fontName },
+                                        modifier = Modifier.size(40.dp)
+                                    ) {
+                                        Icon(Icons.Default.Close, contentDescription = "삭제", modifier = Modifier.size(16.dp))
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Footer
+            Column {
+                if (currentItems.isNotEmpty()) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().height(56.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            modifier = Modifier.clickable(enabled = currentPage > 0) { currentPage-- }.padding(horizontal = 16.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "이전", modifier = Modifier.height(16.dp), tint = if (currentPage > 0) Color.Black else Color(0xFFCCCCCC))
+                            Text("이전", style = MaterialTheme.typography.bodyMedium, color = if (currentPage > 0) Color.Black else Color(0xFFCCCCCC))
+                        }
+                        Text("${currentPage + 1}/$totalPages (${currentItems.size}개)", style = MaterialTheme.typography.bodyMedium)
+                        Row(
+                            modifier = Modifier.clickable(enabled = currentPage < totalPages - 1) { currentPage++ }.padding(horizontal = 16.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text("다음", style = MaterialTheme.typography.bodyMedium, color = if (currentPage < totalPages - 1) Color.Black else Color(0xFFCCCCCC))
+                            Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = "다음", modifier = Modifier.height(16.dp), tint = if (currentPage < totalPages - 1) Color.Black else Color(0xFFCCCCCC))
+                        }
+                    }
+                }
+                HorizontalDivider(color = Color.Black)
             }
         }
     }
