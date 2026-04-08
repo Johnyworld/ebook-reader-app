@@ -390,6 +390,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                                 cfi = cfi,
                                 text = text,
                                 chapterTitle = chapterSnapshot,
+                                page = currentPage,
                                 createdAt = System.currentTimeMillis()
                             )
                             val id = withContext(Dispatchers.IO) { highlightDao.insert(highlight) }
@@ -451,6 +452,30 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                         val map = mutableMapOf<String, Int>()
                         obj.keys().forEach { key -> map[key] = obj.getInt(key) }
                         cfiPageMap = map
+                        val newSpineOffsets = spinePageOffsets
+                        scope.launch(Dispatchers.IO) {
+                            bookmarks = bookmarks.map { bm ->
+                                val newPage = cfiToPage(bm.cfi, newSpineOffsets, map)
+                                if (newPage > 0 && newPage != bm.page) {
+                                    bookmarkDao.updatePage(bm.id, newPage)
+                                    bm.copy(page = newPage)
+                                } else bm
+                            }
+                            highlights = highlights.map { hl ->
+                                val newPage = cfiToPage(hl.cfi, newSpineOffsets, map)
+                                if (newPage > 0 && newPage != hl.page) {
+                                    highlightDao.updatePage(hl.id, newPage)
+                                    hl.copy(page = newPage)
+                                } else hl
+                            }
+                            memos = memos.map { m ->
+                                val newPage = cfiToPage(m.cfi, newSpineOffsets, map)
+                                if (newPage > 0 && newPage != m.page) {
+                                    memoDao.updatePage(m.id, newPage)
+                                    m.copy(page = newPage)
+                                } else m
+                            }
+                        }
                     } catch (_: Exception) {}
                 },
                 onSearchResultsPartial = { json ->
@@ -660,6 +685,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                                             cfi = cfi,
                                             chapterTitle = chapterTitle,
                                             excerpt = excerpt,
+                                            page = currentPage,
                                             createdAt = System.currentTimeMillis()
                                         )
                                         withContext(Dispatchers.IO) { bookmarkDao.insert(bookmark) }
@@ -876,6 +902,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                                 cfi = memo.cfi,
                                 text = memo.text,
                                 chapterTitle = chapterSnapshot,
+                                page = memo.page.takeIf { it > 0 } ?: cfiToPage(memo.cfi, spinePageOffsets, cfiPageMap),
                                 createdAt = System.currentTimeMillis()
                             )
                             val id = withContext(Dispatchers.IO) { highlightDao.insert(highlight) }
@@ -970,6 +997,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                                 text = pendingMemoText,
                                 note = note,
                                 chapterTitle = chapterSnapshot,
+                                page = currentPage,
                                 createdAt = System.currentTimeMillis()
                             )
                             val id = withContext(Dispatchers.IO) { memoDao.insert(newMemo) }
@@ -1499,7 +1527,7 @@ private fun BookmarkPopup(
         when (sortOrder) {
             BookmarkSortOrder.CREATED_ASC -> bookmarks.sortedBy { it.createdAt }
             BookmarkSortOrder.CREATED_DESC -> bookmarks.sortedByDescending { it.createdAt }
-            BookmarkSortOrder.PAGE_ASC -> bookmarks.sortedBy { cfiToPage(it.cfi, spinePageOffsets, cfiPageMap) }
+            BookmarkSortOrder.PAGE_ASC -> bookmarks.sortedBy { it.page.takeIf { p -> p > 0 } ?: cfiToPage(it.cfi, spinePageOffsets, cfiPageMap) }
         }
     }
     val totalPages = maxOf(1, (sortedBookmarks.size + itemsPerPage - 1) / itemsPerPage)
@@ -1613,7 +1641,7 @@ private fun BookmarkPopup(
                                         horizontalArrangement = Arrangement.SpaceBetween,
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        val bookmarkPage = cfiToPage(bookmark.cfi, spinePageOffsets, cfiPageMap)
+                                        val bookmarkPage = bookmark.page.takeIf { it > 0 } ?: cfiToPage(bookmark.cfi, spinePageOffsets, cfiPageMap)
                                         if (bookmarkPage > 0) {
                                             Text(
                                                 "p.$bookmarkPage",
@@ -1739,7 +1767,7 @@ private fun HighlightPopup(
         when (sortOrder) {
             BookmarkSortOrder.CREATED_ASC -> highlights.sortedBy { it.createdAt }
             BookmarkSortOrder.CREATED_DESC -> highlights.sortedByDescending { it.createdAt }
-            BookmarkSortOrder.PAGE_ASC -> highlights.sortedBy { cfiToPage(it.cfi, spinePageOffsets, cfiPageMap) }
+            BookmarkSortOrder.PAGE_ASC -> highlights.sortedBy { it.page.takeIf { p -> p > 0 } ?: cfiToPage(it.cfi, spinePageOffsets, cfiPageMap) }
         }
     }
     val totalPages = maxOf(1, (sortedHighlights.size + itemsPerPage - 1) / itemsPerPage)
@@ -1819,7 +1847,7 @@ private fun HighlightPopup(
                                         horizontalArrangement = Arrangement.SpaceBetween,
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        val highlightPage = cfiToPage(highlight.cfi, spinePageOffsets, cfiPageMap)
+                                        val highlightPage = highlight.page.takeIf { it > 0 } ?: cfiToPage(highlight.cfi, spinePageOffsets, cfiPageMap)
                                         if (highlightPage > 0) {
                                             Text("p.$highlightPage", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold), color = Color.Black)
                                         }
@@ -1993,7 +2021,7 @@ private fun MemoListPopup(
         when (sortOrder) {
             BookmarkSortOrder.CREATED_ASC -> memos.sortedBy { it.createdAt }
             BookmarkSortOrder.CREATED_DESC -> memos.sortedByDescending { it.createdAt }
-            BookmarkSortOrder.PAGE_ASC -> memos.sortedBy { cfiToPage(it.cfi, spinePageOffsets, cfiPageMap) }
+            BookmarkSortOrder.PAGE_ASC -> memos.sortedBy { it.page.takeIf { p -> p > 0 } ?: cfiToPage(it.cfi, spinePageOffsets, cfiPageMap) }
         }
     }
     val totalPages = maxOf(1, (sortedMemos.size + itemsPerPage - 1) / itemsPerPage)
@@ -2073,7 +2101,7 @@ private fun MemoListPopup(
                                         horizontalArrangement = Arrangement.SpaceBetween,
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        val memoPage = cfiToPage(memo.cfi, spinePageOffsets, cfiPageMap)
+                                        val memoPage = memo.page.takeIf { it > 0 } ?: cfiToPage(memo.cfi, spinePageOffsets, cfiPageMap)
                                         if (memoPage > 0) {
                                             Text("p.$memoPage", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold), color = Color.Black)
                                         }

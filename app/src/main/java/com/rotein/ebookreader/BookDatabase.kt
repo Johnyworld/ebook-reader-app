@@ -112,6 +112,7 @@ data class Bookmark(
     val cfi: String,
     val chapterTitle: String = "",
     val excerpt: String = "",
+    val page: Int = 0,
     val createdAt: Long = System.currentTimeMillis()
 )
 
@@ -125,6 +126,9 @@ interface BookmarkDao {
 
     @Query("DELETE FROM bookmarks WHERE bookPath = :bookPath AND cfi = :cfi")
     suspend fun deleteByCfi(bookPath: String, cfi: String)
+
+    @Query("UPDATE bookmarks SET page = :page WHERE id = :id")
+    suspend fun updatePage(id: Long, page: Int)
 }
 
 private val MIGRATION_5_6 = object : Migration(5, 6) {
@@ -156,6 +160,7 @@ data class Highlight(
     val cfi: String,
     val text: String = "",
     val chapterTitle: String = "",
+    val page: Int = 0,
     val createdAt: Long = System.currentTimeMillis()
 )
 
@@ -169,6 +174,9 @@ interface HighlightDao {
 
     @Query("DELETE FROM highlights WHERE id = :id")
     suspend fun deleteById(id: Long)
+
+    @Query("UPDATE highlights SET page = :page WHERE id = :id")
+    suspend fun updatePage(id: Long, page: Int)
 }
 
 private val MIGRATION_8_9 = object : Migration(8, 9) {
@@ -195,6 +203,7 @@ data class Memo(
     val text: String = "",
     val note: String = "",
     val chapterTitle: String = "",
+    val page: Int = 0,
     val createdAt: Long = System.currentTimeMillis()
 )
 
@@ -214,6 +223,9 @@ interface MemoDao {
 
     @Query("DELETE FROM memos WHERE id = :id")
     suspend fun deleteById(id: Long)
+
+    @Query("UPDATE memos SET page = :page WHERE id = :id")
+    suspend fun updatePage(id: Long, page: Int)
 }
 
 private val MIGRATION_10_11 = object : Migration(10, 11) {
@@ -259,7 +271,15 @@ private val MIGRATION_12_13 = object : Migration(12, 13) {
     }
 }
 
-@Database(entities = [BookReadRecord::class, Bookmark::class, Highlight::class, Memo::class], version = 13)
+private val MIGRATION_13_14 = object : Migration(13, 14) {
+    override fun migrate(database: SupportSQLiteDatabase) {
+        database.execSQL("ALTER TABLE bookmarks ADD COLUMN page INTEGER NOT NULL DEFAULT 0")
+        database.execSQL("ALTER TABLE highlights ADD COLUMN page INTEGER NOT NULL DEFAULT 0")
+        database.execSQL("ALTER TABLE memos ADD COLUMN page INTEGER NOT NULL DEFAULT 0")
+    }
+}
+
+@Database(entities = [BookReadRecord::class, Bookmark::class, Highlight::class, Memo::class], version = 14)
 abstract class BookDatabase : RoomDatabase() {
     abstract fun bookReadRecordDao(): BookReadRecordDao
     abstract fun bookmarkDao(): BookmarkDao
@@ -275,7 +295,7 @@ abstract class BookDatabase : RoomDatabase() {
                     context.applicationContext,
                     BookDatabase::class.java,
                     "book_database"
-                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13).build().also { INSTANCE = it }
+                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14).build().also { INSTANCE = it }
             }
     }
 }
