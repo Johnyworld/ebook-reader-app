@@ -2878,8 +2878,26 @@ window._setCfiList = function(jsonStr) {
     } catch(e) {}
 };
 window._currentCfi = "";
+var _waitingForFonts = false;
 rendition.on("relocated", function(location) {
-    if (!_rendered) { _rendered = true; Android.onContentRendered(); }
+    if (!_rendered || _waitingForFonts) {
+        _rendered = true;
+        if (!_waitingForFonts) {
+            try {
+                var iframe = document.querySelector('iframe');
+                var iDoc = iframe && (iframe.contentDocument || (iframe.contentWindow && iframe.contentWindow.document));
+                if (iDoc && iDoc.fonts && iDoc.fonts.status === 'loading' && _savedCfi) {
+                    _waitingForFonts = true;
+                    iDoc.fonts.ready.then(function() {
+                        rendition.display(_savedCfi);
+                    });
+                    return;
+                }
+            } catch(e) {}
+        }
+        _waitingForFonts = false;
+        Android.onContentRendered();
+    }
     try {
         var href = (location.start && location.start.href) ? location.start.href : "";
         if (href && book.navigation && book.navigation.toc) {
