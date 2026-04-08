@@ -20,7 +20,10 @@ data class BookReadRecord(
     @PrimaryKey val bookPath: String,
     val lastReadAt: Long,
     val lastCfi: String = "",
-    val tocJson: String = ""
+    val tocJson: String = "",
+    val cachedTotalPages: Int = 0,
+    val cachedSpinePageOffsetsJson: String = "",
+    val cachedSettingsFingerprint: String = ""
 )
 
 @Dao
@@ -43,6 +46,9 @@ interface BookReadRecordDao {
     @Query("UPDATE book_read_records SET tocJson = :tocJson WHERE bookPath = :bookPath")
     suspend fun updateTocJson(bookPath: String, tocJson: String)
 
+    @Query("UPDATE book_read_records SET cachedTotalPages = :totalPages, cachedSpinePageOffsetsJson = :spinePageOffsetsJson, cachedSettingsFingerprint = :fingerprint WHERE bookPath = :bookPath")
+    suspend fun updatePageScanCache(bookPath: String, totalPages: Int, spinePageOffsetsJson: String, fingerprint: String)
+
     @Transaction
     suspend fun upsertLastReadAt(bookPath: String, lastReadAt: Long) {
         insertIfNotExists(BookReadRecord(bookPath = bookPath, lastReadAt = lastReadAt))
@@ -59,6 +65,12 @@ interface BookReadRecordDao {
     suspend fun upsertTocJson(bookPath: String, tocJson: String) {
         insertIfNotExists(BookReadRecord(bookPath = bookPath, lastReadAt = 0L))
         updateTocJson(bookPath, tocJson)
+    }
+
+    @Transaction
+    suspend fun upsertPageScanCache(bookPath: String, totalPages: Int, spinePageOffsetsJson: String, fingerprint: String) {
+        insertIfNotExists(BookReadRecord(bookPath = bookPath, lastReadAt = 0L))
+        updatePageScanCache(bookPath, totalPages, spinePageOffsetsJson, fingerprint)
     }
 
 }
@@ -239,7 +251,15 @@ private val MIGRATION_11_12 = object : Migration(11, 12) {
     }
 }
 
-@Database(entities = [BookReadRecord::class, Bookmark::class, Highlight::class, Memo::class], version = 12)
+private val MIGRATION_12_13 = object : Migration(12, 13) {
+    override fun migrate(database: SupportSQLiteDatabase) {
+        database.execSQL("ALTER TABLE book_read_records ADD COLUMN cachedTotalPages INTEGER NOT NULL DEFAULT 0")
+        database.execSQL("ALTER TABLE book_read_records ADD COLUMN cachedSpinePageOffsetsJson TEXT NOT NULL DEFAULT ''")
+        database.execSQL("ALTER TABLE book_read_records ADD COLUMN cachedSettingsFingerprint TEXT NOT NULL DEFAULT ''")
+    }
+}
+
+@Database(entities = [BookReadRecord::class, Bookmark::class, Highlight::class, Memo::class], version = 13)
 abstract class BookDatabase : RoomDatabase() {
     abstract fun bookReadRecordDao(): BookReadRecordDao
     abstract fun bookmarkDao(): BookmarkDao
@@ -255,7 +275,7 @@ abstract class BookDatabase : RoomDatabase() {
                     context.applicationContext,
                     BookDatabase::class.java,
                     "book_database"
-                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12).build().also { INSTANCE = it }
+                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13).build().also { INSTANCE = it }
             }
     }
 }

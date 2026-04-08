@@ -230,6 +230,8 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
     var isContentRendered by remember(book.path) { mutableStateOf(false) }
     var isScanning by remember(book.path) { mutableStateOf(false) }
     var spinePageOffsets by remember(book.path) { mutableStateOf<Map<Int, Int>>(emptyMap()) }
+    var scanCacheValid by remember(book.path) { mutableStateOf(false) }
+    var prevProgress by remember(book.path) { mutableStateOf(-1f) }
     var showSettingsPopup by remember { mutableStateOf(false) }
     var showFontPopup by remember { mutableStateOf(false) }
     var readerSettings by remember { mutableStateOf(ReaderSettingsStore.load(context)) }
@@ -285,6 +287,17 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                 locationsReady = true
             } catch (_: Exception) {}
         }
+        val currentFingerprint = readerSettings.layoutFingerprint()
+        if (record != null && record.cachedSettingsFingerprint == currentFingerprint && record.cachedTotalPages > 0) {
+            totalPages = record.cachedTotalPages
+            try {
+                val obj = org.json.JSONObject(record.cachedSpinePageOffsetsJson)
+                val map = mutableMapOf<Int, Int>()
+                obj.keys().forEach { key -> map[key.toInt()] = obj.getInt(key) }
+                spinePageOffsets = map
+            } catch (_: Exception) {}
+            scanCacheValid = true
+        }
         bookmarks = withContext(Dispatchers.IO) { bookmarkDao.getByBook(book.path) }
         highlights = withContext(Dispatchers.IO) { highlightDao.getByBook(book.path) }
         memos = withContext(Dispatchers.IO) { memoDao.getByBook(book.path) }
@@ -316,8 +329,16 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                 onLocationUpdate = { progress, cfi, chapter ->
                     locationsReady = true
                     currentCfi = cfi
-                    if (progress > 0f) readingProgress = progress
                     if (chapter.isNotEmpty()) chapterTitle = chapter
+                    if (prevProgress >= 0f && currentPage > 0 && totalPages > 0) {
+                        if (progress > prevProgress) {
+                            currentPage = (currentPage + 1).coerceAtMost(totalPages)
+                        } else if (progress < prevProgress) {
+                            currentPage = (currentPage - 1).coerceAtLeast(1)
+                        }
+                        readingProgress = currentPage.toFloat() / totalPages.toFloat()
+                    }
+                    prevProgress = progress
                     scope.launch(Dispatchers.IO) { dao.upsertCfi(book.path, cfi) }
                 },
                 onTocLoaded = { tocJson ->
@@ -338,7 +359,11 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                         }
                     } catch (_: Exception) {}
                 },
-                onContentRendered = { isLoading = false; isContentRendered = true; isScanning = true },
+                onContentRendered = {
+                    isLoading = false
+                    isContentRendered = true
+                    if (!scanCacheValid) isScanning = true
+                },
                 onHighlight = { text, cfi ->
                     if (cfi.isNotEmpty()) {
                         val chapterSnapshot = chapterTitle
@@ -384,8 +409,9 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                     }
                 },
                 onWebViewCreated = { webView -> epubWebView.value = webView },
-                onPageInfoChanged = { page, _ ->
+                onPageInfoChanged = { page, total ->
                     currentPage = page
+                    if (total > 0) readingProgress = page.toFloat() / total.toFloat()
                 },
                 onScanComplete = { scannedTotal ->
                     if (scannedTotal != totalPages) {
@@ -398,6 +424,10 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                             val map = mutableMapOf<Int, Int>()
                             obj.keys().forEach { key -> map[key.toInt()] = obj.getInt(key) }
                             spinePageOffsets = map
+                            val fingerprint = readerSettings.layoutFingerprint()
+                            scope.launch(Dispatchers.IO) {
+                                dao.upsertPageScanCache(book.path, scannedTotal, result, fingerprint)
+                            }
                         } catch (_: Exception) {}
                     }
                 },

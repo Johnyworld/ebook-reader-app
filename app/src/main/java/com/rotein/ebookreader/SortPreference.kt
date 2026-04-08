@@ -238,6 +238,9 @@ data class ReaderSettings(
     val dualPage: Boolean = false
 )
 
+fun ReaderSettings.layoutFingerprint(): String =
+    "$fontName|$fontSize|$lineHeight|$paragraphSpacing|$paddingVertical|$paddingHorizontal|$dualPage|${textAlign.name}"
+
 object ReaderSettingsStore {
     private const val PREF_NAME = "reader_settings"
 
