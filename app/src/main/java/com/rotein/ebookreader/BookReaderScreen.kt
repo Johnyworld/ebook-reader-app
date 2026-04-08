@@ -3006,6 +3006,7 @@ book.ready.then(function() {
 
 rendition.hooks.content.register(function(contents) {
     var doc = contents.document;
+    _injectReaderStyle(doc);
     var debounceTimer = null;
     var lastSelectionTime = 0;
     window._getCfiFromSelection = function() {
