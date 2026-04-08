@@ -362,7 +362,16 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                 onContentRendered = {
                     isLoading = false
                     isContentRendered = true
-                    if (!scanCacheValid) isScanning = true
+                    if (scanCacheValid && spinePageOffsets.isNotEmpty()) {
+                        val jsonObj = org.json.JSONObject()
+                        spinePageOffsets.forEach { (k, v) -> jsonObj.put(k.toString(), v) }
+                        val js = "_spinePageOffsets=$jsonObj;_totalVisualPages=$totalPages;" +
+                            "if(_pendingLocation){reportLocation(_pendingLocation);_pendingLocation=null;}" +
+                            "else{var l=rendition.currentLocation();if(l&&l.start)reportLocation(l);}"
+                        epubWebView.value?.evaluateJavascript(js, null)
+                    } else {
+                        isScanning = true
+                    }
                 },
                 onHighlight = { text, cfi ->
                     if (cfi.isNotEmpty()) {
@@ -2847,7 +2856,7 @@ rendition.on("relocated", function(location) {
         var cfi = (location.start && location.start.cfi) ? location.start.cfi : "";
         if (cfi) { window._currentCfi = cfi; Android.onLocationChanged(0, cfi, ""); }
     } catch(e) {}
-    if (_locationsReady) {
+    if (_locationsReady || _totalVisualPages > 0) {
         reportLocation(location);
     } else {
         _pendingLocation = location;
