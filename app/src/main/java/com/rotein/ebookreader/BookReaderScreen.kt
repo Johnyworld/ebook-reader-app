@@ -422,6 +422,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                     currentPage = page
                     if (total > 0) readingProgress = page.toFloat() / total.toFloat()
                 },
+                onScanStart = { isScanning = true },
                 onScanComplete = { scannedTotal, spinePageOffsetsJson ->
                     if (scannedTotal != totalPages) {
                         totalPages = scannedTotal
@@ -2172,6 +2173,7 @@ private fun EpubViewer(
     onTocReady: (tocJson: String) -> Unit = {},
     onWebViewCreated: (WebView) -> Unit = {},
     onPageInfoChanged: (currentPage: Int, totalPages: Int) -> Unit = { _, _ -> },
+    onScanStart: () -> Unit = {},
     onScanComplete: (totalPages: Int, spinePageOffsetsJson: String) -> Unit = { _, _ -> },
     onSearchResultsPartial: (resultsJson: String) -> Unit = {},
     onSearchComplete: () -> Unit = {},
@@ -2275,7 +2277,7 @@ private fun EpubViewer(
                         isHorizontalScrollBarEnabled = false
                         isVerticalScrollBarEnabled = false
                         webViewClient = WebViewClient()
-                        addJavascriptInterface(EpubBridge(onLocationUpdate, onTocLoaded, onContentRendered, onChapterChanged, onTocReady, onPageInfoChanged, onScanComplete, onSearchResultsPartial, onSearchComplete, selectionOnTextSelected, selectionOnSelectionTapped), "Android")
+                        addJavascriptInterface(EpubBridge(onLocationUpdate, onTocLoaded, onContentRendered, onChapterChanged, onTocReady, onPageInfoChanged, onScanStart, onScanComplete, onSearchResultsPartial, onSearchComplete, selectionOnTextSelected, selectionOnSelectionTapped), "Android")
                     }
                     webViewRef.set(webView)
                     onWebViewCreated(webView)
@@ -2887,6 +2889,7 @@ book.loaded.navigation.then(function(nav) {
 });
 
 function computeVisualPages() {
+    try { Android.onScanStart(); } catch(e) {}
     var s = window._readerSettings;
     var scanW = window.innerWidth - s.paddingHorizontal * 2;
     var scanH = window.innerHeight - s.paddingVertical * 2 - 16;
@@ -2901,6 +2904,9 @@ function computeVisualPages() {
         flow: "paginated",
         manager: "default",
         minSpreadWidth: 9999
+    });
+    scanRendition.hooks.content.register(function(contents) {
+        _injectReaderStyle(contents.document);
     });
     scanBook.ready.then(function() {
         var items = scanBook.spine ? (scanBook.spine.items || []) : [];
@@ -3337,6 +3343,7 @@ private class EpubBridge(
     private val onChapterChangedCallback: (chapter: String) -> Unit = {},
     private val onTocReadyCallback: (tocJson: String) -> Unit = {},
     private val onPageInfoChangedCallback: (currentPage: Int, totalPages: Int) -> Unit = { _, _ -> },
+    private val onScanStartCallback: () -> Unit = {},
     private val onScanCompleteCallback: (totalPages: Int, spinePageOffsetsJson: String) -> Unit = { _, _ -> },
     private val onSearchResultsPartialCallback: (resultsJson: String) -> Unit = {},
     private val onSearchCompleteCallback: () -> Unit = {},
@@ -3373,6 +3380,11 @@ private class EpubBridge(
     @android.webkit.JavascriptInterface
     fun onPageInfoChanged(currentPage: Int, totalPages: Int) {
         mainHandler.post { onPageInfoChangedCallback(currentPage, totalPages) }
+    }
+
+    @android.webkit.JavascriptInterface
+    fun onScanStart() {
+        mainHandler.post { onScanStartCallback() }
     }
 
     @android.webkit.JavascriptInterface
