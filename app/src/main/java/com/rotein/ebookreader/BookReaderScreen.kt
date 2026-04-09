@@ -444,7 +444,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                         spinePageOffsets = map
                         val fingerprint = readerSettings.layoutFingerprint()
                         scope.launch(Dispatchers.IO) {
-                            dao.upsertPageScanCache(book.path, scannedTotal, spinePageOffsetsJson, fingerprint)
+                            dao.upsertPageScanCache(book.path, scannedTotal, spinePageOffsetsJson, "", fingerprint)
                         }
                     } catch (_: Exception) {}
                     try {
