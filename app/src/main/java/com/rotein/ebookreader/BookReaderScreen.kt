@@ -234,6 +234,11 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
     var scanCacheValid by remember(book.path) { mutableStateOf(false) }
     var spineCharPageBreaksJson by remember(book.path) { mutableStateOf("") }
     var prevProgress by remember(book.path) { mutableStateOf(-1f) }
+    var debugSpineIndex by remember(book.path) { mutableStateOf(-1) }
+    var debugDisplayedPage by remember(book.path) { mutableStateOf(-1) }
+    var debugScrollX by remember(book.path) { mutableStateOf(0) }
+    var debugScrollWidth by remember(book.path) { mutableStateOf(0) }
+    var debugDeltaX by remember(book.path) { mutableStateOf(0) }
     var showSettingsPopup by remember { mutableStateOf(false) }
     var showFontPopup by remember { mutableStateOf(false) }
     var readerSettings by remember { mutableStateOf(ReaderSettingsStore.load(context)) }
@@ -434,6 +439,13 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                     currentPage = page
                     if (total > 0) readingProgress = page.toFloat() / total.toFloat()
                 },
+                onDebugInfo = { spineIdx, dispPage, scrollX, scrollW, deltaX ->
+                    debugSpineIndex = spineIdx
+                    debugDisplayedPage = dispPage
+                    debugScrollX = scrollX
+                    debugScrollWidth = scrollW
+                    debugDeltaX = deltaX
+                },
                 onScanStart = { if (!scanCacheValid) isScanning = true },
                 onScanComplete = { scannedTotal, spinePageOffsetsJson, cfiPageMapJson, charPageBreaksJson ->
                     if (scannedTotal != totalPages) {
@@ -494,6 +506,19 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
             "pdf"  -> PdfViewer(book.path, onCenterTap)
             "mobi" -> MobiViewer(book.path, onCenterTap)
             else   -> CenteredMessage("지원하지 않는 형식입니다.")
+        }
+
+        // 디버그 정보 오버레이
+        if (isContentRendered && debugSpineIndex >= 0) {
+            Text(
+                text = "spine=$debugSpineIndex  disp.page=$debugDisplayedPage  scrollX=$debugScrollX  scrollW=$debugScrollWidth  delta=$debugDeltaX",
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 4.dp)
+                    .background(Color.White),
+                style = MaterialTheme.typography.bodySmall,
+                color = Color.Black
+            )
         }
 
         // 하단 정보 오버레이
@@ -2227,6 +2252,7 @@ private fun EpubViewer(
     onTocReady: (tocJson: String) -> Unit = {},
     onWebViewCreated: (WebView) -> Unit = {},
     onPageInfoChanged: (currentPage: Int, totalPages: Int) -> Unit = { _, _ -> },
+    onDebugInfo: (spineIndex: Int, displayedPage: Int, scrollX: Int, scrollWidth: Int, deltaX: Int) -> Unit = { _, _, _, _, _ -> },
     onScanStart: () -> Unit = {},
     onScanComplete: (totalPages: Int, spinePageOffsetsJson: String, cfiPageMapJson: String, spineCharPageBreaksJson: String) -> Unit = { _, _, _, _ -> },
     onSearchResultsPartial: (resultsJson: String) -> Unit = {},
@@ -2331,7 +2357,7 @@ private fun EpubViewer(
                         isHorizontalScrollBarEnabled = false
                         isVerticalScrollBarEnabled = false
                         webViewClient = WebViewClient()
-                        addJavascriptInterface(EpubBridge(onLocationUpdate, onTocLoaded, onContentRendered, onChapterChanged, onTocReady, onPageInfoChanged, onScanStart, onScanComplete, onSearchResultsPartial, onSearchComplete, selectionOnTextSelected, selectionOnSelectionTapped), "Android")
+                        addJavascriptInterface(EpubBridge(onLocationUpdate, onTocLoaded, onContentRendered, onChapterChanged, onTocReady, onPageInfoChanged, onDebugInfo, onScanStart, onScanComplete, onSearchResultsPartial, onSearchComplete, selectionOnTextSelected, selectionOnSelectionTapped), "Android")
                     }
                     webViewRef.set(webView)
                     onWebViewCreated(webView)
@@ -2881,6 +2907,17 @@ function reportLocation(location) {
                 }
             } catch(e) {}
             Android.onPageInfoChanged((_spinePageOffsets[idx] || 0) + pg, _totalVisualPages);
+            var _scrollX = 0, _scrollW = 0, _deltaX = 0;
+            try {
+                if (rendition.manager && rendition.manager.container) {
+                    _scrollX = rendition.manager.container.scrollLeft;
+                    _scrollW = rendition.manager.container.scrollWidth;
+                }
+                if (rendition.manager && rendition.manager.layout) {
+                    _deltaX = rendition.manager.layout.delta;
+                }
+            } catch(e) {}
+            Android.onDebugInfo(idx, pg, _scrollX, _scrollW, _deltaX);
         }
     } catch(e) {}
 }
@@ -3508,6 +3545,7 @@ private class EpubBridge(
     private val onChapterChangedCallback: (chapter: String) -> Unit = {},
     private val onTocReadyCallback: (tocJson: String) -> Unit = {},
     private val onPageInfoChangedCallback: (currentPage: Int, totalPages: Int) -> Unit = { _, _ -> },
+    private val onDebugInfoCallback: (spineIndex: Int, displayedPage: Int, scrollX: Int, scrollWidth: Int, deltaX: Int) -> Unit = { _, _, _, _, _ -> },
     private val onScanStartCallback: () -> Unit = {},
     private val onScanCompleteCallback: (totalPages: Int, spinePageOffsetsJson: String, cfiPageMapJson: String, spineCharPageBreaksJson: String) -> Unit = { _, _, _, _ -> },
     private val onSearchResultsPartialCallback: (resultsJson: String) -> Unit = {},
@@ -3545,6 +3583,11 @@ private class EpubBridge(
     @android.webkit.JavascriptInterface
     fun onPageInfoChanged(currentPage: Int, totalPages: Int) {
         mainHandler.post { onPageInfoChangedCallback(currentPage, totalPages) }
+    }
+
+    @android.webkit.JavascriptInterface
+    fun onDebugInfo(spineIndex: Int, displayedPage: Int, scrollX: Int, scrollWidth: Int, deltaX: Int) {
+        mainHandler.post { onDebugInfoCallback(spineIndex, displayedPage, scrollX, scrollWidth, deltaX) }
     }
 
     @android.webkit.JavascriptInterface
