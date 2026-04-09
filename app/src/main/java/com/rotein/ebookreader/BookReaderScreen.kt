@@ -3370,9 +3370,18 @@ window._search = function(query) {
                             var pos = positions[i];
                             var matchPage = 0;
                             if (_totalVisualPages > 0) {
-                                var sectionPages = _spinePageCounts[spineIndex] || 1;
-                                var pageWithin = Math.floor((pos / Math.max(fullText.length, 1)) * sectionPages);
-                                matchPage = (_spinePageOffsets[spineIndex] || 0) + pageWithin + 1;
+                                var breaks = _spineCharPageBreaks[spineIndex];
+                                if (breaks && breaks.length > 1) {
+                                    var pageWithin = 0;
+                                    for (var bi = breaks.length - 1; bi >= 0; bi--) {
+                                        if (pos >= breaks[bi]) { pageWithin = bi; break; }
+                                    }
+                                    matchPage = (_spinePageOffsets[spineIndex] || 0) + pageWithin + 1;
+                                } else {
+                                    var sectionPages = _spinePageCounts[spineIndex] || 1;
+                                    var pageWithin = Math.floor((pos / Math.max(fullText.length, 1)) * sectionPages);
+                                    matchPage = (_spinePageOffsets[spineIndex] || 0) + pageWithin + 1;
+                                }
                             }
                             var s = Math.max(0, pos - 60);
                             var e = Math.min(fullText.length, pos + query.length + 60);
