@@ -232,6 +232,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
     var spinePageOffsets by remember(book.path) { mutableStateOf<Map<Int, Int>>(emptyMap()) }
     var cfiPageMap by remember(book.path) { mutableStateOf<Map<String, Int>>(emptyMap()) }
     var scanCacheValid by remember(book.path) { mutableStateOf(false) }
+    var spineCharPageBreaksJson by remember(book.path) { mutableStateOf("") }
     var prevProgress by remember(book.path) { mutableStateOf(-1f) }
     var showSettingsPopup by remember { mutableStateOf(false) }
     var showFontPopup by remember { mutableStateOf(false) }
@@ -298,6 +299,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                 spinePageOffsets = map
             } catch (_: Exception) {}
             scanCacheValid = true
+            spineCharPageBreaksJson = record.cachedSpineCharPageBreaksJson
         }
         bookmarks = withContext(Dispatchers.IO) { bookmarkDao.getByBook(book.path) }
         highlights = withContext(Dispatchers.IO) { highlightDao.getByBook(book.path) }
@@ -366,7 +368,8 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                     if (scanCacheValid && spinePageOffsets.isNotEmpty()) {
                         val jsonObj = org.json.JSONObject()
                         spinePageOffsets.forEach { (k, v) -> jsonObj.put(k.toString(), v) }
-                        val js = "_spinePageOffsets=$jsonObj;_totalVisualPages=$totalPages;" +
+                        val charBreaksJs = if (spineCharPageBreaksJson.isNotEmpty()) "_spineCharPageBreaks=$spineCharPageBreaksJson;" else ""
+                        val js = "_spinePageOffsets=$jsonObj;_totalVisualPages=$totalPages;$charBreaksJs" +
                             "if(_pendingLocation){reportLocation(_pendingLocation);_pendingLocation=null;}" +
                             "else{var l=rendition.currentLocation();if(l&&l.start)reportLocation(l);}"
                         epubWebView.value?.evaluateJavascript(js, null)
@@ -432,7 +435,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                     if (total > 0) readingProgress = page.toFloat() / total.toFloat()
                 },
                 onScanStart = { if (!scanCacheValid) isScanning = true },
-                onScanComplete = { scannedTotal, spinePageOffsetsJson, cfiPageMapJson ->
+                onScanComplete = { scannedTotal, spinePageOffsetsJson, cfiPageMapJson, charPageBreaksJson ->
                     if (scannedTotal != totalPages) {
                         totalPages = scannedTotal
                     }
@@ -444,9 +447,10 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                         spinePageOffsets = map
                         val fingerprint = readerSettings.layoutFingerprint()
                         scope.launch(Dispatchers.IO) {
-                            dao.upsertPageScanCache(book.path, scannedTotal, spinePageOffsetsJson, fingerprint)
+                            dao.upsertPageScanCache(book.path, scannedTotal, spinePageOffsetsJson, charPageBreaksJson, fingerprint)
                         }
                     } catch (_: Exception) {}
+                    spineCharPageBreaksJson = charPageBreaksJson
                     try {
                         val obj = org.json.JSONObject(cfiPageMapJson)
                         val map = mutableMapOf<String, Int>()
@@ -2224,7 +2228,7 @@ private fun EpubViewer(
     onWebViewCreated: (WebView) -> Unit = {},
     onPageInfoChanged: (currentPage: Int, totalPages: Int) -> Unit = { _, _ -> },
     onScanStart: () -> Unit = {},
-    onScanComplete: (totalPages: Int, spinePageOffsetsJson: String, cfiPageMapJson: String) -> Unit = { _, _, _ -> },
+    onScanComplete: (totalPages: Int, spinePageOffsetsJson: String, cfiPageMapJson: String, spineCharPageBreaksJson: String) -> Unit = { _, _, _, _ -> },
     onSearchResultsPartial: (resultsJson: String) -> Unit = {},
     onSearchComplete: () -> Unit = {},
     onTextSelected: (text: String, x: Float, y: Float, bottom: Float) -> Unit = { _, _, _, _ -> },
@@ -2885,6 +2889,7 @@ var _totalLocations = 0;
 var _spinePageCounts = {};
 var _spinePageOffsets = {};
 var _totalVisualPages = 0;
+var _spineCharPageBreaks = {};
 var _locationsReady = false;
 var _rendered = false;
 var _pendingLocation = null;
@@ -3065,7 +3070,7 @@ function computeVisualPages() {
                     } catch(e) {}
                     _scanCurrentPage = (_spinePageOffsets[idx] || 0) + pg;
                 }
-                Android.onScanComplete(_totalVisualPages, _scanCurrentPage, JSON.stringify(_spinePageOffsets), JSON.stringify(_cfiPageMap));
+                Android.onScanComplete(_totalVisualPages, _scanCurrentPage, JSON.stringify(_spinePageOffsets), JSON.stringify(_cfiPageMap), JSON.stringify(_spineCharPageBreaks));
                 setTimeout(function() {
                     try { scanRendition.destroy(); } catch(e) {}
                     try { scanBook.destroy(); } catch(e) {}
@@ -3077,6 +3082,47 @@ function computeVisualPages() {
                 var loc = scanRendition.currentLocation();
                 _spinePageCounts[i] = (loc && loc.start && loc.start.displayed) ? loc.start.displayed.total : 1;
                 _spinePageOffsets[i] = _runningOffset;
+                try {
+                    var pageBreaks = [0];
+                    var sTotal = _spinePageCounts[i];
+                    if (sTotal > 1) {
+                        var sDelta = scanRendition.manager && scanRendition.manager.layout ? scanRendition.manager.layout.delta : 0;
+                        if (sDelta > 0) {
+                            var sIframe = scanDiv.querySelector('iframe');
+                            var sDoc = sIframe && (sIframe.contentDocument || (sIframe.contentWindow && sIframe.contentWindow.document));
+                            if (sDoc) {
+                                var sBody = sDoc.body || sDoc.querySelector('body') || sDoc.documentElement;
+                                if (sBody) {
+                                    var sWalker = sDoc.createTreeWalker(sBody, NodeFilter.SHOW_TEXT, null, false);
+                                    var sNd, charOffset = 0;
+                                    var lastPage = 0;
+                                    while ((sNd = sWalker.nextNode())) {
+                                        var len = sNd.textContent.length;
+                                        if (len === 0) continue;
+                                        try {
+                                            var range = sDoc.createRange();
+                                            range.selectNodeContents(sNd);
+                                            var rect = range.getBoundingClientRect();
+                                            if (rect.width > 0) {
+                                                var nodePage = Math.floor(rect.left / sDelta);
+                                                if (nodePage > lastPage) {
+                                                    for (var np = lastPage + 1; np <= nodePage; np++) {
+                                                        pageBreaks.push(charOffset);
+                                                    }
+                                                    lastPage = nodePage;
+                                                }
+                                            }
+                                        } catch(re) {}
+                                        charOffset += len;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    _spineCharPageBreaks[i] = pageBreaks;
+                } catch(pe) {
+                    _spineCharPageBreaks[i] = [0];
+                }
                 var cfisForSpine = [];
                 for (var ci = 0; ci < _pendingCfiList.length; ci++) {
                     if (_pendingCfiList[ci].spineIndex === i) cfisForSpine.push(_pendingCfiList[ci].cfi);
@@ -3324,9 +3370,18 @@ window._search = function(query) {
                             var pos = positions[i];
                             var matchPage = 0;
                             if (_totalVisualPages > 0) {
-                                var sectionPages = _spinePageCounts[spineIndex] || 1;
-                                var pageWithin = Math.floor((pos / Math.max(fullText.length, 1)) * sectionPages);
-                                matchPage = (_spinePageOffsets[spineIndex] || 0) + pageWithin + 1;
+                                var breaks = _spineCharPageBreaks[spineIndex];
+                                if (breaks && breaks.length > 1) {
+                                    var pageWithin = 0;
+                                    for (var bi = breaks.length - 1; bi >= 0; bi--) {
+                                        if (pos >= breaks[bi]) { pageWithin = bi; break; }
+                                    }
+                                    matchPage = (_spinePageOffsets[spineIndex] || 0) + pageWithin + 1;
+                                } else {
+                                    var sectionPages = _spinePageCounts[spineIndex] || 1;
+                                    var pageWithin = Math.floor((pos / Math.max(fullText.length, 1)) * sectionPages);
+                                    matchPage = (_spinePageOffsets[spineIndex] || 0) + pageWithin + 1;
+                                }
                             }
                             var s = Math.max(0, pos - 60);
                             var e = Math.min(fullText.length, pos + query.length + 60);
@@ -3454,7 +3509,7 @@ private class EpubBridge(
     private val onTocReadyCallback: (tocJson: String) -> Unit = {},
     private val onPageInfoChangedCallback: (currentPage: Int, totalPages: Int) -> Unit = { _, _ -> },
     private val onScanStartCallback: () -> Unit = {},
-    private val onScanCompleteCallback: (totalPages: Int, spinePageOffsetsJson: String, cfiPageMapJson: String) -> Unit = { _, _, _ -> },
+    private val onScanCompleteCallback: (totalPages: Int, spinePageOffsetsJson: String, cfiPageMapJson: String, spineCharPageBreaksJson: String) -> Unit = { _, _, _, _ -> },
     private val onSearchResultsPartialCallback: (resultsJson: String) -> Unit = {},
     private val onSearchCompleteCallback: () -> Unit = {},
     private val onTextSelectedCallback: (text: String, x: Float, y: Float, bottom: Float) -> Unit = { _, _, _, _ -> },
@@ -3498,10 +3553,10 @@ private class EpubBridge(
     }
 
     @android.webkit.JavascriptInterface
-    fun onScanComplete(totalPages: Int, currentPage: Int, spinePageOffsetsJson: String, cfiPageMapJson: String) {
+    fun onScanComplete(totalPages: Int, currentPage: Int, spinePageOffsetsJson: String, cfiPageMapJson: String, spineCharPageBreaksJson: String) {
         mainHandler.post {
             onPageInfoChangedCallback(currentPage, totalPages)
-            onScanCompleteCallback(totalPages, spinePageOffsetsJson, cfiPageMapJson)
+            onScanCompleteCallback(totalPages, spinePageOffsetsJson, cfiPageMapJson, spineCharPageBreaksJson)
         }
     }
 
