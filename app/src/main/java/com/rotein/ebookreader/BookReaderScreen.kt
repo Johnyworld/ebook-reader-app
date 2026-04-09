@@ -2885,6 +2885,7 @@ var _totalLocations = 0;
 var _spinePageCounts = {};
 var _spinePageOffsets = {};
 var _totalVisualPages = 0;
+var _spineCharPageBreaks = {};
 var _locationsReady = false;
 var _rendered = false;
 var _pendingLocation = null;
@@ -3077,6 +3078,47 @@ function computeVisualPages() {
                 var loc = scanRendition.currentLocation();
                 _spinePageCounts[i] = (loc && loc.start && loc.start.displayed) ? loc.start.displayed.total : 1;
                 _spinePageOffsets[i] = _runningOffset;
+                try {
+                    var pageBreaks = [0];
+                    var sTotal = _spinePageCounts[i];
+                    if (sTotal > 1) {
+                        var sDelta = scanRendition.manager && scanRendition.manager.layout ? scanRendition.manager.layout.delta : 0;
+                        if (sDelta > 0) {
+                            var sIframe = scanDiv.querySelector('iframe');
+                            var sDoc = sIframe && (sIframe.contentDocument || (sIframe.contentWindow && sIframe.contentWindow.document));
+                            if (sDoc) {
+                                var sBody = sDoc.body || sDoc.querySelector('body') || sDoc.documentElement;
+                                if (sBody) {
+                                    var sWalker = sDoc.createTreeWalker(sBody, NodeFilter.SHOW_TEXT, null, false);
+                                    var sNd, charOffset = 0;
+                                    var lastPage = 0;
+                                    while ((sNd = sWalker.nextNode())) {
+                                        var len = sNd.textContent.length;
+                                        if (len === 0) continue;
+                                        try {
+                                            var range = sDoc.createRange();
+                                            range.selectNodeContents(sNd);
+                                            var rect = range.getBoundingClientRect();
+                                            if (rect.width > 0) {
+                                                var nodePage = Math.floor(rect.left / sDelta);
+                                                if (nodePage > lastPage) {
+                                                    for (var np = lastPage + 1; np <= nodePage; np++) {
+                                                        pageBreaks.push(charOffset);
+                                                    }
+                                                    lastPage = nodePage;
+                                                }
+                                            }
+                                        } catch(re) {}
+                                        charOffset += len;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    _spineCharPageBreaks[i] = pageBreaks;
+                } catch(pe) {
+                    _spineCharPageBreaks[i] = [0];
+                }
                 var cfisForSpine = [];
                 for (var ci = 0; ci < _pendingCfiList.length; ci++) {
                     if (_pendingCfiList[ci].spineIndex === i) cfisForSpine.push(_pendingCfiList[ci].cfi);
