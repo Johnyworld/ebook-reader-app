@@ -2618,19 +2618,17 @@ private fun EpubViewer(
             onHighlight = {
                 if (isContinuationMode && pendingStartCfi != null) {
                     val startCfi = pendingStartCfi!!
-                    val startText = pendingStartText ?: ""
-                    val endText = sel.text
-                    val combinedText = startText + endText
+                    val combinedText = (pendingStartText ?: "") + sel.text
                     webViewRef.get()?.evaluateJavascript(
                         "window._mergeCfi(\"${startCfi.replace("\\", "\\\\").replace("\"", "\\\"")}\", \"${sel.cfi.replace("\\", "\\\\").replace("\"", "\\\"")}\")"
                     ) { mergedCfi ->
                         val cfi = mergedCfi?.removeSurrounding("\"")?.replace("\\\"", "\"")?.replace("\\\\", "\\") ?: sel.cfi
                         onHighlight(combinedText, cfi)
+                        pendingStartCfi = null
+                        pendingStartText = null
+                        isContinuationMode = false
+                        clearSelection()
                     }
-                    pendingStartCfi = null
-                    pendingStartText = null
-                    isContinuationMode = false
-                    clearSelection()
                 } else {
                     onHighlight(sel.text, sel.cfi)
                     clearSelection()
@@ -2639,19 +2637,17 @@ private fun EpubViewer(
             onMemo = {
                 if (isContinuationMode && pendingStartCfi != null) {
                     val startCfi = pendingStartCfi!!
-                    val startText = pendingStartText ?: ""
-                    val endText = sel.text
-                    val combinedText = startText + endText
+                    val combinedText = (pendingStartText ?: "") + sel.text
                     webViewRef.get()?.evaluateJavascript(
                         "window._mergeCfi(\"${startCfi.replace("\\", "\\\\").replace("\"", "\\\"")}\", \"${sel.cfi.replace("\\", "\\\\").replace("\"", "\\\"")}\")"
                     ) { mergedCfi ->
                         val cfi = mergedCfi?.removeSurrounding("\"")?.replace("\\\"", "\"")?.replace("\\\\", "\\") ?: sel.cfi
                         onMemo(combinedText, cfi)
+                        pendingStartCfi = null
+                        pendingStartText = null
+                        isContinuationMode = false
+                        clearSelection()
                     }
-                    pendingStartCfi = null
-                    pendingStartText = null
-                    isContinuationMode = false
-                    clearSelection()
                 } else {
                     onMemo(sel.text, sel.cfi)
                     clearSelection()
@@ -3667,15 +3663,8 @@ window._isSelectionAtPageEnd = function() {
         if (!sel || sel.rangeCount === 0 || sel.toString().trim().length === 0) return false;
         var range = sel.getRangeAt(0);
 
-        var manager = rendition.manager;
-        if (!manager || !manager.container) return false;
-        var scrollLeft = manager.container.scrollLeft;
-        var pageWidth = manager.layout ? manager.layout.delta : manager.container.offsetWidth;
+        var pageWidth = delta;
         var rightEdge = scrollLeft + pageWidth;
-
-        var endRange = doc.createRange();
-        endRange.setStart(range.endContainer, range.endOffset);
-        endRange.setEnd(range.endContainer, range.endOffset);
 
         var walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT, null, false);
         var lastVisibleTextNode = null;
@@ -3743,9 +3732,10 @@ window._selectFirstCharOfPage = function() {
 
 window._mergeCfi = function(startCfi, endCfi) {
     try {
-        var sMatch = startCfi.match(/^(epubcfi\([^,]+),([^,]+),([^)]+)\)$/);
-        var eMatch = endCfi.match(/^(epubcfi\([^,]+),([^,]+),([^)]+)\)$/);
+        var sMatch = startCfi.match(/^(epubcfi\([^,]+),([^,]+),(.+)\)$/);
+        var eMatch = endCfi.match(/^(epubcfi\([^,]+),([^,]+),(.+)\)$/);
         if (sMatch && eMatch) {
+            if (sMatch[1] !== eMatch[1]) return endCfi;
             return sMatch[1] + ',' + sMatch[2] + ',' + eMatch[3] + ')';
         }
         return endCfi;
