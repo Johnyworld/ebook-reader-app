@@ -2373,6 +2373,9 @@ private fun EpubViewer(
     var error by remember(path) { mutableStateOf(false) }
     data class SelectionState(val text: String, val x: Float, val y: Float, val bottom: Float, val cfi: String = "", val isAtPageEnd: Boolean = false)
     var selectionState by remember { mutableStateOf<SelectionState?>(null) }
+    var pendingStartCfi by remember { mutableStateOf<String?>(null) }
+    var pendingStartText by remember { mutableStateOf<String?>(null) }
+    var isContinuationMode by remember { mutableStateOf(false) }
     val selectionActive = remember { java.util.concurrent.atomic.AtomicBoolean(false) }
     val webViewRef = remember { java.util.concurrent.atomic.AtomicReference<android.webkit.WebView?>(null) }
     val onHighlightLongPressRef = remember { java.util.concurrent.atomic.AtomicReference<((Long, Float, Float, Float) -> Unit)?>(null) }
@@ -2612,17 +2615,80 @@ private fun EpubViewer(
             selectionY = sel.y,
             selectionBottom = sel.bottom,
             selectionCx = sel.x,
-            onHighlight = { onHighlight(sel.text, sel.cfi); clearSelection() },
-            onMemo = { onMemo(sel.text, sel.cfi); clearSelection() },
+            onHighlight = {
+                if (isContinuationMode && pendingStartCfi != null) {
+                    val startCfi = pendingStartCfi!!
+                    val startText = pendingStartText ?: ""
+                    val endText = sel.text
+                    val combinedText = startText + endText
+                    webViewRef.get()?.evaluateJavascript(
+                        "window._mergeCfi(\"${startCfi.replace("\\", "\\\\").replace("\"", "\\\"")}\", \"${sel.cfi.replace("\\", "\\\\").replace("\"", "\\\"")}\")"
+                    ) { mergedCfi ->
+                        val cfi = mergedCfi?.removeSurrounding("\"")?.replace("\\\"", "\"")?.replace("\\\\", "\\") ?: sel.cfi
+                        onHighlight(combinedText, cfi)
+                    }
+                    pendingStartCfi = null
+                    pendingStartText = null
+                    isContinuationMode = false
+                    clearSelection()
+                } else {
+                    onHighlight(sel.text, sel.cfi)
+                    clearSelection()
+                }
+            },
+            onMemo = {
+                if (isContinuationMode && pendingStartCfi != null) {
+                    val startCfi = pendingStartCfi!!
+                    val startText = pendingStartText ?: ""
+                    val endText = sel.text
+                    val combinedText = startText + endText
+                    webViewRef.get()?.evaluateJavascript(
+                        "window._mergeCfi(\"${startCfi.replace("\\", "\\\\").replace("\"", "\\\"")}\", \"${sel.cfi.replace("\\", "\\\\").replace("\"", "\\\"")}\")"
+                    ) { mergedCfi ->
+                        val cfi = mergedCfi?.removeSurrounding("\"")?.replace("\\\"", "\"")?.replace("\\\\", "\\") ?: sel.cfi
+                        onMemo(combinedText, cfi)
+                    }
+                    pendingStartCfi = null
+                    pendingStartText = null
+                    isContinuationMode = false
+                    clearSelection()
+                } else {
+                    onMemo(sel.text, sel.cfi)
+                    clearSelection()
+                }
+            },
             onShare = {
+                val shareText = if (isContinuationMode) (pendingStartText ?: "") + sel.text else sel.text
                 val intent = Intent(Intent.ACTION_SEND).apply {
                     type = "text/plain"
-                    putExtra(Intent.EXTRA_TEXT, sel.text)
+                    putExtra(Intent.EXTRA_TEXT, shareText)
                 }
                 context.startActivity(Intent.createChooser(intent, null))
+                pendingStartCfi = null
+                pendingStartText = null
+                isContinuationMode = false
                 clearSelection()
             },
-            onDismiss = { clearSelection() }
+            onContinue = if (sel.isAtPageEnd && !isContinuationMode) {
+                {
+                    pendingStartCfi = sel.cfi
+                    pendingStartText = sel.text
+                    isContinuationMode = true
+                    selectionState = null
+                    webViewRef.get()?.evaluateJavascript("window._next()", null)
+                    webViewRef.get()?.postDelayed({
+                        webViewRef.get()?.evaluateJavascript("window._selectFirstCharOfPage()", null)
+                    }, 300)
+                }
+            } else null,
+            onDismiss = {
+                if (isContinuationMode) {
+                    pendingStartCfi = null
+                    pendingStartText = null
+                    isContinuationMode = false
+                }
+                clearSelection()
+            }
         )
     }
     } // Box
@@ -2636,6 +2702,7 @@ private fun SelectionPopup(
     onHighlight: () -> Unit,
     onMemo: () -> Unit,
     onShare: () -> Unit,
+    onContinue: (() -> Unit)?,
     onDismiss: () -> Unit
 ) {
     val popupHeightDp = 48.dp
@@ -2675,6 +2742,12 @@ private fun SelectionPopup(
             Box(Modifier.width(1.dp).height(20.dp).background(Color.Black))
             TextButton(onClick = onShare) {
                 Text("공유", color = Color.Black, fontSize = 14.sp)
+            }
+            if (onContinue != null) {
+                Box(Modifier.width(1.dp).height(20.dp).background(Color.Black))
+                TextButton(onClick = onContinue) {
+                    Text("이어하기", color = Color.Black, fontSize = 14.sp)
+                }
             }
         }
     }
