@@ -3347,6 +3347,61 @@ rendition.hooks.content.register(function(contents) {
     if (doc.body) { void doc.body.offsetHeight; }
     var debounceTimer = null;
     var lastSelectionTime = 0;
+
+    // 선택 드래그 중 CSS columns 스크롤 방지
+    // iframe 내부 + 외부 컨테이너 모두 잠금
+    var _selLocked = false;
+    var _savedScrolls = [];
+    function _getAllScrollTargets() {
+        var targets = [];
+        if (doc.body) targets.push(doc.body);
+        if (doc.documentElement) targets.push(doc.documentElement);
+        try {
+            var outer = document; // 외부 문서
+            var epubView = outer.querySelector('.epub-view');
+            var epubContainer = outer.querySelector('.epub-container');
+            if (epubView) targets.push(epubView);
+            if (epubContainer) targets.push(epubContainer);
+            if (outer.querySelector('#viewer')) targets.push(outer.querySelector('#viewer'));
+        } catch(e) {}
+        return targets;
+    }
+    function _captureAll() {
+        _savedScrolls = _getAllScrollTargets().map(function(el) {
+            return { el: el, left: el.scrollLeft };
+        });
+    }
+    function _restoreAll() {
+        _savedScrolls.forEach(function(s) {
+            if (s.el.scrollLeft !== s.left) s.el.scrollLeft = s.left;
+        });
+    }
+    var _rafId = 0;
+    function _lockLoop() {
+        if (!_selLocked) return;
+        _restoreAll();
+        _rafId = (doc.defaultView || window).requestAnimationFrame(_lockLoop);
+    }
+    _captureAll();
+    doc.addEventListener('selectionchange', function() {
+        var sel = doc.getSelection();
+        var hasSelection = sel && sel.toString().trim().length > 0;
+        if (hasSelection && !_selLocked) {
+            _captureAll();
+            _selLocked = true;
+            _rafId = (doc.defaultView || window).requestAnimationFrame(_lockLoop);
+        } else if (!hasSelection && _selLocked) {
+            _selLocked = false;
+            if (_rafId) (doc.defaultView || window).cancelAnimationFrame(_rafId);
+        }
+    });
+    _getAllScrollTargets().forEach(function(el) {
+        el.addEventListener('scroll', function() {
+            if (_selLocked) _restoreAll();
+            else _captureAll();
+        });
+    });
+
     window._getCfiFromSelection = function() {
         try {
             var sel = doc.getSelection();
