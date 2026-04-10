@@ -3327,7 +3327,28 @@ window._getAnnotationAtPoint = function(x, y) {
 var _savedCfi = "${savedCfi.replace("\"", "\\\"")}";
 rendition.display(_savedCfi.length > 0 ? _savedCfi : undefined);
 window._prev = function() { rendition.prev(); };
-window._next = function() { rendition.next(); };
+window._next = function() {
+    // epub.js는 scrollLeft + offsetWidth + delta <= scrollWidth 로 같은 챕터 내 다음 페이지 존재 여부를 판단한다.
+    // 브라우저가 scrollLeft를 물리 픽셀에 스냅하면서 서브픽셀 오차가 누적되어,
+    // 실제로 마지막 페이지가 남아있는데도 이 조건이 false가 되어 챕터를 건너뛰는 문제가 있다.
+    // tolerance(delta/2)를 두어 오차 범위 내일 때는 직접 스크롤하여 마지막 페이지를 보여준다.
+    var manager = rendition.manager;
+    if (manager && manager.container && manager.layout) {
+        var scrollLeft = manager.container.scrollLeft;
+        var offsetWidth = manager.container.offsetWidth;
+        var scrollWidth = manager.container.scrollWidth;
+        var delta = manager.layout.delta;
+        var tolerance = delta * 0.5;
+        var scrollEnd = scrollLeft + offsetWidth + delta;
+        if (scrollEnd > scrollWidth && scrollEnd <= scrollWidth + tolerance) {
+            manager.scrollBy(delta, 0, true);
+            rendition.reportLocation();
+            return;
+        }
+    }
+    rendition.next();
+};
+
 window._displayHref = function(href) { rendition.display(href); };
 window._displayCfi = function(cfi) { rendition.display(cfi); };
 window._displayPageNum = function(pageNum) {
