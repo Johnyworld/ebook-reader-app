@@ -2371,7 +2371,7 @@ private fun EpubViewer(
     var bookDir by remember(path) { mutableStateOf<String?>(null) }
     var opfPath by remember(path) { mutableStateOf<String?>(null) }
     var error by remember(path) { mutableStateOf(false) }
-    data class SelectionState(val text: String, val x: Float, val y: Float, val bottom: Float, val cfi: String = "")
+    data class SelectionState(val text: String, val x: Float, val y: Float, val bottom: Float, val cfi: String = "", val isAtPageEnd: Boolean = false)
     var selectionState by remember { mutableStateOf<SelectionState?>(null) }
     val selectionActive = remember { java.util.concurrent.atomic.AtomicBoolean(false) }
     val webViewRef = remember { java.util.concurrent.atomic.AtomicReference<android.webkit.WebView?>(null) }
@@ -2395,8 +2395,8 @@ private fun EpubViewer(
             selectionState = null
         }
     }
-    val selectionOnSelectionTapped: (String, Float, Float, Float, String) -> Unit = { text, x, y, bottom, cfi ->
-        if (text.isNotEmpty()) selectionState = SelectionState(text, x, y, bottom, cfi)
+    val selectionOnSelectionTapped: (String, Float, Float, Float, String, Boolean) -> Unit = { text, x, y, bottom, cfi, isAtPageEnd ->
+        if (text.isNotEmpty()) selectionState = SelectionState(text, x, y, bottom, cfi, isAtPageEnd)
     }
 
     LaunchedEffect(readerSettings) {
@@ -2490,12 +2490,14 @@ private fun EpubViewer(
                                                     if (docX >= r.left && docX <= r.right && docY >= r.top && docY <= r.bottom) {
                                                         var boundRect = range.getBoundingClientRect();
                                                         var cfi = typeof window._getCfiFromSelection === 'function' ? (window._getCfiFromSelection() || '') : '';
+                                                        var isAtPageEnd = typeof window._isSelectionAtPageEnd === 'function' ? window._isSelectionAtPageEnd() : false;
                                                         Android.onSelectionTapped(
                                                             sel.toString().trim(),
                                                             boundRect.left + boundRect.width/2 + iframeRect.left,
                                                             boundRect.top + iframeRect.top,
                                                             boundRect.bottom + iframeRect.top,
-                                                            cfi
+                                                            cfi,
+                                                            isAtPageEnd
                                                         );
                                                         return;
                                                     }
@@ -3934,7 +3936,7 @@ private class EpubBridge(
     private val onSearchResultsPartialCallback: (resultsJson: String) -> Unit = {},
     private val onSearchCompleteCallback: () -> Unit = {},
     private val onTextSelectedCallback: (text: String, x: Float, y: Float, bottom: Float) -> Unit = { _, _, _, _ -> },
-    private val onSelectionTappedCallback: (text: String, x: Float, y: Float, bottom: Float, cfi: String) -> Unit = { _, _, _, _, _ -> }
+    private val onSelectionTappedCallback: (text: String, x: Float, y: Float, bottom: Float, cfi: String, isAtPageEnd: Boolean) -> Unit = { _, _, _, _, _, _ -> }
 ) {
     private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
 
@@ -4002,8 +4004,8 @@ private class EpubBridge(
     }
 
     @android.webkit.JavascriptInterface
-    fun onSelectionTapped(text: String, x: Float, y: Float, bottom: Float, cfi: String) {
-        mainHandler.post { onSelectionTappedCallback(text, x, y, bottom, cfi) }
+    fun onSelectionTapped(text: String, x: Float, y: Float, bottom: Float, cfi: String, isAtPageEnd: Boolean) {
+        mainHandler.post { onSelectionTappedCallback(text, x, y, bottom, cfi, isAtPageEnd) }
     }
 
 }
