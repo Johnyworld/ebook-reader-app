@@ -2675,10 +2675,7 @@ private fun EpubViewer(
                     pendingStartText = sel.text
                     isContinuationMode = true
                     selectionState = null
-                    webViewRef.get()?.evaluateJavascript("window._next()", null)
-                    webViewRef.get()?.postDelayed({
-                        webViewRef.get()?.evaluateJavascript("window._selectFirstCharOfPage()", null)
-                    }, 300)
+                    webViewRef.get()?.evaluateJavascript("window._pendingContinuation = true; window._next()", null)
                 }
             } else null,
             onDismiss = {
@@ -3197,6 +3194,10 @@ rendition.on("relocated", function(location) {
         _pendingLocation = location;
     }
     if (_searchHighlightQuery) { setTimeout(_applySearchHighlights, 50); }
+    if (window._pendingContinuation) {
+        window._pendingContinuation = false;
+        setTimeout(function() { window._selectFirstCharOfPage(); }, 50);
+    }
 });
 
 book.loaded.navigation.then(function(nav) {
@@ -3651,6 +3652,14 @@ window._getAnnotationAtPoint = function(x, y) {
 
 window._isSelectionAtPageEnd = function() {
     try {
+        // spine item의 마지막 페이지인지 확인
+        var manager = rendition.manager;
+        if (!manager || !manager.container) return false;
+        var scrollLeft = manager.container.scrollLeft;
+        var offsetWidth = manager.container.offsetWidth;
+        var scrollWidth = manager.container.scrollWidth;
+        var delta = manager.layout ? manager.layout.delta : offsetWidth;
+        if (scrollLeft + offsetWidth + delta > scrollWidth + delta * 0.5) return false;
         var iframe = document.querySelector('iframe');
         if (!iframe || !iframe.contentDocument) return false;
         var doc = iframe.contentDocument;
