@@ -3574,6 +3574,100 @@ window._getAnnotationAtPoint = function(x, y) {
     return 'null';
 };
 
+window._isSelectionAtPageEnd = function() {
+    try {
+        var iframe = document.querySelector('iframe');
+        if (!iframe || !iframe.contentDocument) return false;
+        var doc = iframe.contentDocument;
+        var sel = doc.getSelection();
+        if (!sel || sel.rangeCount === 0 || sel.toString().trim().length === 0) return false;
+        var range = sel.getRangeAt(0);
+
+        var manager = rendition.manager;
+        if (!manager || !manager.container) return false;
+        var scrollLeft = manager.container.scrollLeft;
+        var pageWidth = manager.layout ? manager.layout.delta : manager.container.offsetWidth;
+        var rightEdge = scrollLeft + pageWidth;
+
+        var endRange = doc.createRange();
+        endRange.setStart(range.endContainer, range.endOffset);
+        endRange.setEnd(range.endContainer, range.endOffset);
+
+        var walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT, null, false);
+        var lastVisibleTextNode = null;
+        var node;
+        while (node = walker.nextNode()) {
+            if (node.textContent.trim().length === 0) continue;
+            var r = doc.createRange();
+            r.selectNodeContents(node);
+            var rects = r.getClientRects();
+            for (var i = 0; i < rects.length; i++) {
+                var rect = rects[i];
+                if (rect.right > scrollLeft && rect.left < rightEdge) {
+                    lastVisibleTextNode = node;
+                }
+            }
+        }
+
+        if (!lastVisibleTextNode) return false;
+
+        return range.endContainer === lastVisibleTextNode &&
+               range.endOffset === lastVisibleTextNode.textContent.length;
+    } catch(e) { return false; }
+};
+
+window._selectFirstCharOfPage = function() {
+    try {
+        var iframe = document.querySelector('iframe');
+        if (!iframe || !iframe.contentDocument) return;
+        var doc = iframe.contentDocument;
+
+        var manager = rendition.manager;
+        if (!manager || !manager.container) return;
+        var scrollLeft = manager.container.scrollLeft;
+        var pageWidth = manager.layout ? manager.layout.delta : manager.container.offsetWidth;
+        var rightEdge = scrollLeft + pageWidth;
+
+        var walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT, null, false);
+        var firstVisibleTextNode = null;
+        var node;
+        while (node = walker.nextNode()) {
+            if (node.textContent.trim().length === 0) continue;
+            var r = doc.createRange();
+            r.selectNodeContents(node);
+            var rects = r.getClientRects();
+            for (var i = 0; i < rects.length; i++) {
+                var rect = rects[i];
+                if (rect.right > scrollLeft && rect.left < rightEdge) {
+                    firstVisibleTextNode = node;
+                    break;
+                }
+            }
+            if (firstVisibleTextNode) break;
+        }
+
+        if (!firstVisibleTextNode) return;
+
+        var range = doc.createRange();
+        range.setStart(firstVisibleTextNode, 0);
+        range.setEnd(firstVisibleTextNode, Math.min(1, firstVisibleTextNode.textContent.length));
+        var sel = doc.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+    } catch(e) {}
+};
+
+window._mergeCfi = function(startCfi, endCfi) {
+    try {
+        var sMatch = startCfi.match(/^(epubcfi\([^,]+),([^,]+),([^)]+)\)$/);
+        var eMatch = endCfi.match(/^(epubcfi\([^,]+),([^,]+),([^)]+)\)$/);
+        if (sMatch && eMatch) {
+            return sMatch[1] + ',' + sMatch[2] + ',' + eMatch[3] + ')';
+        }
+        return endCfi;
+    } catch(e) { return endCfi; }
+};
+
 var _savedCfi = "${savedCfi.replace("\"", "\\\"")}";
 rendition.display(_savedCfi.length > 0 ? _savedCfi : undefined);
 window._prev = function() { rendition.prev(); };
