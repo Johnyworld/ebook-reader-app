@@ -396,7 +396,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                 onLocationUpdate = { progress, cfi, chapter ->
                     locationsReady = true
                     currentCfi = cfi
-                    if (chapter.isNotEmpty()) chapterTitle = chapter
+                    chapterTitle = chapter
                     if (prevProgress >= 0f && currentPage > 0 && totalPages > 0) {
                         if (progress > prevProgress) {
                             currentPage = (currentPage + 1).coerceAtMost(totalPages)
@@ -675,29 +675,27 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                                 drawStopIndicator = {}
                             )
                             }
-                            if (chapterTitle.isNotEmpty()) {
-                                Spacer(Modifier.height(12.dp))
-                                Row(
-                                    modifier = Modifier
-                                        .align(Alignment.CenterHorizontally)
-                                        .clickable { showTocPopup = true }
-                                        .border(1.dp, MaterialTheme.colorScheme.onSurfaceVariant, RoundedCornerShape(4.dp))
-                                        .padding(horizontal = 8.dp, vertical = 4.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                ) {
-                                    Icon(
-                                        Icons.Default.FormatListBulleted,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(14.dp),
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                    Text(
-                                        chapterTitle,
-                                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 14.sp),
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
+                            Spacer(Modifier.height(12.dp))
+                            Row(
+                                modifier = Modifier
+                                    .align(Alignment.CenterHorizontally)
+                                    .clickable { showTocPopup = true }
+                                    .border(1.dp, MaterialTheme.colorScheme.onSurfaceVariant, RoundedCornerShape(4.dp))
+                                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.FormatListBulleted,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(14.dp),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    chapterTitle.ifEmpty { "목차" },
+                                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 14.sp),
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
                             }
                         }
 
