@@ -20,6 +20,7 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.FrameLayout
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -90,6 +91,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
@@ -366,7 +368,13 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
         }
     }
 
-    Box(modifier = modifier.fillMaxSize()) {
+    LaunchedEffect(currentCfi, bookmarks, isContentRendered) {
+        if (!isContentRendered) return@LaunchedEffect
+        val show = currentCfi.isNotEmpty() && bookmarks.any { it.cfi == currentCfi }
+        epubWebView.value?.evaluateJavascript("window._showBookmarkRibbon($show)", null)
+    }
+
+    Box(modifier = modifier.fillMaxSize().clipToBounds()) {
         when (book.extension.lowercase()) {
             "txt"  -> TxtViewer(book.path, onCenterTap)
             "epub" -> EpubViewer(
@@ -563,6 +571,8 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
         //         color = Color.Black
         //     )
         // }
+
+        // 북마크 리본은 WebView 내부 HTML로 렌더링 (글자 하위 레이어)
 
         // 하단 정보 오버레이
         if (!showMenu && isContentRendered) {
@@ -2888,6 +2898,11 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: #fff; }
 </style>
 </head>
 <body>
+<div id="bookmark-ribbon" style="display:none;position:absolute;top:-12px;right:16px;width:16px;height:40px;z-index:0;pointer-events:none;">
+<svg width="16" height="40" viewBox="0 0 16 40" xmlns="http://www.w3.org/2000/svg">
+<path d="M0,0 L16,0 L16,40 L8,30 L0,40 Z" fill="#ccc"/>
+</svg>
+</div>
 <div id="viewer"></div>
 <script>
 (function() {
@@ -2903,6 +2918,10 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: #fff; }
 </script>
 <script src="epub.min.js"></script>
 <script>
+window._showBookmarkRibbon = function(show) {
+    var el = document.getElementById('bookmark-ribbon');
+    if (el) el.style.display = show ? 'block' : 'none';
+};
 var _dualPage = ${settings.dualPage};
 function _getSpreadMode() {
     return (_dualPage && window.innerWidth > window.innerHeight) ? "always" : "none";
