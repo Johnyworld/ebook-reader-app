@@ -3274,6 +3274,7 @@ book.ready.then(function() {
 rendition.hooks.content.register(function(contents) {
     var doc = contents.document;
     _injectReaderStyle(doc);
+    if (doc.body) { void doc.body.offsetHeight; }
     var debounceTimer = null;
     var lastSelectionTime = 0;
     window._getCfiFromSelection = function() {
@@ -3474,7 +3475,23 @@ window._next = function() {
 };
 
 window._displayHref = function(href) { rendition.display(href); };
-window._displayCfi = function(cfi) { rendition.display(cfi); };
+window._displayCfi = function(cfi) {
+    var prevIndex = -1;
+    try {
+        var loc = rendition.currentLocation();
+        if (loc && loc.start) prevIndex = loc.start.index;
+    } catch(e) {}
+    rendition.display(cfi).then(function() {
+        var newIndex = -1;
+        try {
+            var loc2 = rendition.currentLocation();
+            if (loc2 && loc2.start) newIndex = loc2.start.index;
+        } catch(e) {}
+        if (prevIndex !== newIndex) {
+            setTimeout(function() { rendition.display(cfi); }, 0);
+        }
+    });
+};
 window._displayPageNum = function(pageNum) {
     try {
         var items = book.spine ? (book.spine.items || []) : [];
