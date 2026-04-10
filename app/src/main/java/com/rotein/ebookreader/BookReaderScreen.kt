@@ -142,7 +142,9 @@ data class SearchResultItem(
     val cfi: String,
     val excerpt: String,
     val chapter: String = "",
-    val page: Int = 0
+    val page: Int = 0,
+    val spineIndex: Int = -1,
+    val charPos: Int = -1
 )
 
 private fun parseSearchResults(json: JSONArray): List<SearchResultItem> {
@@ -153,10 +155,45 @@ private fun parseSearchResults(json: JSONArray): List<SearchResultItem> {
             cfi = obj.optString("cfi", ""),
             excerpt = obj.optString("excerpt", ""),
             chapter = obj.optString("chapter", ""),
-            page = obj.optInt("page", 0)
+            page = obj.optInt("page", 0),
+            spineIndex = obj.optInt("spineIndex", -1),
+            charPos = obj.optInt("charPos", -1)
         ))
     }
     return items
+}
+
+private fun recalcSearchPages(
+    results: List<SearchResultItem>,
+    spinePageOffsets: Map<Int, Int>,
+    charPageBreaksJson: String
+): List<SearchResultItem> {
+    if (results.isEmpty() || charPageBreaksJson.isEmpty()) return results
+    val breaksMap = try {
+        val obj = org.json.JSONObject(charPageBreaksJson)
+        val map = mutableMapOf<Int, List<Int>>()
+        obj.keys().forEach { key ->
+            val arr = obj.getJSONArray(key)
+            val list = mutableListOf<Int>()
+            for (i in 0 until arr.length()) list.add(arr.getInt(i))
+            map[key.toInt()] = list
+        }
+        map
+    } catch (_: Exception) { return results }
+
+    return results.map { r ->
+        if (r.spineIndex < 0 || r.charPos < 0) return@map r
+        val breaks = breaksMap[r.spineIndex]
+        val baseOffset = spinePageOffsets[r.spineIndex] ?: 0
+        val pageWithin = if (breaks != null && breaks.size > 1) {
+            var pw = 0
+            for (bi in breaks.indices.reversed()) {
+                if (r.charPos >= breaks[bi]) { pw = bi; break }
+            }
+            pw
+        } else 0
+        r.copy(page = baseOffset + pageWithin + 1)
+    }
 }
 
 private fun parseTocJson(json: JSONArray, depth: Int = 0): List<TocItem> {
@@ -221,6 +258,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
     var combinedAnnotationState by remember { mutableStateOf<CombinedAnnotationState?>(null) }
     var searchResults by remember { mutableStateOf<List<SearchResultItem>?>(null) }
     var isSearching by remember { mutableStateOf(false) }
+    var searchQuery by remember { mutableStateOf("") }
     val epubWebView = remember { mutableStateOf<WebView?>(null) }
     var currentPage by remember(book.path) { mutableStateOf(0) }
     var totalPages by remember(book.path) { mutableStateOf(0) }
@@ -495,6 +533,9 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                             }
                         }
                     } catch (_: Exception) {}
+                    if (!searchResults.isNullOrEmpty()) {
+                        searchResults = recalcSearchPages(searchResults!!, spinePageOffsets, charPageBreaksJson)
+                    }
                 },
                 onSearchResultsPartial = { json ->
                     try {
@@ -641,8 +682,6 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                         HorizontalDivider(color = Color.Black)
 
                         ReaderMenuItem(Icons.Default.Search, "본문 검색", onClick = {
-                            searchResults = null
-                            isSearching = false
                             showSearchPopup = true
                         })
                         HorizontalDivider(color = Color(0xFFCCCCCC))
@@ -786,11 +825,14 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                 searchResults = searchResults,
                 isSearching = isSearching,
                 tocItems = tocItems,
+                initialQuery = searchQuery,
                 onSearch = { query ->
+                    searchQuery = query
                     isSearching = true
                     searchResults = emptyList()
                     val escaped = query.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n")
                     epubWebView.value?.post {
+                        epubWebView.value?.evaluateJavascript("window._setSearchHighlight(\"$escaped\")", null)
                         epubWebView.value?.evaluateJavascript("window._search(\"$escaped\")", null)
                     }
                 },
@@ -801,6 +843,14 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                     }
                     showSearchPopup = false
                     showMenu = false
+                },
+                onClear = {
+                    searchQuery = ""
+                    searchResults = null
+                    isSearching = false
+                    epubWebView.value?.post {
+                        epubWebView.value?.evaluateJavascript("window._clearSearchHighlight()", null)
+                    }
                 },
                 onDismiss = { showSearchPopup = false }
             )
@@ -1295,8 +1345,10 @@ private fun SearchPopup(
     searchResults: List<SearchResultItem>?,
     isSearching: Boolean,
     tocItems: List<TocItem>,
+    initialQuery: String,
     onSearch: (String) -> Unit,
     onNavigate: (cfi: String, page: Int) -> Unit,
+    onClear: () -> Unit,
     onDismiss: () -> Unit
 ) {
     val tocPageMap = remember(tocItems) {
@@ -1307,8 +1359,8 @@ private fun SearchPopup(
             if (r.page > 0) r.page else (tocPageMap[r.chapter] ?: Int.MAX_VALUE)
         }
     }
-    var query by remember { mutableStateOf("") }
-    var searchedQuery by remember { mutableStateOf("") }
+    var query by remember { mutableStateOf(initialQuery) }
+    var searchedQuery by remember { mutableStateOf(initialQuery) }
     val focusRequester = remember { FocusRequester() }
     var currentPage by remember { mutableStateOf(0) }
 
@@ -1518,6 +1570,19 @@ private fun SearchPopup(
                             }
                         }
                     )
+                    if (query.isNotEmpty()) {
+                        IconButton(
+                            onClick = { query = ""; searchedQuery = ""; onClear() },
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Close,
+                                contentDescription = "검색어 지우기",
+                                modifier = Modifier.size(20.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
                     Box(
                         modifier = Modifier
                             .border(1.dp, Color.Black, RoundedCornerShape(4.dp))
@@ -2986,6 +3051,7 @@ rendition.on("relocated", function(location) {
     } else {
         _pendingLocation = location;
     }
+    if (_searchHighlightQuery) { setTimeout(_applySearchHighlights, 50); }
 });
 
 book.loaded.navigation.then(function(nav) {
@@ -3243,6 +3309,64 @@ window._clearSelection = function() {
     } catch(e) {}
 };
 
+var _searchHighlightQuery = '';
+function _removeSearchHighlights() {
+    try {
+        var iframe = document.querySelector('iframe');
+        var iDoc = iframe && (iframe.contentDocument || (iframe.contentWindow && iframe.contentWindow.document));
+        if (!iDoc) return;
+        var marks = iDoc.querySelectorAll('.search-hl');
+        for (var i = marks.length - 1; i >= 0; i--) {
+            var mark = marks[i];
+            var parent = mark.parentNode;
+            parent.replaceChild(iDoc.createTextNode(mark.textContent), mark);
+            parent.normalize();
+        }
+    } catch(e) {}
+}
+function _applySearchHighlights() {
+    if (!_searchHighlightQuery) return;
+    _removeSearchHighlights();
+    try {
+        var iframe = document.querySelector('iframe');
+        var iDoc = iframe && (iframe.contentDocument || (iframe.contentWindow && iframe.contentWindow.document));
+        if (!iDoc || !iDoc.body) return;
+        var lowerQuery = _searchHighlightQuery.toLowerCase();
+        var walker = iDoc.createTreeWalker(iDoc.body, NodeFilter.SHOW_TEXT, null, false);
+        var textNodes = [];
+        var nd;
+        while ((nd = walker.nextNode())) textNodes.push(nd);
+        for (var i = 0; i < textNodes.length; i++) {
+            var tn = textNodes[i];
+            var text = tn.textContent;
+            var lower = text.toLowerCase();
+            var idx = lower.indexOf(lowerQuery);
+            if (idx === -1) continue;
+            var frag = iDoc.createDocumentFragment();
+            var cursor = 0;
+            while (idx !== -1) {
+                if (idx > cursor) frag.appendChild(iDoc.createTextNode(text.substring(cursor, idx)));
+                var span = iDoc.createElement('span');
+                span.className = 'search-hl';
+                span.textContent = text.substring(idx, idx + lowerQuery.length);
+                frag.appendChild(span);
+                cursor = idx + lowerQuery.length;
+                idx = lower.indexOf(lowerQuery, cursor);
+            }
+            if (cursor < text.length) frag.appendChild(iDoc.createTextNode(text.substring(cursor)));
+            tn.parentNode.replaceChild(frag, tn);
+        }
+    } catch(e) {}
+}
+window._setSearchHighlight = function(query) {
+    _searchHighlightQuery = query;
+    _applySearchHighlights();
+};
+window._clearSearchHighlight = function() {
+    _searchHighlightQuery = '';
+    _removeSearchHighlights();
+};
+
 var _highlightCfiMap = {};
 window._addHighlight = function(cfi, id) {
     try {
@@ -3479,7 +3603,7 @@ window._search = function(query) {
                                 var cfiBase = section.cfiBase || '';
                                 if (cfiBase) { cfi = 'epubcfi(' + cfiBase + ')'; }
                             }
-                            found.push({ cfi: cfi, excerpt: fullText.substring(s, e).replace(/\s+/g, ' ').trim(), chapter: chapter, page: matchPage });
+                            found.push({ cfi: cfi, excerpt: fullText.substring(s, e).replace(/\s+/g, ' ').trim(), chapter: chapter, page: matchPage, spineIndex: spineIndex, charPos: pos });
                         }
                         if (found.length) Android.onSearchResultsPartial(JSON.stringify(found));
                     }
@@ -3532,7 +3656,7 @@ function _injectReaderStyle(doc) {
             style.id = '_rs';
             doc.head.appendChild(style);
         }
-        style.textContent = _buildReaderCss(window._readerSettings);
+        style.textContent = _buildReaderCss(window._readerSettings) + ' .search-hl { background: #e8a230; color: #fff; }';
     } catch(e) {}
 }
 
