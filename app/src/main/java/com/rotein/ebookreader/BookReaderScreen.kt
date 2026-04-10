@@ -265,6 +265,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
     var currentPage by remember(book.path) { mutableStateOf(0) }
     var totalPages by remember(book.path) { mutableStateOf(0) }
     var currentCfi by remember(book.path) { mutableStateOf("") }
+    var isCurrentPageBookmarked by remember(book.path) { mutableStateOf(false) }
     var bookmarks by remember(book.path) { mutableStateOf<List<Bookmark>>(emptyList()) }
     var highlights by remember(book.path) { mutableStateOf<List<Highlight>>(emptyList()) }
     var isContentRendered by remember(book.path) { mutableStateOf(false) }
@@ -370,8 +371,19 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
 
     LaunchedEffect(currentCfi, bookmarks, isContentRendered) {
         if (!isContentRendered) return@LaunchedEffect
-        val show = currentCfi.isNotEmpty() && bookmarks.any { it.cfi == currentCfi }
-        epubWebView.value?.evaluateJavascript("window._showBookmarkRibbon($show)", null)
+        val wv = epubWebView.value ?: return@LaunchedEffect
+        if (currentCfi.isEmpty() || bookmarks.isEmpty()) {
+            isCurrentPageBookmarked = false
+            wv.evaluateJavascript("window._showBookmarkRibbon(false)", null)
+            return@LaunchedEffect
+        }
+        val cfiListJson = bookmarks.map { it.cfi }.filter { it.isNotEmpty() }
+            .joinToString(",", "[", "]") { "\"${it.replace("\"", "\\\"")}\"" }
+        wv.evaluateJavascript("window._isBookmarkedInRange('${cfiListJson.replace("'", "\\'")}')") { result ->
+            val matched = result?.removeSurrounding("\"")?.trim() == "true"
+            isCurrentPageBookmarked = matched
+            wv.evaluateJavascript("window._showBookmarkRibbon($matched)", null)
+        }
     }
 
     Box(modifier = modifier.fillMaxSize().clipToBounds()) {
@@ -747,13 +759,29 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
-                        val isBookmarked = currentCfi.isNotEmpty() && bookmarks.any { it.cfi == currentCfi }
                         IconButton(onClick = {
                             if (currentCfi.isEmpty()) return@IconButton
-                            if (isBookmarked) {
+                            if (isCurrentPageBookmarked) {
                                 scope.launch {
-                                    withContext(Dispatchers.IO) { bookmarkDao.deleteByCfi(book.path, currentCfi) }
-                                    bookmarks = bookmarks.filter { it.cfi != currentCfi }
+                                    val wv = epubWebView.value
+                                    if (wv != null) {
+                                        val cfiListJson = bookmarks.map { it.cfi }.filter { it.isNotEmpty() }
+                                            .joinToString(",", "[", "]") { "\"${it.replace("\"", "\\\"")}\"" }
+                                        wv.evaluateJavascript(
+                                            "(function(){try{var cfis=${cfiListJson};var startCfi=window._currentCfi;var endCfi=window._currentEndCfi;var epubcfi=new ePub.CFI();var matched=[];for(var i=0;i<cfis.length;i++){var c=cfis[i];if(c===startCfi||(endCfi&&epubcfi.compare(c,startCfi)>=0&&epubcfi.compare(c,endCfi)<=0)){matched.push(c);}}return JSON.stringify(matched);}catch(e){return '[]';}})()"
+                                        ) { result ->
+                                            val matchedCfis = try {
+                                                val arr = org.json.JSONArray(result?.removeSurrounding("\"")?.replace("\\\"", "\"")?.replace("\\\\", "\\") ?: "[]")
+                                                (0 until arr.length()).map { arr.getString(it) }.toSet()
+                                            } catch (_: Exception) { emptySet() }
+                                            scope.launch {
+                                                for (cfi in matchedCfis) {
+                                                    withContext(Dispatchers.IO) { bookmarkDao.deleteByCfi(book.path, cfi) }
+                                                }
+                                                bookmarks = bookmarks.filter { it.cfi !in matchedCfis }
+                                            }
+                                        }
+                                    }
                                 }
                             } else {
                                 val wv = epubWebView.value
@@ -797,7 +825,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                             }
                         }) {
                             Icon(
-                                if (isBookmarked) Icons.Filled.Bookmark else Icons.Filled.BookmarkBorder,
+                                if (isCurrentPageBookmarked) Icons.Filled.Bookmark else Icons.Filled.BookmarkBorder,
                                 contentDescription = "북마크",
                                 tint = Color.Black
                             )
@@ -3034,6 +3062,26 @@ window._setCfiList = function(jsonStr) {
     } catch(e) {}
 };
 window._currentCfi = "";
+window._currentEndCfi = "";
+window._isBookmarkedInRange = function(cfiListJson) {
+    try {
+        var cfis = JSON.parse(cfiListJson);
+        if (!cfis.length || !window._currentCfi) return false;
+        var startCfi = window._currentCfi;
+        var endCfi = window._currentEndCfi;
+        var epubcfi = new ePub.CFI();
+        for (var i = 0; i < cfis.length; i++) {
+            var c = cfis[i];
+            if (c === startCfi) return true;
+            if (endCfi) {
+                var afterStart = epubcfi.compare(c, startCfi) >= 0;
+                var beforeEnd = epubcfi.compare(c, endCfi) <= 0;
+                if (afterStart && beforeEnd) return true;
+            }
+        }
+    } catch(e) {}
+    return false;
+};
 var _waitingForFonts = false;
 rendition.on("relocated", function(location) {
     if (!_rendered || _waitingForFonts) {
@@ -3063,7 +3111,12 @@ rendition.on("relocated", function(location) {
     } catch(e) {}
     try {
         var cfi = (location.start && location.start.cfi) ? location.start.cfi : "";
-        if (cfi) { window._currentCfi = cfi; Android.onLocationChanged(0, cfi, ""); }
+        if (cfi) {
+            window._currentCfi = cfi;
+            var endCfi = (location.end && location.end.cfi) ? location.end.cfi : "";
+            window._currentEndCfi = endCfi;
+            Android.onLocationChanged(0, cfi, "");
+        }
     } catch(e) {}
     if (_locationsReady || _totalVisualPages > 0) {
         reportLocation(location);
