@@ -551,18 +551,18 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
             else   -> CenteredMessage("지원하지 않는 형식입니다.")
         }
 
-        // 디버그 정보 오버레이
-        if (isContentRendered && debugSpineIndex >= 0) {
-            Text(
-                text = "si=$debugSpineIndex p=$debugDisplayedPage/$debugDisplayedTotal s=${"%.3f".format(debugScrollX)}/${"%.3f".format(debugScrollWidth)} d=${"%.3f".format(debugDeltaX)}",
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .padding(top = 4.dp)
-                    .background(Color.White),
-                style = MaterialTheme.typography.bodySmall,
-                color = Color.Black
-            )
-        }
+        // 디버그 정보 오버레이 (필요 시 주석 해제)
+        // if (isContentRendered && debugSpineIndex >= 0) {
+        //     Text(
+        //         text = "si=$debugSpineIndex p=$debugDisplayedPage/$debugDisplayedTotal s=${"%.3f".format(debugScrollX)}/${"%.3f".format(debugScrollWidth)} d=${"%.3f".format(debugDeltaX)}",
+        //         modifier = Modifier
+        //             .align(Alignment.TopCenter)
+        //             .padding(top = 4.dp)
+        //             .background(Color.White),
+        //         style = MaterialTheme.typography.bodySmall,
+        //         color = Color.Black
+        //     )
+        // }
 
         // 하단 정보 오버레이
         if (!showMenu && isContentRendered) {
