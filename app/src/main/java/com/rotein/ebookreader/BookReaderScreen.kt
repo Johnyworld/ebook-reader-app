@@ -2376,6 +2376,7 @@ private fun EpubViewer(
     var selectionState by remember { mutableStateOf<SelectionState?>(null) }
     var pendingStartText by remember { mutableStateOf<String?>(null) }
     var isContinuationMode by remember { mutableStateOf(false) }
+    var isContinuationTransitioning by remember { mutableStateOf(false) }
     val selectionActive = remember { java.util.concurrent.atomic.AtomicBoolean(false) }
     val webViewRef = remember { java.util.concurrent.atomic.AtomicReference<android.webkit.WebView?>(null) }
     val onHighlightLongPressRef = remember { java.util.concurrent.atomic.AtomicReference<((Long, Float, Float, Float) -> Unit)?>(null) }
@@ -2393,9 +2394,15 @@ private fun EpubViewer(
         onTextSelected(text, x, y, bottom)
         if (text.isNotEmpty()) {
             selectionActive.set(true)
+            isContinuationTransitioning = false
         } else {
             selectionActive.set(false)
             selectionState = null
+            if (isContinuationMode && !isContinuationTransitioning) {
+                pendingStartText = null
+                isContinuationMode = false
+                webViewRef.get()?.evaluateJavascript("window._clearContStart()", null)
+            }
         }
     }
     val selectionOnSelectionTapped: (String, Float, Float, Float, String, Boolean) -> Unit = { text, x, y, bottom, cfi, isAtPageEnd ->
@@ -2665,6 +2672,7 @@ private fun EpubViewer(
                 {
                     pendingStartText = sel.text
                     isContinuationMode = true
+                    isContinuationTransitioning = true
                     webViewRef.get()?.evaluateJavascript("window._saveContStart()", null)
                     selectionState = null
                     clearSelection()
