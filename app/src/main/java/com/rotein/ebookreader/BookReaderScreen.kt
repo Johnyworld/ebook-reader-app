@@ -2671,7 +2671,33 @@ private fun EpubViewer(
                     pendingStartText = sel.text
                     isContinuationMode = true
                     selectionState = null
-                    webViewRef.get()?.evaluateJavascript("window._pendingContinuation = true; window._next()", null)
+                    clearSelection()
+                    webViewRef.get()?.evaluateJavascript("window._next()", null)
+                    webViewRef.get()?.postDelayed({
+                        val wv = webViewRef.get() ?: return@postDelayed
+                        wv.evaluateJavascript("window._autoSelectFirstChar()") { result ->
+                            val cleaned = result?.trim()?.removeSurrounding("\"")
+                                ?.replace("\\\"", "\"")?.replace("\\\\", "\\") ?: return@evaluateJavascript
+                            if (cleaned.isEmpty()) return@evaluateJavascript
+                            try {
+                                val json = JSONObject(cleaned)
+                                val cssX = json.getDouble("x").toFloat()
+                                val cssY = json.getDouble("y").toFloat()
+                                val density = wv.context.resources.displayMetrics.density
+                                val px = cssX * density
+                                val py = cssY * density
+                                val downTime = SystemClock.uptimeMillis()
+                                val down = MotionEvent.obtain(downTime, downTime, MotionEvent.ACTION_DOWN, px, py, 0)
+                                wv.dispatchTouchEvent(down)
+                                down.recycle()
+                                wv.postDelayed({
+                                    val up = MotionEvent.obtain(downTime, SystemClock.uptimeMillis(), MotionEvent.ACTION_UP, px, py, 0)
+                                    wv.dispatchTouchEvent(up)
+                                    up.recycle()
+                                }, 600)
+                            } catch (_: Exception) {}
+                        }
+                    }, 300)
                 }
             } else null,
             onDismiss = {
@@ -3190,10 +3216,6 @@ rendition.on("relocated", function(location) {
         _pendingLocation = location;
     }
     if (_searchHighlightQuery) { setTimeout(_applySearchHighlights, 50); }
-    if (window._pendingContinuation) {
-        window._pendingContinuation = false;
-        setTimeout(function() { window._selectFirstCharOfPage(); }, 50);
-    }
 });
 
 book.loaded.navigation.then(function(nav) {
@@ -3506,6 +3528,52 @@ window._clearSelection = function() {
         }
     } catch(e) {}
 };
+window._extendSelectionToNextPage = function() {
+    try {
+        if (!window._contStartContainer) return;
+        var iframe = document.querySelector('iframe');
+        if (!iframe || !iframe.contentDocument) return;
+        var doc = iframe.contentDocument;
+        var manager = rendition.manager;
+        if (!manager || !manager.container) return;
+        var scrollLeft = manager.container.scrollLeft;
+        var delta = manager.layout ? manager.layout.delta : manager.container.offsetWidth;
+        var rightEdge = scrollLeft + delta;
+
+        var walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT, null, false);
+        var firstNode = null;
+        var node;
+        while (node = walker.nextNode()) {
+            if (node.textContent.trim().length === 0) continue;
+            var r = doc.createRange();
+            r.selectNodeContents(node);
+            var rects = r.getClientRects();
+            for (var i = 0; i < rects.length; i++) {
+                if (rects[i].right > scrollLeft && rects[i].left < rightEdge) {
+                    firstNode = node;
+                    break;
+                }
+            }
+            if (firstNode) break;
+        }
+        if (!firstNode) return;
+
+        var text = firstNode.textContent;
+        var wordEnd = 0;
+        while (wordEnd < text.length && /\s/.test(text[wordEnd])) wordEnd++;
+        while (wordEnd < text.length && !/\s/.test(text[wordEnd])) wordEnd++;
+        if (wordEnd === 0) wordEnd = Math.min(1, text.length);
+
+        var range = doc.createRange();
+        range.setStart(window._contStartContainer, window._contStartOffset);
+        range.setEnd(firstNode, wordEnd);
+        var sel = doc.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+        window._contStartContainer = null;
+        window._contStartOffset = null;
+    } catch(e) {}
+};
 
 var _searchHighlightQuery = '';
 function _removeSearchHighlights() {
@@ -3648,86 +3716,63 @@ window._getAnnotationAtPoint = function(x, y) {
 
 window._isSelectionAtPageEnd = function() {
     try {
-        // spine item의 마지막 페이지인지 확인
         var manager = rendition.manager;
         if (!manager || !manager.container) return false;
         var scrollLeft = manager.container.scrollLeft;
         var offsetWidth = manager.container.offsetWidth;
         var scrollWidth = manager.container.scrollWidth;
         var delta = manager.layout ? manager.layout.delta : offsetWidth;
+        // spine item 마지막 페이지이면 이어하기 불가
         if (scrollLeft + offsetWidth + delta > scrollWidth + delta * 0.5) return false;
+
         var iframe = document.querySelector('iframe');
         if (!iframe || !iframe.contentDocument) return false;
         var doc = iframe.contentDocument;
         var sel = doc.getSelection();
         if (!sel || sel.rangeCount === 0 || sel.toString().trim().length === 0) return false;
         var range = sel.getRangeAt(0);
+        var rightEdge = scrollLeft + delta;
 
-        var pageWidth = delta;
-        var rightEdge = scrollLeft + pageWidth;
-
-        var walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT, null, false);
-        var lastVisibleTextNode = null;
-        var node;
-        while (node = walker.nextNode()) {
-            if (node.textContent.trim().length === 0) continue;
-            var r = doc.createRange();
-            r.selectNodeContents(node);
-            var rects = r.getClientRects();
-            for (var i = 0; i < rects.length; i++) {
-                var rect = rects[i];
-                if (rect.right > scrollLeft && rect.left < rightEdge) {
-                    lastVisibleTextNode = node;
-                }
-            }
-        }
-
-        if (!lastVisibleTextNode) return false;
-
-        return range.endContainer === lastVisibleTextNode &&
-               range.endOffset === lastVisibleTextNode.textContent.length;
+        // 선택 영역의 마지막 rect의 오른쪽 끝이 페이지 오른쪽 끝에 닿아 있는지
+        var selRects = range.getClientRects();
+        if (selRects.length === 0) return false;
+        var lastRect = selRects[selRects.length - 1];
+        var tolerance = 20;
+        return lastRect.right >= rightEdge - tolerance;
     } catch(e) { return false; }
 };
 
-window._selectFirstCharOfPage = function() {
+window._autoSelectFirstChar = function() {
     try {
         var iframe = document.querySelector('iframe');
-        if (!iframe || !iframe.contentDocument) return;
-        var doc = iframe.contentDocument;
-
-        var manager = rendition.manager;
-        if (!manager || !manager.container) return;
-        var scrollLeft = manager.container.scrollLeft;
-        var pageWidth = manager.layout ? manager.layout.delta : manager.container.offsetWidth;
-        var rightEdge = scrollLeft + pageWidth;
-
-        var walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT, null, false);
-        var firstVisibleTextNode = null;
+        if (!iframe || !iframe.contentDocument) return '';
+        var iDoc = iframe.contentDocument;
+        var body = iDoc.body;
+        if (!body) return '';
+        var container = rendition.manager.container;
+        var scrollLeft = container.scrollLeft;
+        var viewRight = scrollLeft + container.offsetWidth;
+        var iframeRect = iframe.getBoundingClientRect();
+        var walker = iDoc.createTreeWalker(body, NodeFilter.SHOW_TEXT, null, false);
         var node;
-        while (node = walker.nextNode()) {
-            if (node.textContent.trim().length === 0) continue;
-            var r = doc.createRange();
-            r.selectNodeContents(node);
-            var rects = r.getClientRects();
-            for (var i = 0; i < rects.length; i++) {
-                var rect = rects[i];
-                if (rect.right > scrollLeft && rect.left < rightEdge) {
-                    firstVisibleTextNode = node;
-                    break;
+        while ((node = walker.nextNode())) {
+            var text = node.textContent;
+            if (!text || text.trim().length === 0) continue;
+            var range = iDoc.createRange();
+            for (var i = 0; i < text.length; i++) {
+                range.setStart(node, i);
+                range.setEnd(node, i + 1);
+                var cr = range.getBoundingClientRect();
+                if (cr.left >= scrollLeft && cr.right <= viewRight && cr.height > 0) {
+                    return JSON.stringify({
+                        x: iframeRect.left + (cr.left + cr.right) / 2,
+                        y: iframeRect.top + (cr.top + cr.bottom) / 2
+                    });
                 }
             }
-            if (firstVisibleTextNode) break;
         }
-
-        if (!firstVisibleTextNode) return;
-
-        var range = doc.createRange();
-        range.setStart(firstVisibleTextNode, 0);
-        range.setEnd(firstVisibleTextNode, Math.min(1, firstVisibleTextNode.textContent.length));
-        var sel = doc.getSelection();
-        sel.removeAllRanges();
-        sel.addRange(range);
-    } catch(e) {}
+        return '';
+    } catch(e) { return ''; }
 };
 
 window._mergeCfi = function(startCfi, endCfi) {
