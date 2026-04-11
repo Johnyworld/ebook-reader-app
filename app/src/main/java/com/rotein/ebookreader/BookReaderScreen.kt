@@ -87,6 +87,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
@@ -2729,43 +2730,51 @@ private fun SelectionPopup(
     val yDp = selectionY.dp
     val bottomDp = selectionBottom.dp
     val cxDp = selectionCx.dp
+    val screenHeightDp = LocalConfiguration.current.screenHeightDp.dp
+    val bottomSafeDp = 28.dp
     val showAbove = yDp > popupHeightDp + marginDp
-    val offsetY = if (showAbove) yDp - popupHeightDp - marginDp else bottomDp + marginDp
+    val offsetY = if (showAbove) {
+        yDp - popupHeightDp - marginDp
+    } else {
+        (bottomDp + marginDp).coerceAtMost(screenHeightDp - popupHeightDp - bottomSafeDp)
+    }
 
     val density = LocalDensity.current
     val screenWidthDp = LocalConfiguration.current.screenWidthDp.dp
     var popupWidthDp by remember { mutableStateOf(0.dp) }
 
-    Box(Modifier.fillMaxSize().pointerInput(Unit) { detectTapGestures { onDismiss() } }) {
-        Row(
-            modifier = Modifier
-                .onSizeChanged { popupWidthDp = with(density) { it.width.toDp() } }
-                .alpha(if (popupWidthDp == 0.dp) 0f else 1f)
-                .offset(
-                    x = (cxDp - popupWidthDp / 2).coerceIn(marginDp, screenWidthDp - popupWidthDp - marginDp),
-                    y = offsetY
-                )
-                .border(1.dp, Color.Black, RoundedCornerShape(8.dp))
-                .background(Color.White, RoundedCornerShape(8.dp))
-                .padding(horizontal = 4.dp)
-                .pointerInput(Unit) { detectTapGestures { } },
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            TextButton(onClick = onHighlight) {
-                Text("하이라이트", color = Color.Black, fontSize = 14.sp)
-            }
-            Box(Modifier.width(1.dp).height(20.dp).background(Color.Black))
-            TextButton(onClick = onMemo) {
-                Text("메모", color = Color.Black, fontSize = 14.sp)
-            }
-            Box(Modifier.width(1.dp).height(20.dp).background(Color.Black))
-            TextButton(onClick = onShare) {
-                Text("공유", color = Color.Black, fontSize = 14.sp)
-            }
-            if (onContinue != null) {
+    Popup(onDismissRequest = onDismiss) {
+        Box(Modifier.fillMaxSize().pointerInput(Unit) { detectTapGestures { onDismiss() } }) {
+            Row(
+                modifier = Modifier
+                    .onSizeChanged { popupWidthDp = with(density) { it.width.toDp() } }
+                    .alpha(if (popupWidthDp == 0.dp) 0f else 1f)
+                    .offset(
+                        x = (cxDp - popupWidthDp / 2).coerceIn(marginDp, screenWidthDp - popupWidthDp - marginDp),
+                        y = offsetY
+                    )
+                    .border(1.dp, Color.Black, RoundedCornerShape(8.dp))
+                    .background(Color.White, RoundedCornerShape(8.dp))
+                    .padding(horizontal = 4.dp)
+                    .pointerInput(Unit) { detectTapGestures { } },
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                TextButton(onClick = onHighlight) {
+                    Text("하이라이트", color = Color.Black, fontSize = 14.sp)
+                }
                 Box(Modifier.width(1.dp).height(20.dp).background(Color.Black))
-                TextButton(onClick = onContinue) {
-                    Text("이어하기", color = Color.Black, fontSize = 14.sp)
+                TextButton(onClick = onMemo) {
+                    Text("메모", color = Color.Black, fontSize = 14.sp)
+                }
+                Box(Modifier.width(1.dp).height(20.dp).background(Color.Black))
+                TextButton(onClick = onShare) {
+                    Text("공유", color = Color.Black, fontSize = 14.sp)
+                }
+                if (onContinue != null) {
+                    Box(Modifier.width(1.dp).height(20.dp).background(Color.Black))
+                    TextButton(onClick = onContinue) {
+                        Text("이어하기", color = Color.Black, fontSize = 14.sp)
+                    }
                 }
             }
         }
@@ -2787,14 +2796,20 @@ private fun HighlightActionPopup(
     val yDp = selectionY.dp
     val bottomDp = selectionBottom.dp
     val cxDp = selectionCx.dp
+    val screenHeightDp = LocalConfiguration.current.screenHeightDp.dp
+    val bottomSafeDp = 28.dp
     val showAbove = yDp > popupHeightDp + marginDp
-    val offsetY = if (showAbove) yDp - popupHeightDp - marginDp else bottomDp + marginDp
+    val offsetY = if (showAbove) {
+        yDp - popupHeightDp - marginDp
+    } else {
+        (bottomDp + marginDp).coerceAtMost(screenHeightDp - popupHeightDp - bottomSafeDp)
+    }
 
     val density = LocalDensity.current
     val screenWidthDp = LocalConfiguration.current.screenWidthDp.dp
     var popupWidthDp by remember { mutableStateOf(0.dp) }
 
-    Box(Modifier.fillMaxSize().pointerInput(Unit) { detectTapGestures { onDismiss() } }) {
+    Box(Modifier.fillMaxSize().zIndex(10f).pointerInput(Unit) { detectTapGestures { onDismiss() } }) {
         Row(
             modifier = Modifier
                 .onSizeChanged { popupWidthDp = with(density) { it.width.toDp() } }
@@ -2840,14 +2855,20 @@ private fun MemoActionPopup(
     val yDp = selectionY.dp
     val bottomDp = selectionBottom.dp
     val cxDp = selectionCx.dp
+    val screenHeightDp = LocalConfiguration.current.screenHeightDp.dp
+    val bottomSafeDp = 28.dp
     val showAbove = yDp > popupHeightDp + marginDp
-    val offsetY = if (showAbove) yDp - popupHeightDp - marginDp else bottomDp + marginDp
+    val offsetY = if (showAbove) {
+        yDp - popupHeightDp - marginDp
+    } else {
+        (bottomDp + marginDp).coerceAtMost(screenHeightDp - popupHeightDp - bottomSafeDp)
+    }
 
     val density = LocalDensity.current
     val screenWidthDp = LocalConfiguration.current.screenWidthDp.dp
     var popupWidthDp by remember { mutableStateOf(0.dp) }
 
-    Box(Modifier.fillMaxSize().pointerInput(Unit) { detectTapGestures { onDismiss() } }) {
+    Box(Modifier.fillMaxSize().zIndex(10f).pointerInput(Unit) { detectTapGestures { onDismiss() } }) {
         Row(
             modifier = Modifier
                 .onSizeChanged { popupWidthDp = with(density) { it.width.toDp() } }
@@ -2897,14 +2918,20 @@ private fun CombinedAnnotationPopup(
     val yDp = selectionY.dp
     val bottomDp = selectionBottom.dp
     val cxDp = selectionCx.dp
+    val screenHeightDp = LocalConfiguration.current.screenHeightDp.dp
+    val bottomSafeDp = 28.dp
     val showAbove = yDp > popupHeightDp + marginDp
-    val offsetY = if (showAbove) yDp - popupHeightDp - marginDp else bottomDp + marginDp
+    val offsetY = if (showAbove) {
+        yDp - popupHeightDp - marginDp
+    } else {
+        (bottomDp + marginDp).coerceAtMost(screenHeightDp - popupHeightDp - bottomSafeDp)
+    }
 
     val density = LocalDensity.current
     val screenWidthDp = LocalConfiguration.current.screenWidthDp.dp
     var popupWidthDp by remember { mutableStateOf(0.dp) }
 
-    Box(Modifier.fillMaxSize().pointerInput(Unit) { detectTapGestures { onDismiss() } }) {
+    Box(Modifier.fillMaxSize().zIndex(10f).pointerInput(Unit) { detectTapGestures { onDismiss() } }) {
         Row(
             modifier = Modifier
                 .onSizeChanged { popupWidthDp = with(density) { it.width.toDp() } }
