@@ -29,6 +29,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -2391,6 +2392,11 @@ private fun EpubViewer(
         selectionState = null
         webViewRef.get()?.evaluateJavascript("window._clearSelection()", null)
     }
+    val resetContinuation: () -> Unit = {
+        pendingStartText = null
+        isContinuationMode = false
+        webViewRef.get()?.evaluateJavascript("window._clearContStart()", null)
+    }
     val selectionOnTextSelected: (String, Float, Float, Float) -> Unit = { text, x, y, bottom ->
         onTextSelected(text, x, y, bottom)
         if (text.isNotEmpty()) {
@@ -2400,9 +2406,7 @@ private fun EpubViewer(
             selectionActive.set(false)
             selectionState = null
             if (isContinuationMode && !isContinuationTransitioning) {
-                pendingStartText = null
-                isContinuationMode = false
-                webViewRef.get()?.evaluateJavascript("window._clearContStart()", null)
+                resetContinuation()
             }
         }
     }
@@ -2641,37 +2645,37 @@ private fun EpubViewer(
             selectionBottom = sel.bottom,
             selectionCx = sel.x,
             onHighlight = {
+                fun doHighlight(text: String, cfi: String) {
+                    onHighlight(text, cfi)
+                    resetContinuation()
+                    clearSelection()
+                }
                 if (isContinuationMode) {
                     val combinedText = (pendingStartText ?: "") + sel.text
                     webViewRef.get()?.evaluateJavascript("window._getContMergedCfi()") { mergedCfi ->
                         val cfi = mergedCfi?.removeSurrounding("\"")?.replace("\\\"", "\"")?.replace("\\\\", "\\")
                             ?.takeIf { it.isNotEmpty() } ?: sel.cfi
-                        onHighlight(combinedText, cfi)
-                        pendingStartText = null
-                        isContinuationMode = false
-                        webViewRef.get()?.evaluateJavascript("window._clearContStart()", null)
-                        clearSelection()
+                        doHighlight(combinedText, cfi)
                     }
                 } else {
-                    onHighlight(sel.text, sel.cfi)
-                    clearSelection()
+                    doHighlight(sel.text, sel.cfi)
                 }
             },
             onMemo = {
+                fun doMemo(text: String, cfi: String) {
+                    onMemo(text, cfi)
+                    resetContinuation()
+                    clearSelection()
+                }
                 if (isContinuationMode) {
                     val combinedText = (pendingStartText ?: "") + sel.text
                     webViewRef.get()?.evaluateJavascript("window._getContMergedCfi()") { mergedCfi ->
                         val cfi = mergedCfi?.removeSurrounding("\"")?.replace("\\\"", "\"")?.replace("\\\\", "\\")
                             ?.takeIf { it.isNotEmpty() } ?: sel.cfi
-                        onMemo(combinedText, cfi)
-                        pendingStartText = null
-                        isContinuationMode = false
-                        webViewRef.get()?.evaluateJavascript("window._clearContStart()", null)
-                        clearSelection()
+                        doMemo(combinedText, cfi)
                     }
                 } else {
-                    onMemo(sel.text, sel.cfi)
-                    clearSelection()
+                    doMemo(sel.text, sel.cfi)
                 }
             },
             onShare = {
@@ -2681,9 +2685,7 @@ private fun EpubViewer(
                     putExtra(Intent.EXTRA_TEXT, shareText)
                 }
                 context.startActivity(Intent.createChooser(intent, null))
-                pendingStartText = null
-                isContinuationMode = false
-                webViewRef.get()?.evaluateJavascript("window._clearContStart()", null)
+                resetContinuation()
                 clearSelection()
             },
             onContinue = if (sel.isAtPageEnd && !isContinuationMode) {
@@ -2698,11 +2700,7 @@ private fun EpubViewer(
                 }
             } else null,
             onDismiss = {
-                if (isContinuationMode) {
-                    pendingStartText = null
-                    isContinuationMode = false
-                    webViewRef.get()?.evaluateJavascript("window._clearContStart()", null)
-                }
+                if (isContinuationMode) resetContinuation()
                 clearSelection()
             }
         )
@@ -2711,15 +2709,13 @@ private fun EpubViewer(
 }
 
 @Composable
-private fun SelectionPopup(
+private fun ActionPopupContainer(
     selectionY: Float,
     selectionBottom: Float,
     selectionCx: Float,
-    onHighlight: () -> Unit,
-    onMemo: () -> Unit,
-    onShare: () -> Unit,
-    onContinue: (() -> Unit)?,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    usePopup: Boolean = false,
+    content: @Composable RowScope.() -> Unit
 ) {
     val popupHeightDp = 48.dp
     val marginDp = 8.dp
@@ -2739,8 +2735,8 @@ private fun SelectionPopup(
     val screenWidthDp = LocalConfiguration.current.screenWidthDp.dp
     var popupWidthDp by remember { mutableStateOf(0.dp) }
 
-    Popup(onDismissRequest = onDismiss) {
-        Box(Modifier.fillMaxSize().pointerInput(Unit) { detectTapGestures { onDismiss() } }) {
+    val inner: @Composable () -> Unit = {
+        Box(Modifier.fillMaxSize().let { if (!usePopup) it.zIndex(10f) else it }.pointerInput(Unit) { detectTapGestures { onDismiss() } }) {
             Row(
                 modifier = Modifier
                     .onSizeChanged { popupWidthDp = with(density) { it.width.toDp() } }
@@ -2753,26 +2749,40 @@ private fun SelectionPopup(
                     .background(Color.White, RoundedCornerShape(8.dp))
                     .padding(horizontal = 4.dp)
                     .pointerInput(Unit) { detectTapGestures { } },
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                TextButton(onClick = onHighlight) {
-                    Text("하이라이트", color = Color.Black, fontSize = 14.sp)
-                }
-                Box(Modifier.width(1.dp).height(20.dp).background(Color.Black))
-                TextButton(onClick = onMemo) {
-                    Text("메모", color = Color.Black, fontSize = 14.sp)
-                }
-                Box(Modifier.width(1.dp).height(20.dp).background(Color.Black))
-                TextButton(onClick = onShare) {
-                    Text("공유", color = Color.Black, fontSize = 14.sp)
-                }
-                if (onContinue != null) {
-                    Box(Modifier.width(1.dp).height(20.dp).background(Color.Black))
-                    TextButton(onClick = onContinue) {
-                        Text("이어서 선택", color = Color.Black, fontSize = 14.sp)
-                    }
-                }
-            }
+                verticalAlignment = Alignment.CenterVertically,
+                content = content
+            )
+        }
+    }
+
+    if (usePopup) Popup(onDismissRequest = onDismiss) { inner() } else inner()
+}
+
+@Composable
+private fun PopupDivider() {
+    Box(Modifier.width(1.dp).height(20.dp).background(Color.Black))
+}
+
+@Composable
+private fun SelectionPopup(
+    selectionY: Float,
+    selectionBottom: Float,
+    selectionCx: Float,
+    onHighlight: () -> Unit,
+    onMemo: () -> Unit,
+    onShare: () -> Unit,
+    onContinue: (() -> Unit)?,
+    onDismiss: () -> Unit
+) {
+    ActionPopupContainer(selectionY, selectionBottom, selectionCx, onDismiss, usePopup = true) {
+        TextButton(onClick = onHighlight) { Text("하이라이트", color = Color.Black, fontSize = 14.sp) }
+        PopupDivider()
+        TextButton(onClick = onMemo) { Text("메모", color = Color.Black, fontSize = 14.sp) }
+        PopupDivider()
+        TextButton(onClick = onShare) { Text("공유", color = Color.Black, fontSize = 14.sp) }
+        if (onContinue != null) {
+            PopupDivider()
+            TextButton(onClick = onContinue) { Text("이어서 선택", color = Color.Black, fontSize = 14.sp) }
         }
     }
 }
@@ -2787,51 +2797,12 @@ private fun HighlightActionPopup(
     onShare: () -> Unit,
     onDismiss: () -> Unit
 ) {
-    val popupHeightDp = 48.dp
-    val marginDp = 8.dp
-    val yDp = selectionY.dp
-    val bottomDp = selectionBottom.dp
-    val cxDp = selectionCx.dp
-    val screenHeightDp = LocalConfiguration.current.screenHeightDp.dp
-    val bottomSafeDp = 28.dp
-    val showAbove = yDp > popupHeightDp + marginDp
-    val offsetY = if (showAbove) {
-        yDp - popupHeightDp - marginDp
-    } else {
-        (bottomDp + marginDp).coerceAtMost(screenHeightDp - popupHeightDp - bottomSafeDp)
-    }
-
-    val density = LocalDensity.current
-    val screenWidthDp = LocalConfiguration.current.screenWidthDp.dp
-    var popupWidthDp by remember { mutableStateOf(0.dp) }
-
-    Box(Modifier.fillMaxSize().zIndex(10f).pointerInput(Unit) { detectTapGestures { onDismiss() } }) {
-        Row(
-            modifier = Modifier
-                .onSizeChanged { popupWidthDp = with(density) { it.width.toDp() } }
-                .alpha(if (popupWidthDp == 0.dp) 0f else 1f)
-                .offset(
-                    x = (cxDp - popupWidthDp / 2).coerceIn(marginDp, screenWidthDp - popupWidthDp - marginDp),
-                    y = offsetY
-                )
-                .border(1.dp, Color.Black, RoundedCornerShape(8.dp))
-                .background(Color.White, RoundedCornerShape(8.dp))
-                .padding(horizontal = 4.dp)
-                .pointerInput(Unit) { detectTapGestures { } },
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            TextButton(onClick = onDelete) {
-                Text("하이라이트 삭제", color = Color.Black, fontSize = 14.sp)
-            }
-            Box(Modifier.width(1.dp).height(20.dp).background(Color.Black))
-            TextButton(onClick = onMemo) {
-                Text("메모", color = Color.Black, fontSize = 14.sp)
-            }
-            Box(Modifier.width(1.dp).height(20.dp).background(Color.Black))
-            TextButton(onClick = onShare) {
-                Text("공유", color = Color.Black, fontSize = 14.sp)
-            }
-        }
+    ActionPopupContainer(selectionY, selectionBottom, selectionCx, onDismiss) {
+        TextButton(onClick = onDelete) { Text("하이라이트 삭제", color = Color.Black, fontSize = 14.sp) }
+        PopupDivider()
+        TextButton(onClick = onMemo) { Text("메모", color = Color.Black, fontSize = 14.sp) }
+        PopupDivider()
+        TextButton(onClick = onShare) { Text("공유", color = Color.Black, fontSize = 14.sp) }
     }
 }
 
@@ -2846,55 +2817,14 @@ private fun MemoActionPopup(
     onShare: () -> Unit,
     onDismiss: () -> Unit
 ) {
-    val popupHeightDp = 48.dp
-    val marginDp = 8.dp
-    val yDp = selectionY.dp
-    val bottomDp = selectionBottom.dp
-    val cxDp = selectionCx.dp
-    val screenHeightDp = LocalConfiguration.current.screenHeightDp.dp
-    val bottomSafeDp = 28.dp
-    val showAbove = yDp > popupHeightDp + marginDp
-    val offsetY = if (showAbove) {
-        yDp - popupHeightDp - marginDp
-    } else {
-        (bottomDp + marginDp).coerceAtMost(screenHeightDp - popupHeightDp - bottomSafeDp)
-    }
-
-    val density = LocalDensity.current
-    val screenWidthDp = LocalConfiguration.current.screenWidthDp.dp
-    var popupWidthDp by remember { mutableStateOf(0.dp) }
-
-    Box(Modifier.fillMaxSize().zIndex(10f).pointerInput(Unit) { detectTapGestures { onDismiss() } }) {
-        Row(
-            modifier = Modifier
-                .onSizeChanged { popupWidthDp = with(density) { it.width.toDp() } }
-                .alpha(if (popupWidthDp == 0.dp) 0f else 1f)
-                .offset(
-                    x = (cxDp - popupWidthDp / 2).coerceIn(marginDp, screenWidthDp - popupWidthDp - marginDp),
-                    y = offsetY
-                )
-                .border(1.dp, Color.Black, RoundedCornerShape(8.dp))
-                .background(Color.White, RoundedCornerShape(8.dp))
-                .padding(horizontal = 4.dp)
-                .pointerInput(Unit) { detectTapGestures { } },
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            TextButton(onClick = onHighlight) {
-                Text("하이라이트", color = Color.Black, fontSize = 14.sp)
-            }
-            Box(Modifier.width(1.dp).height(20.dp).background(Color.Black))
-            TextButton(onClick = onEdit) {
-                Text("메모 편집", color = Color.Black, fontSize = 14.sp)
-            }
-            Box(Modifier.width(1.dp).height(20.dp).background(Color.Black))
-            TextButton(onClick = onDelete) {
-                Text("메모 삭제", color = Color.Black, fontSize = 14.sp)
-            }
-            Box(Modifier.width(1.dp).height(20.dp).background(Color.Black))
-            TextButton(onClick = onShare) {
-                Text("공유", color = Color.Black, fontSize = 14.sp)
-            }
-        }
+    ActionPopupContainer(selectionY, selectionBottom, selectionCx, onDismiss) {
+        TextButton(onClick = onHighlight) { Text("하이라이트", color = Color.Black, fontSize = 14.sp) }
+        PopupDivider()
+        TextButton(onClick = onEdit) { Text("메모 편집", color = Color.Black, fontSize = 14.sp) }
+        PopupDivider()
+        TextButton(onClick = onDelete) { Text("메모 삭제", color = Color.Black, fontSize = 14.sp) }
+        PopupDivider()
+        TextButton(onClick = onShare) { Text("공유", color = Color.Black, fontSize = 14.sp) }
     }
 }
 
@@ -2909,55 +2839,14 @@ private fun CombinedAnnotationPopup(
     onShare: () -> Unit,
     onDismiss: () -> Unit
 ) {
-    val popupHeightDp = 48.dp
-    val marginDp = 8.dp
-    val yDp = selectionY.dp
-    val bottomDp = selectionBottom.dp
-    val cxDp = selectionCx.dp
-    val screenHeightDp = LocalConfiguration.current.screenHeightDp.dp
-    val bottomSafeDp = 28.dp
-    val showAbove = yDp > popupHeightDp + marginDp
-    val offsetY = if (showAbove) {
-        yDp - popupHeightDp - marginDp
-    } else {
-        (bottomDp + marginDp).coerceAtMost(screenHeightDp - popupHeightDp - bottomSafeDp)
-    }
-
-    val density = LocalDensity.current
-    val screenWidthDp = LocalConfiguration.current.screenWidthDp.dp
-    var popupWidthDp by remember { mutableStateOf(0.dp) }
-
-    Box(Modifier.fillMaxSize().zIndex(10f).pointerInput(Unit) { detectTapGestures { onDismiss() } }) {
-        Row(
-            modifier = Modifier
-                .onSizeChanged { popupWidthDp = with(density) { it.width.toDp() } }
-                .alpha(if (popupWidthDp == 0.dp) 0f else 1f)
-                .offset(
-                    x = (cxDp - popupWidthDp / 2).coerceIn(marginDp, screenWidthDp - popupWidthDp - marginDp),
-                    y = offsetY
-                )
-                .border(1.dp, Color.Black, RoundedCornerShape(8.dp))
-                .background(Color.White, RoundedCornerShape(8.dp))
-                .padding(horizontal = 4.dp)
-                .pointerInput(Unit) { detectTapGestures { } },
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            TextButton(onClick = onDeleteHighlight) {
-                Text("하이라이트 삭제", color = Color.Black, fontSize = 14.sp)
-            }
-            Box(Modifier.width(1.dp).height(20.dp).background(Color.Black))
-            TextButton(onClick = onEditMemo) {
-                Text("메모 편집", color = Color.Black, fontSize = 14.sp)
-            }
-            Box(Modifier.width(1.dp).height(20.dp).background(Color.Black))
-            TextButton(onClick = onDeleteMemo) {
-                Text("메모 삭제", color = Color.Black, fontSize = 14.sp)
-            }
-            Box(Modifier.width(1.dp).height(20.dp).background(Color.Black))
-            TextButton(onClick = onShare) {
-                Text("공유", color = Color.Black, fontSize = 14.sp)
-            }
-        }
+    ActionPopupContainer(selectionY, selectionBottom, selectionCx, onDismiss) {
+        TextButton(onClick = onDeleteHighlight) { Text("하이라이트 삭제", color = Color.Black, fontSize = 14.sp) }
+        PopupDivider()
+        TextButton(onClick = onEditMemo) { Text("메모 편집", color = Color.Black, fontSize = 14.sp) }
+        PopupDivider()
+        TextButton(onClick = onDeleteMemo) { Text("메모 삭제", color = Color.Black, fontSize = 14.sp) }
+        PopupDivider()
+        TextButton(onClick = onShare) { Text("공유", color = Color.Black, fontSize = 14.sp) }
     }
 }
 
@@ -3587,7 +3476,6 @@ window._clearSelection = function() {
     } catch(e) {}
 };
 
-
 var _searchHighlightQuery = '';
 function _removeSearchHighlights() {
     try {
@@ -3788,8 +3676,6 @@ window._autoSelectFirstWord = function() {
         return '';
     } catch(e) { return ''; }
 };
-
-
 
 var _savedCfi = "${savedCfi.replace("\"", "\\\"")}";
 rendition.display(_savedCfi.length > 0 ? _savedCfi : undefined);
