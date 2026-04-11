@@ -2374,7 +2374,6 @@ private fun EpubViewer(
     var error by remember(path) { mutableStateOf(false) }
     data class SelectionState(val text: String, val x: Float, val y: Float, val bottom: Float, val cfi: String = "", val isAtPageEnd: Boolean = false)
     var selectionState by remember { mutableStateOf<SelectionState?>(null) }
-    var pendingStartCfi by remember { mutableStateOf<String?>(null) }
     var pendingStartText by remember { mutableStateOf<String?>(null) }
     var isContinuationMode by remember { mutableStateOf(false) }
     val selectionActive = remember { java.util.concurrent.atomic.AtomicBoolean(false) }
@@ -2617,17 +2616,15 @@ private fun EpubViewer(
             selectionBottom = sel.bottom,
             selectionCx = sel.x,
             onHighlight = {
-                if (isContinuationMode && pendingStartCfi != null) {
-                    val startCfi = pendingStartCfi!!
+                if (isContinuationMode) {
                     val combinedText = (pendingStartText ?: "") + sel.text
-                    webViewRef.get()?.evaluateJavascript(
-                        "window._mergeCfi(\"${startCfi.replace("\\", "\\\\").replace("\"", "\\\"")}\", \"${sel.cfi.replace("\\", "\\\\").replace("\"", "\\\"")}\")"
-                    ) { mergedCfi ->
-                        val cfi = mergedCfi?.removeSurrounding("\"")?.replace("\\\"", "\"")?.replace("\\\\", "\\") ?: sel.cfi
+                    webViewRef.get()?.evaluateJavascript("window._getContMergedCfi()") { mergedCfi ->
+                        val cfi = mergedCfi?.removeSurrounding("\"")?.replace("\\\"", "\"")?.replace("\\\\", "\\")
+                            ?.takeIf { it.isNotEmpty() } ?: sel.cfi
                         onHighlight(combinedText, cfi)
-                        pendingStartCfi = null
                         pendingStartText = null
                         isContinuationMode = false
+                        webViewRef.get()?.evaluateJavascript("window._clearContStart()", null)
                         clearSelection()
                     }
                 } else {
@@ -2636,17 +2633,15 @@ private fun EpubViewer(
                 }
             },
             onMemo = {
-                if (isContinuationMode && pendingStartCfi != null) {
-                    val startCfi = pendingStartCfi!!
+                if (isContinuationMode) {
                     val combinedText = (pendingStartText ?: "") + sel.text
-                    webViewRef.get()?.evaluateJavascript(
-                        "window._mergeCfi(\"${startCfi.replace("\\", "\\\\").replace("\"", "\\\"")}\", \"${sel.cfi.replace("\\", "\\\\").replace("\"", "\\\"")}\")"
-                    ) { mergedCfi ->
-                        val cfi = mergedCfi?.removeSurrounding("\"")?.replace("\\\"", "\"")?.replace("\\\\", "\\") ?: sel.cfi
+                    webViewRef.get()?.evaluateJavascript("window._getContMergedCfi()") { mergedCfi ->
+                        val cfi = mergedCfi?.removeSurrounding("\"")?.replace("\\\"", "\"")?.replace("\\\\", "\\")
+                            ?.takeIf { it.isNotEmpty() } ?: sel.cfi
                         onMemo(combinedText, cfi)
-                        pendingStartCfi = null
                         pendingStartText = null
                         isContinuationMode = false
+                        webViewRef.get()?.evaluateJavascript("window._clearContStart()", null)
                         clearSelection()
                     }
                 } else {
@@ -2661,16 +2656,16 @@ private fun EpubViewer(
                     putExtra(Intent.EXTRA_TEXT, shareText)
                 }
                 context.startActivity(Intent.createChooser(intent, null))
-                pendingStartCfi = null
                 pendingStartText = null
                 isContinuationMode = false
+                webViewRef.get()?.evaluateJavascript("window._clearContStart()", null)
                 clearSelection()
             },
             onContinue = if (sel.isAtPageEnd && !isContinuationMode) {
                 {
-                    pendingStartCfi = sel.cfi
                     pendingStartText = sel.text
                     isContinuationMode = true
+                    webViewRef.get()?.evaluateJavascript("window._saveContStart()", null)
                     selectionState = null
                     clearSelection()
                     webViewRef.get()?.evaluateJavascript("window._next()", null)
@@ -2703,9 +2698,9 @@ private fun EpubViewer(
             } else null,
             onDismiss = {
                 if (isContinuationMode) {
-                    pendingStartCfi = null
                     pendingStartText = null
                     isContinuationMode = false
+                    webViewRef.get()?.evaluateJavascript("window._clearContStart()", null)
                 }
                 clearSelection()
             }
@@ -3530,6 +3525,31 @@ rendition.hooks.content.register(function(contents) {
             return contents.cfiFromRange(sel.getRangeAt(0)) || '';
         } catch(e) { return ''; }
     };
+    window._saveContStart = function() {
+        try {
+            var sel = doc.getSelection();
+            if (!sel || sel.rangeCount === 0) return;
+            var range = sel.getRangeAt(0);
+            window._contStartContainer = range.startContainer;
+            window._contStartOffset = range.startOffset;
+        } catch(e) {}
+    };
+    window._clearContStart = function() {
+        window._contStartContainer = null;
+        window._contStartOffset = null;
+    };
+    window._getContMergedCfi = function() {
+        try {
+            if (!window._contStartContainer) return '';
+            var sel = doc.getSelection();
+            if (!sel || sel.rangeCount === 0) return '';
+            var curRange = sel.getRangeAt(0);
+            var merged = doc.createRange();
+            merged.setStart(window._contStartContainer, window._contStartOffset);
+            merged.setEnd(curRange.endContainer, curRange.endOffset);
+            return contents.cfiFromRange(merged) || '';
+        } catch(e) { return ''; }
+    };
     doc.addEventListener('selectionchange', function() {
         clearTimeout(debounceTimer);
         debounceTimer = setTimeout(function() {
@@ -3555,52 +3575,7 @@ window._clearSelection = function() {
         }
     } catch(e) {}
 };
-window._extendSelectionToNextPage = function() {
-    try {
-        if (!window._contStartContainer) return;
-        var iframe = document.querySelector('iframe');
-        if (!iframe || !iframe.contentDocument) return;
-        var doc = iframe.contentDocument;
-        var manager = rendition.manager;
-        if (!manager || !manager.container) return;
-        var scrollLeft = manager.container.scrollLeft;
-        var delta = manager.layout ? manager.layout.delta : manager.container.offsetWidth;
-        var rightEdge = scrollLeft + delta;
 
-        var walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT, null, false);
-        var firstNode = null;
-        var node;
-        while (node = walker.nextNode()) {
-            if (node.textContent.trim().length === 0) continue;
-            var r = doc.createRange();
-            r.selectNodeContents(node);
-            var rects = r.getClientRects();
-            for (var i = 0; i < rects.length; i++) {
-                if (rects[i].right > scrollLeft && rects[i].left < rightEdge) {
-                    firstNode = node;
-                    break;
-                }
-            }
-            if (firstNode) break;
-        }
-        if (!firstNode) return;
-
-        var text = firstNode.textContent;
-        var wordEnd = 0;
-        while (wordEnd < text.length && /\s/.test(text[wordEnd])) wordEnd++;
-        while (wordEnd < text.length && !/\s/.test(text[wordEnd])) wordEnd++;
-        if (wordEnd === 0) wordEnd = Math.min(1, text.length);
-
-        var range = doc.createRange();
-        range.setStart(window._contStartContainer, window._contStartOffset);
-        range.setEnd(firstNode, wordEnd);
-        var sel = doc.getSelection();
-        sel.removeAllRanges();
-        sel.addRange(range);
-        window._contStartContainer = null;
-        window._contStartOffset = null;
-    } catch(e) {}
-};
 
 var _searchHighlightQuery = '';
 function _removeSearchHighlights() {
@@ -3802,17 +3777,7 @@ window._autoSelectFirstChar = function() {
     } catch(e) { return ''; }
 };
 
-window._mergeCfi = function(startCfi, endCfi) {
-    try {
-        var sMatch = startCfi.match(/^(epubcfi\([^,]+),([^,]+),(.+)\)$/);
-        var eMatch = endCfi.match(/^(epubcfi\([^,]+),([^,]+),(.+)\)$/);
-        if (sMatch && eMatch) {
-            if (sMatch[1] !== eMatch[1]) return endCfi;
-            return sMatch[1] + ',' + sMatch[2] + ',' + eMatch[3] + ')';
-        }
-        return endCfi;
-    } catch(e) { return endCfi; }
-};
+
 
 var _savedCfi = "${savedCfi.replace("\"", "\\\"")}";
 rendition.display(_savedCfi.length > 0 ? _savedCfi : undefined);
