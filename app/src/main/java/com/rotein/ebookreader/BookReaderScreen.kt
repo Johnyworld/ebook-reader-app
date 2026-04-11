@@ -2503,9 +2503,9 @@ private fun EpubViewer(
                                                         var isAtPageEnd = typeof window._isSelectionAtPageEnd === 'function' ? window._isSelectionAtPageEnd() : false;
                                                         Android.onSelectionTapped(
                                                             sel.toString().trim(),
-                                                            boundRect.left + boundRect.width/2 + iframeRect.left,
-                                                            boundRect.top + iframeRect.top,
-                                                            boundRect.bottom + iframeRect.top,
+                                                            $cssX,
+                                                            $cssY,
+                                                            $cssY,
                                                             cfi,
                                                             isAtPageEnd
                                                         );
@@ -2565,12 +2565,9 @@ private fun EpubViewer(
                                     } catch (_: Exception) { null }
                                     if (hitData != null) {
                                         val id = hitData.getLong("id")
-                                        val cx = hitData.getDouble("cx").toFloat()
-                                        val y = hitData.getDouble("y").toFloat()
-                                        val bottom = hitData.getDouble("bottom").toFloat()
                                         when (hitData.getString("type")) {
-                                            "highlight" -> onHighlightLongPressRef.get()?.invoke(id, cx, y, bottom)
-                                            "memo" -> onMemoLongPressRef.get()?.invoke(id, cx, y, bottom)
+                                            "highlight" -> onHighlightLongPressRef.get()?.invoke(id, cssX, cssY, cssY)
+                                            "memo" -> onMemoLongPressRef.get()?.invoke(id, cssX, cssY, cssY)
                                         }
                                     } else {
                                         isLongPress = true
@@ -2776,7 +2773,7 @@ private fun SelectionPopup(
                 if (onContinue != null) {
                     Box(Modifier.width(1.dp).height(20.dp).background(Color.Black))
                     TextButton(onClick = onContinue) {
-                        Text("이어하기", color = Color.Black, fontSize = 14.sp)
+                        Text("이어서 선택", color = Color.Black, fontSize = 14.sp)
                     }
                 }
             }
