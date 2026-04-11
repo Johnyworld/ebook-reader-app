@@ -29,6 +29,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -87,6 +88,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
@@ -2371,10 +2373,14 @@ private fun EpubViewer(
     var bookDir by remember(path) { mutableStateOf<String?>(null) }
     var opfPath by remember(path) { mutableStateOf<String?>(null) }
     var error by remember(path) { mutableStateOf(false) }
-    data class SelectionState(val text: String, val x: Float, val y: Float, val bottom: Float, val cfi: String = "")
+    data class SelectionState(val text: String, val x: Float, val y: Float, val bottom: Float, val cfi: String = "", val isAtPageEnd: Boolean = false)
     var selectionState by remember { mutableStateOf<SelectionState?>(null) }
+    var pendingStartText by remember { mutableStateOf<String?>(null) }
+    var isContinuationMode by remember { mutableStateOf(false) }
+    var isContinuationTransitioning by remember { mutableStateOf(false) }
     val selectionActive = remember { java.util.concurrent.atomic.AtomicBoolean(false) }
     val webViewRef = remember { java.util.concurrent.atomic.AtomicReference<android.webkit.WebView?>(null) }
+    val overlayRef = remember { java.util.concurrent.atomic.AtomicReference<android.view.View?>(null) }
     val onHighlightLongPressRef = remember { java.util.concurrent.atomic.AtomicReference<((Long, Float, Float, Float) -> Unit)?>(null) }
     onHighlightLongPressRef.set(onHighlightLongPress)
     val onMemoLongPressRef = remember { java.util.concurrent.atomic.AtomicReference<((Long, Float, Float, Float) -> Unit)?>(null) }
@@ -2386,17 +2392,26 @@ private fun EpubViewer(
         selectionState = null
         webViewRef.get()?.evaluateJavascript("window._clearSelection()", null)
     }
+    val resetContinuation: () -> Unit = {
+        pendingStartText = null
+        isContinuationMode = false
+        webViewRef.get()?.evaluateJavascript("window._clearContStart()", null)
+    }
     val selectionOnTextSelected: (String, Float, Float, Float) -> Unit = { text, x, y, bottom ->
         onTextSelected(text, x, y, bottom)
         if (text.isNotEmpty()) {
             selectionActive.set(true)
+            isContinuationTransitioning = false
         } else {
             selectionActive.set(false)
             selectionState = null
+            if (isContinuationMode && !isContinuationTransitioning) {
+                resetContinuation()
+            }
         }
     }
-    val selectionOnSelectionTapped: (String, Float, Float, Float, String) -> Unit = { text, x, y, bottom, cfi ->
-        if (text.isNotEmpty()) selectionState = SelectionState(text, x, y, bottom, cfi)
+    val selectionOnSelectionTapped: (String, Float, Float, Float, String, Boolean) -> Unit = { text, x, y, bottom, cfi, isAtPageEnd ->
+        if (text.isNotEmpty()) selectionState = SelectionState(text, x, y, bottom, cfi, isAtPageEnd)
     }
 
     LaunchedEffect(readerSettings) {
@@ -2460,7 +2475,26 @@ private fun EpubViewer(
                         isHorizontalScrollBarEnabled = false
                         isVerticalScrollBarEnabled = false
                         webViewClient = WebViewClient()
-                        addJavascriptInterface(EpubBridge(onLocationUpdate, onTocLoaded, onContentRendered, onChapterChanged, onTocReady, onPageInfoChanged, onDebugInfo, onScanStart, onScanComplete, onSearchResultsPartial, onSearchComplete, selectionOnTextSelected, selectionOnSelectionTapped), "Android")
+                        addJavascriptInterface(EpubBridge(onLocationUpdate, onTocLoaded, onContentRendered, onChapterChanged, onTocReady, onPageInfoChanged, onDebugInfo, onScanStart, onScanComplete, onSearchResultsPartial, onSearchComplete, selectionOnTextSelected, selectionOnSelectionTapped) { cssX, cssY ->
+                            val wv = webViewRef.get() ?: return@EpubBridge
+                            val ov = overlayRef.get()
+                            ov?.visibility = View.GONE
+                            val density = wv.context.resources.displayMetrics.density
+                            val px = cssX * density
+                            val py = cssY * density
+                            wv.postDelayed({
+                                val downTime = SystemClock.uptimeMillis()
+                                val down = MotionEvent.obtain(downTime, downTime, MotionEvent.ACTION_DOWN, px, py, 0)
+                                wv.dispatchTouchEvent(down)
+                                down.recycle()
+                                wv.postDelayed({
+                                    val up = MotionEvent.obtain(downTime, SystemClock.uptimeMillis(), MotionEvent.ACTION_UP, px, py, 0)
+                                    wv.dispatchTouchEvent(up)
+                                    up.recycle()
+                                    ov?.visibility = View.VISIBLE
+                                }, 600)
+                            }, 100)
+                        }, "Android")
                     }
                     webViewRef.set(webView)
                     onWebViewCreated(webView)
@@ -2490,12 +2524,14 @@ private fun EpubViewer(
                                                     if (docX >= r.left && docX <= r.right && docY >= r.top && docY <= r.bottom) {
                                                         var boundRect = range.getBoundingClientRect();
                                                         var cfi = typeof window._getCfiFromSelection === 'function' ? (window._getCfiFromSelection() || '') : '';
+                                                        var isAtPageEnd = typeof window._isSelectionAtPageEnd === 'function' ? window._isSelectionAtPageEnd() : false;
                                                         Android.onSelectionTapped(
                                                             sel.toString().trim(),
-                                                            boundRect.left + boundRect.width/2 + iframeRect.left,
-                                                            boundRect.top + iframeRect.top,
-                                                            boundRect.bottom + iframeRect.top,
-                                                            cfi
+                                                            $cssX,
+                                                            $cssY,
+                                                            $cssY,
+                                                            cfi,
+                                                            isAtPageEnd
                                                         );
                                                         return;
                                                     }
@@ -2553,12 +2589,9 @@ private fun EpubViewer(
                                     } catch (_: Exception) { null }
                                     if (hitData != null) {
                                         val id = hitData.getLong("id")
-                                        val cx = hitData.getDouble("cx").toFloat()
-                                        val y = hitData.getDouble("y").toFloat()
-                                        val bottom = hitData.getDouble("bottom").toFloat()
                                         when (hitData.getString("type")) {
-                                            "highlight" -> onHighlightLongPressRef.get()?.invoke(id, cx, y, bottom)
-                                            "memo" -> onMemoLongPressRef.get()?.invoke(id, cx, y, bottom)
+                                            "highlight" -> onHighlightLongPressRef.get()?.invoke(id, cssX, cssY, cssY)
+                                            "memo" -> onMemoLongPressRef.get()?.invoke(id, cssX, cssY, cssY)
                                         }
                                     } else {
                                         isLongPress = true
@@ -2583,6 +2616,7 @@ private fun EpubViewer(
                             true
                         }
                     }
+                    overlayRef.set(overlay)
                     addView(webView, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
                     addView(overlay, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
                 }
@@ -2610,20 +2644,123 @@ private fun EpubViewer(
             selectionY = sel.y,
             selectionBottom = sel.bottom,
             selectionCx = sel.x,
-            onHighlight = { onHighlight(sel.text, sel.cfi); clearSelection() },
-            onMemo = { onMemo(sel.text, sel.cfi); clearSelection() },
+            onHighlight = {
+                fun doHighlight(text: String, cfi: String) {
+                    onHighlight(text, cfi)
+                    resetContinuation()
+                    clearSelection()
+                }
+                if (isContinuationMode) {
+                    val combinedText = (pendingStartText ?: "") + sel.text
+                    webViewRef.get()?.evaluateJavascript("window._getContMergedCfi()") { mergedCfi ->
+                        val cfi = mergedCfi?.removeSurrounding("\"")?.replace("\\\"", "\"")?.replace("\\\\", "\\")
+                            ?.takeIf { it.isNotEmpty() } ?: sel.cfi
+                        doHighlight(combinedText, cfi)
+                    }
+                } else {
+                    doHighlight(sel.text, sel.cfi)
+                }
+            },
+            onMemo = {
+                fun doMemo(text: String, cfi: String) {
+                    onMemo(text, cfi)
+                    resetContinuation()
+                    clearSelection()
+                }
+                if (isContinuationMode) {
+                    val combinedText = (pendingStartText ?: "") + sel.text
+                    webViewRef.get()?.evaluateJavascript("window._getContMergedCfi()") { mergedCfi ->
+                        val cfi = mergedCfi?.removeSurrounding("\"")?.replace("\\\"", "\"")?.replace("\\\\", "\\")
+                            ?.takeIf { it.isNotEmpty() } ?: sel.cfi
+                        doMemo(combinedText, cfi)
+                    }
+                } else {
+                    doMemo(sel.text, sel.cfi)
+                }
+            },
             onShare = {
+                val shareText = if (isContinuationMode) (pendingStartText ?: "") + sel.text else sel.text
                 val intent = Intent(Intent.ACTION_SEND).apply {
                     type = "text/plain"
-                    putExtra(Intent.EXTRA_TEXT, sel.text)
+                    putExtra(Intent.EXTRA_TEXT, shareText)
                 }
                 context.startActivity(Intent.createChooser(intent, null))
+                resetContinuation()
                 clearSelection()
             },
-            onDismiss = { clearSelection() }
+            onContinue = if (sel.isAtPageEnd && !isContinuationMode) {
+                {
+                    pendingStartText = sel.text
+                    isContinuationMode = true
+                    isContinuationTransitioning = true
+                    webViewRef.get()?.evaluateJavascript("window._saveContStart()", null)
+                    selectionState = null
+                    clearSelection()
+                    webViewRef.get()?.evaluateJavascript("window._nextThenAutoSelect()", null)
+                }
+            } else null,
+            onDismiss = {
+                if (isContinuationMode) resetContinuation()
+                clearSelection()
+            }
         )
     }
     } // Box
+}
+
+@Composable
+private fun ActionPopupContainer(
+    selectionY: Float,
+    selectionBottom: Float,
+    selectionCx: Float,
+    onDismiss: () -> Unit,
+    usePopup: Boolean = false,
+    content: @Composable RowScope.() -> Unit
+) {
+    val popupHeightDp = 48.dp
+    val marginDp = 8.dp
+    val yDp = selectionY.dp
+    val bottomDp = selectionBottom.dp
+    val cxDp = selectionCx.dp
+    val screenHeightDp = LocalConfiguration.current.screenHeightDp.dp
+    val bottomSafeDp = 28.dp
+    val showAbove = yDp > popupHeightDp + marginDp
+    val offsetY = if (showAbove) {
+        yDp - popupHeightDp - marginDp
+    } else {
+        (bottomDp + marginDp).coerceAtMost(screenHeightDp - popupHeightDp - bottomSafeDp)
+    }
+
+    val density = LocalDensity.current
+    val screenWidthDp = LocalConfiguration.current.screenWidthDp.dp
+    var popupWidthDp by remember { mutableStateOf(0.dp) }
+
+    val inner: @Composable () -> Unit = {
+        Box(Modifier.fillMaxSize().let { if (!usePopup) it.zIndex(10f) else it }.pointerInput(Unit) { detectTapGestures { onDismiss() } }) {
+            Row(
+                modifier = Modifier
+                    .onSizeChanged { popupWidthDp = with(density) { it.width.toDp() } }
+                    .alpha(if (popupWidthDp == 0.dp) 0f else 1f)
+                    .offset(
+                        x = (cxDp - popupWidthDp / 2).coerceIn(marginDp, screenWidthDp - popupWidthDp - marginDp),
+                        y = offsetY
+                    )
+                    .border(1.dp, Color.Black, RoundedCornerShape(8.dp))
+                    .background(Color.White, RoundedCornerShape(8.dp))
+                    .padding(horizontal = 4.dp)
+                    .pointerInput(Unit) { detectTapGestures { } },
+                verticalAlignment = Alignment.CenterVertically,
+                content = content
+            )
+        }
+    }
+
+    if (usePopup) Popup(onDismissRequest = onDismiss) { inner() } else inner()
+}
+
+@Composable
+private fun PopupDivider() {
+    Box(Modifier.width(1.dp).height(20.dp).background(Color.Black))
 }
 
 @Composable
@@ -2634,46 +2771,18 @@ private fun SelectionPopup(
     onHighlight: () -> Unit,
     onMemo: () -> Unit,
     onShare: () -> Unit,
+    onContinue: (() -> Unit)?,
     onDismiss: () -> Unit
 ) {
-    val popupHeightDp = 48.dp
-    val marginDp = 8.dp
-    val yDp = selectionY.dp
-    val bottomDp = selectionBottom.dp
-    val cxDp = selectionCx.dp
-    val showAbove = yDp > popupHeightDp + marginDp
-    val offsetY = if (showAbove) yDp - popupHeightDp - marginDp else bottomDp + marginDp
-
-    val density = LocalDensity.current
-    val screenWidthDp = LocalConfiguration.current.screenWidthDp.dp
-    var popupWidthDp by remember { mutableStateOf(0.dp) }
-
-    Box(Modifier.fillMaxSize().pointerInput(Unit) { detectTapGestures { onDismiss() } }) {
-        Row(
-            modifier = Modifier
-                .onSizeChanged { popupWidthDp = with(density) { it.width.toDp() } }
-                .alpha(if (popupWidthDp == 0.dp) 0f else 1f)
-                .offset(
-                    x = (cxDp - popupWidthDp / 2).coerceIn(marginDp, screenWidthDp - popupWidthDp - marginDp),
-                    y = offsetY
-                )
-                .border(1.dp, Color.Black, RoundedCornerShape(8.dp))
-                .background(Color.White, RoundedCornerShape(8.dp))
-                .padding(horizontal = 4.dp)
-                .pointerInput(Unit) { detectTapGestures { } },
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            TextButton(onClick = onHighlight) {
-                Text("하이라이트", color = Color.Black, fontSize = 14.sp)
-            }
-            Box(Modifier.width(1.dp).height(20.dp).background(Color.Black))
-            TextButton(onClick = onMemo) {
-                Text("메모", color = Color.Black, fontSize = 14.sp)
-            }
-            Box(Modifier.width(1.dp).height(20.dp).background(Color.Black))
-            TextButton(onClick = onShare) {
-                Text("공유", color = Color.Black, fontSize = 14.sp)
-            }
+    ActionPopupContainer(selectionY, selectionBottom, selectionCx, onDismiss, usePopup = true) {
+        TextButton(onClick = onHighlight) { Text("하이라이트", color = Color.Black, fontSize = 14.sp) }
+        PopupDivider()
+        TextButton(onClick = onMemo) { Text("메모", color = Color.Black, fontSize = 14.sp) }
+        PopupDivider()
+        TextButton(onClick = onShare) { Text("공유", color = Color.Black, fontSize = 14.sp) }
+        if (onContinue != null) {
+            PopupDivider()
+            TextButton(onClick = onContinue) { Text("이어서 선택", color = Color.Black, fontSize = 14.sp) }
         }
     }
 }
@@ -2688,45 +2797,12 @@ private fun HighlightActionPopup(
     onShare: () -> Unit,
     onDismiss: () -> Unit
 ) {
-    val popupHeightDp = 48.dp
-    val marginDp = 8.dp
-    val yDp = selectionY.dp
-    val bottomDp = selectionBottom.dp
-    val cxDp = selectionCx.dp
-    val showAbove = yDp > popupHeightDp + marginDp
-    val offsetY = if (showAbove) yDp - popupHeightDp - marginDp else bottomDp + marginDp
-
-    val density = LocalDensity.current
-    val screenWidthDp = LocalConfiguration.current.screenWidthDp.dp
-    var popupWidthDp by remember { mutableStateOf(0.dp) }
-
-    Box(Modifier.fillMaxSize().pointerInput(Unit) { detectTapGestures { onDismiss() } }) {
-        Row(
-            modifier = Modifier
-                .onSizeChanged { popupWidthDp = with(density) { it.width.toDp() } }
-                .alpha(if (popupWidthDp == 0.dp) 0f else 1f)
-                .offset(
-                    x = (cxDp - popupWidthDp / 2).coerceIn(marginDp, screenWidthDp - popupWidthDp - marginDp),
-                    y = offsetY
-                )
-                .border(1.dp, Color.Black, RoundedCornerShape(8.dp))
-                .background(Color.White, RoundedCornerShape(8.dp))
-                .padding(horizontal = 4.dp)
-                .pointerInput(Unit) { detectTapGestures { } },
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            TextButton(onClick = onDelete) {
-                Text("하이라이트 삭제", color = Color.Black, fontSize = 14.sp)
-            }
-            Box(Modifier.width(1.dp).height(20.dp).background(Color.Black))
-            TextButton(onClick = onMemo) {
-                Text("메모", color = Color.Black, fontSize = 14.sp)
-            }
-            Box(Modifier.width(1.dp).height(20.dp).background(Color.Black))
-            TextButton(onClick = onShare) {
-                Text("공유", color = Color.Black, fontSize = 14.sp)
-            }
-        }
+    ActionPopupContainer(selectionY, selectionBottom, selectionCx, onDismiss) {
+        TextButton(onClick = onDelete) { Text("하이라이트 삭제", color = Color.Black, fontSize = 14.sp) }
+        PopupDivider()
+        TextButton(onClick = onMemo) { Text("메모", color = Color.Black, fontSize = 14.sp) }
+        PopupDivider()
+        TextButton(onClick = onShare) { Text("공유", color = Color.Black, fontSize = 14.sp) }
     }
 }
 
@@ -2741,49 +2817,14 @@ private fun MemoActionPopup(
     onShare: () -> Unit,
     onDismiss: () -> Unit
 ) {
-    val popupHeightDp = 48.dp
-    val marginDp = 8.dp
-    val yDp = selectionY.dp
-    val bottomDp = selectionBottom.dp
-    val cxDp = selectionCx.dp
-    val showAbove = yDp > popupHeightDp + marginDp
-    val offsetY = if (showAbove) yDp - popupHeightDp - marginDp else bottomDp + marginDp
-
-    val density = LocalDensity.current
-    val screenWidthDp = LocalConfiguration.current.screenWidthDp.dp
-    var popupWidthDp by remember { mutableStateOf(0.dp) }
-
-    Box(Modifier.fillMaxSize().pointerInput(Unit) { detectTapGestures { onDismiss() } }) {
-        Row(
-            modifier = Modifier
-                .onSizeChanged { popupWidthDp = with(density) { it.width.toDp() } }
-                .alpha(if (popupWidthDp == 0.dp) 0f else 1f)
-                .offset(
-                    x = (cxDp - popupWidthDp / 2).coerceIn(marginDp, screenWidthDp - popupWidthDp - marginDp),
-                    y = offsetY
-                )
-                .border(1.dp, Color.Black, RoundedCornerShape(8.dp))
-                .background(Color.White, RoundedCornerShape(8.dp))
-                .padding(horizontal = 4.dp)
-                .pointerInput(Unit) { detectTapGestures { } },
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            TextButton(onClick = onHighlight) {
-                Text("하이라이트", color = Color.Black, fontSize = 14.sp)
-            }
-            Box(Modifier.width(1.dp).height(20.dp).background(Color.Black))
-            TextButton(onClick = onEdit) {
-                Text("메모 편집", color = Color.Black, fontSize = 14.sp)
-            }
-            Box(Modifier.width(1.dp).height(20.dp).background(Color.Black))
-            TextButton(onClick = onDelete) {
-                Text("메모 삭제", color = Color.Black, fontSize = 14.sp)
-            }
-            Box(Modifier.width(1.dp).height(20.dp).background(Color.Black))
-            TextButton(onClick = onShare) {
-                Text("공유", color = Color.Black, fontSize = 14.sp)
-            }
-        }
+    ActionPopupContainer(selectionY, selectionBottom, selectionCx, onDismiss) {
+        TextButton(onClick = onHighlight) { Text("하이라이트", color = Color.Black, fontSize = 14.sp) }
+        PopupDivider()
+        TextButton(onClick = onEdit) { Text("메모 편집", color = Color.Black, fontSize = 14.sp) }
+        PopupDivider()
+        TextButton(onClick = onDelete) { Text("메모 삭제", color = Color.Black, fontSize = 14.sp) }
+        PopupDivider()
+        TextButton(onClick = onShare) { Text("공유", color = Color.Black, fontSize = 14.sp) }
     }
 }
 
@@ -2798,49 +2839,14 @@ private fun CombinedAnnotationPopup(
     onShare: () -> Unit,
     onDismiss: () -> Unit
 ) {
-    val popupHeightDp = 48.dp
-    val marginDp = 8.dp
-    val yDp = selectionY.dp
-    val bottomDp = selectionBottom.dp
-    val cxDp = selectionCx.dp
-    val showAbove = yDp > popupHeightDp + marginDp
-    val offsetY = if (showAbove) yDp - popupHeightDp - marginDp else bottomDp + marginDp
-
-    val density = LocalDensity.current
-    val screenWidthDp = LocalConfiguration.current.screenWidthDp.dp
-    var popupWidthDp by remember { mutableStateOf(0.dp) }
-
-    Box(Modifier.fillMaxSize().pointerInput(Unit) { detectTapGestures { onDismiss() } }) {
-        Row(
-            modifier = Modifier
-                .onSizeChanged { popupWidthDp = with(density) { it.width.toDp() } }
-                .alpha(if (popupWidthDp == 0.dp) 0f else 1f)
-                .offset(
-                    x = (cxDp - popupWidthDp / 2).coerceIn(marginDp, screenWidthDp - popupWidthDp - marginDp),
-                    y = offsetY
-                )
-                .border(1.dp, Color.Black, RoundedCornerShape(8.dp))
-                .background(Color.White, RoundedCornerShape(8.dp))
-                .padding(horizontal = 4.dp)
-                .pointerInput(Unit) { detectTapGestures { } },
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            TextButton(onClick = onDeleteHighlight) {
-                Text("하이라이트 삭제", color = Color.Black, fontSize = 14.sp)
-            }
-            Box(Modifier.width(1.dp).height(20.dp).background(Color.Black))
-            TextButton(onClick = onEditMemo) {
-                Text("메모 편집", color = Color.Black, fontSize = 14.sp)
-            }
-            Box(Modifier.width(1.dp).height(20.dp).background(Color.Black))
-            TextButton(onClick = onDeleteMemo) {
-                Text("메모 삭제", color = Color.Black, fontSize = 14.sp)
-            }
-            Box(Modifier.width(1.dp).height(20.dp).background(Color.Black))
-            TextButton(onClick = onShare) {
-                Text("공유", color = Color.Black, fontSize = 14.sp)
-            }
-        }
+    ActionPopupContainer(selectionY, selectionBottom, selectionCx, onDismiss) {
+        TextButton(onClick = onDeleteHighlight) { Text("하이라이트 삭제", color = Color.Black, fontSize = 14.sp) }
+        PopupDivider()
+        TextButton(onClick = onEditMemo) { Text("메모 편집", color = Color.Black, fontSize = 14.sp) }
+        PopupDivider()
+        TextButton(onClick = onDeleteMemo) { Text("메모 삭제", color = Color.Black, fontSize = 14.sp) }
+        PopupDivider()
+        TextButton(onClick = onShare) { Text("공유", color = Color.Black, fontSize = 14.sp) }
     }
 }
 
@@ -3122,6 +3128,16 @@ rendition.on("relocated", function(location) {
         _pendingLocation = location;
     }
     if (_searchHighlightQuery) { setTimeout(_applySearchHighlights, 50); }
+    if (_pendingAutoSelect) {
+        _pendingAutoSelect = false;
+        requestAnimationFrame(function() {
+            var result = window._autoSelectFirstWord();
+            if (result) {
+                var pos = JSON.parse(result);
+                Android.onAutoSelectReady(pos.x, pos.y);
+            }
+        });
+    }
 });
 
 book.loaded.navigation.then(function(nav) {
@@ -3409,6 +3425,31 @@ rendition.hooks.content.register(function(contents) {
             return contents.cfiFromRange(sel.getRangeAt(0)) || '';
         } catch(e) { return ''; }
     };
+    window._saveContStart = function() {
+        try {
+            var sel = doc.getSelection();
+            if (!sel || sel.rangeCount === 0) return;
+            var range = sel.getRangeAt(0);
+            window._contStartContainer = range.startContainer;
+            window._contStartOffset = range.startOffset;
+        } catch(e) {}
+    };
+    window._clearContStart = function() {
+        window._contStartContainer = null;
+        window._contStartOffset = null;
+    };
+    window._getContMergedCfi = function() {
+        try {
+            if (!window._contStartContainer) return '';
+            var sel = doc.getSelection();
+            if (!sel || sel.rangeCount === 0) return '';
+            var curRange = sel.getRangeAt(0);
+            var merged = doc.createRange();
+            merged.setStart(window._contStartContainer, window._contStartOffset);
+            merged.setEnd(curRange.endContainer, curRange.endOffset);
+            return contents.cfiFromRange(merged) || '';
+        } catch(e) { return ''; }
+    };
     doc.addEventListener('selectionchange', function() {
         clearTimeout(debounceTimer);
         debounceTimer = setTimeout(function() {
@@ -3574,6 +3615,68 @@ window._getAnnotationAtPoint = function(x, y) {
     return 'null';
 };
 
+window._isSelectionAtPageEnd = function() {
+    try {
+        var manager = rendition.manager;
+        if (!manager || !manager.container) return false;
+        var scrollLeft = manager.container.scrollLeft;
+        var offsetWidth = manager.container.offsetWidth;
+        var scrollWidth = manager.container.scrollWidth;
+        var delta = manager.layout ? manager.layout.delta : offsetWidth;
+        // spine item 마지막 페이지이면 이어하기 불가
+        if (scrollLeft + offsetWidth + delta > scrollWidth + delta * 0.5) return false;
+
+        var iframe = document.querySelector('iframe');
+        if (!iframe || !iframe.contentDocument) return false;
+        var doc = iframe.contentDocument;
+        var sel = doc.getSelection();
+        if (!sel || sel.rangeCount === 0 || sel.toString().trim().length === 0) return false;
+        var range = sel.getRangeAt(0);
+        var rightEdge = scrollLeft + delta;
+
+        // 선택 영역의 마지막 rect의 오른쪽 끝이 페이지 오른쪽 끝에 닿아 있는지
+        var selRects = range.getClientRects();
+        if (selRects.length === 0) return false;
+        var lastRect = selRects[selRects.length - 1];
+        var tolerance = 20;
+        return lastRect.right >= rightEdge - tolerance;
+    } catch(e) { return false; }
+};
+
+window._autoSelectFirstWord = function() {
+    try {
+        var iframe = document.querySelector('iframe');
+        if (!iframe || !iframe.contentDocument) return '';
+        var iDoc = iframe.contentDocument;
+        var body = iDoc.body;
+        if (!body) return '';
+        var container = rendition.manager.container;
+        var scrollLeft = container.scrollLeft;
+        var viewRight = scrollLeft + container.offsetWidth;
+        var walker = iDoc.createTreeWalker(body, NodeFilter.SHOW_TEXT, null, false);
+        var node;
+        while ((node = walker.nextNode())) {
+            var text = node.textContent;
+            if (!text || text.trim().length === 0) continue;
+            var testRange = iDoc.createRange();
+            for (var i = 0; i < text.length; i++) {
+                if (/\s/.test(text[i])) continue;
+                testRange.setStart(node, i);
+                testRange.setEnd(node, i + 1);
+                var cr = testRange.getBoundingClientRect();
+                if (cr.left >= scrollLeft && cr.right <= viewRight && cr.height > 0) {
+                    var iframeRect = iframe.getBoundingClientRect();
+                    return JSON.stringify({
+                        x: iframeRect.left + (cr.left + cr.right) / 2,
+                        y: iframeRect.top + (cr.top + cr.bottom) / 2
+                    });
+                }
+            }
+        }
+        return '';
+    } catch(e) { return ''; }
+};
+
 var _savedCfi = "${savedCfi.replace("\"", "\\\"")}";
 rendition.display(_savedCfi.length > 0 ? _savedCfi : undefined);
 window._prev = function() { rendition.prev(); };
@@ -3593,10 +3696,15 @@ window._next = function() {
         if (scrollEnd > scrollWidth && scrollEnd <= scrollWidth + tolerance) {
             manager.scrollBy(delta, 0, true);
             rendition.reportLocation();
-            return;
+            return Promise.resolve();
         }
     }
-    rendition.next();
+    return rendition.next();
+};
+var _pendingAutoSelect = false;
+window._nextThenAutoSelect = function() {
+    _pendingAutoSelect = true;
+    window._next();
 };
 
 window._displayHref = function(href) { rendition.display(href); };
@@ -3840,7 +3948,8 @@ private class EpubBridge(
     private val onSearchResultsPartialCallback: (resultsJson: String) -> Unit = {},
     private val onSearchCompleteCallback: () -> Unit = {},
     private val onTextSelectedCallback: (text: String, x: Float, y: Float, bottom: Float) -> Unit = { _, _, _, _ -> },
-    private val onSelectionTappedCallback: (text: String, x: Float, y: Float, bottom: Float, cfi: String) -> Unit = { _, _, _, _, _ -> }
+    private val onSelectionTappedCallback: (text: String, x: Float, y: Float, bottom: Float, cfi: String, isAtPageEnd: Boolean) -> Unit = { _, _, _, _, _, _ -> },
+    private val onAutoSelectReadyCallback: (cssX: Float, cssY: Float) -> Unit = { _, _ -> }
 ) {
     private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
 
@@ -3908,8 +4017,13 @@ private class EpubBridge(
     }
 
     @android.webkit.JavascriptInterface
-    fun onSelectionTapped(text: String, x: Float, y: Float, bottom: Float, cfi: String) {
-        mainHandler.post { onSelectionTappedCallback(text, x, y, bottom, cfi) }
+    fun onSelectionTapped(text: String, x: Float, y: Float, bottom: Float, cfi: String, isAtPageEnd: Boolean) {
+        mainHandler.post { onSelectionTappedCallback(text, x, y, bottom, cfi, isAtPageEnd) }
+    }
+
+    @android.webkit.JavascriptInterface
+    fun onAutoSelectReady(cssX: Float, cssY: Float) {
+        mainHandler.post { onAutoSelectReadyCallback(cssX, cssY) }
     }
 
 }
