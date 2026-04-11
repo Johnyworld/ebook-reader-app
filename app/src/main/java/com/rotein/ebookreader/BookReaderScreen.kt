@@ -2379,6 +2379,7 @@ private fun EpubViewer(
     var isContinuationTransitioning by remember { mutableStateOf(false) }
     val selectionActive = remember { java.util.concurrent.atomic.AtomicBoolean(false) }
     val webViewRef = remember { java.util.concurrent.atomic.AtomicReference<android.webkit.WebView?>(null) }
+    val overlayRef = remember { java.util.concurrent.atomic.AtomicReference<android.view.View?>(null) }
     val onHighlightLongPressRef = remember { java.util.concurrent.atomic.AtomicReference<((Long, Float, Float, Float) -> Unit)?>(null) }
     onHighlightLongPressRef.set(onHighlightLongPress)
     val onMemoLongPressRef = remember { java.util.concurrent.atomic.AtomicReference<((Long, Float, Float, Float) -> Unit)?>(null) }
@@ -2470,7 +2471,26 @@ private fun EpubViewer(
                         isHorizontalScrollBarEnabled = false
                         isVerticalScrollBarEnabled = false
                         webViewClient = WebViewClient()
-                        addJavascriptInterface(EpubBridge(onLocationUpdate, onTocLoaded, onContentRendered, onChapterChanged, onTocReady, onPageInfoChanged, onDebugInfo, onScanStart, onScanComplete, onSearchResultsPartial, onSearchComplete, selectionOnTextSelected, selectionOnSelectionTapped), "Android")
+                        addJavascriptInterface(EpubBridge(onLocationUpdate, onTocLoaded, onContentRendered, onChapterChanged, onTocReady, onPageInfoChanged, onDebugInfo, onScanStart, onScanComplete, onSearchResultsPartial, onSearchComplete, selectionOnTextSelected, selectionOnSelectionTapped) { cssX, cssY ->
+                            val wv = webViewRef.get() ?: return@EpubBridge
+                            val ov = overlayRef.get()
+                            ov?.visibility = View.GONE
+                            val density = wv.context.resources.displayMetrics.density
+                            val px = cssX * density
+                            val py = cssY * density
+                            wv.postDelayed({
+                                val downTime = SystemClock.uptimeMillis()
+                                val down = MotionEvent.obtain(downTime, downTime, MotionEvent.ACTION_DOWN, px, py, 0)
+                                wv.dispatchTouchEvent(down)
+                                down.recycle()
+                                wv.postDelayed({
+                                    val up = MotionEvent.obtain(downTime, SystemClock.uptimeMillis(), MotionEvent.ACTION_UP, px, py, 0)
+                                    wv.dispatchTouchEvent(up)
+                                    up.recycle()
+                                    ov?.visibility = View.VISIBLE
+                                }, 600)
+                            }, 100)
+                        }, "Android")
                     }
                     webViewRef.set(webView)
                     onWebViewCreated(webView)
@@ -2592,6 +2612,7 @@ private fun EpubViewer(
                             true
                         }
                     }
+                    overlayRef.set(overlay)
                     addView(webView, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
                     addView(overlay, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
                 }
@@ -2673,32 +2694,7 @@ private fun EpubViewer(
                     webViewRef.get()?.evaluateJavascript("window._saveContStart()", null)
                     selectionState = null
                     clearSelection()
-                    webViewRef.get()?.evaluateJavascript("window._next()", null)
-                    webViewRef.get()?.postDelayed({
-                        val wv = webViewRef.get() ?: return@postDelayed
-                        wv.evaluateJavascript("window._autoSelectFirstChar()") { result ->
-                            val cleaned = result?.trim()?.removeSurrounding("\"")
-                                ?.replace("\\\"", "\"")?.replace("\\\\", "\\") ?: return@evaluateJavascript
-                            if (cleaned.isEmpty()) return@evaluateJavascript
-                            try {
-                                val json = JSONObject(cleaned)
-                                val cssX = json.getDouble("x").toFloat()
-                                val cssY = json.getDouble("y").toFloat()
-                                val density = wv.context.resources.displayMetrics.density
-                                val px = cssX * density
-                                val py = cssY * density
-                                val downTime = SystemClock.uptimeMillis()
-                                val down = MotionEvent.obtain(downTime, downTime, MotionEvent.ACTION_DOWN, px, py, 0)
-                                wv.dispatchTouchEvent(down)
-                                down.recycle()
-                                wv.postDelayed({
-                                    val up = MotionEvent.obtain(downTime, SystemClock.uptimeMillis(), MotionEvent.ACTION_UP, px, py, 0)
-                                    wv.dispatchTouchEvent(up)
-                                    up.recycle()
-                                }, 600)
-                            } catch (_: Exception) {}
-                        }
-                    }, 300)
+                    webViewRef.get()?.evaluateJavascript("window._nextThenAutoSelect()", null)
                 }
             } else null,
             onDismiss = {
@@ -3243,6 +3239,16 @@ rendition.on("relocated", function(location) {
         _pendingLocation = location;
     }
     if (_searchHighlightQuery) { setTimeout(_applySearchHighlights, 50); }
+    if (_pendingAutoSelect) {
+        _pendingAutoSelect = false;
+        requestAnimationFrame(function() {
+            var result = window._autoSelectFirstWord();
+            if (result) {
+                var pos = JSON.parse(result);
+                Android.onAutoSelectReady(pos.x, pos.y);
+            }
+        });
+    }
 });
 
 book.loaded.navigation.then(function(nav) {
@@ -3749,7 +3755,7 @@ window._isSelectionAtPageEnd = function() {
     } catch(e) { return false; }
 };
 
-window._autoSelectFirstChar = function() {
+window._autoSelectFirstWord = function() {
     try {
         var iframe = document.querySelector('iframe');
         if (!iframe || !iframe.contentDocument) return '';
@@ -3759,18 +3765,19 @@ window._autoSelectFirstChar = function() {
         var container = rendition.manager.container;
         var scrollLeft = container.scrollLeft;
         var viewRight = scrollLeft + container.offsetWidth;
-        var iframeRect = iframe.getBoundingClientRect();
         var walker = iDoc.createTreeWalker(body, NodeFilter.SHOW_TEXT, null, false);
         var node;
         while ((node = walker.nextNode())) {
             var text = node.textContent;
             if (!text || text.trim().length === 0) continue;
-            var range = iDoc.createRange();
+            var testRange = iDoc.createRange();
             for (var i = 0; i < text.length; i++) {
-                range.setStart(node, i);
-                range.setEnd(node, i + 1);
-                var cr = range.getBoundingClientRect();
+                if (/\s/.test(text[i])) continue;
+                testRange.setStart(node, i);
+                testRange.setEnd(node, i + 1);
+                var cr = testRange.getBoundingClientRect();
                 if (cr.left >= scrollLeft && cr.right <= viewRight && cr.height > 0) {
+                    var iframeRect = iframe.getBoundingClientRect();
                     return JSON.stringify({
                         x: iframeRect.left + (cr.left + cr.right) / 2,
                         y: iframeRect.top + (cr.top + cr.bottom) / 2
@@ -3803,10 +3810,15 @@ window._next = function() {
         if (scrollEnd > scrollWidth && scrollEnd <= scrollWidth + tolerance) {
             manager.scrollBy(delta, 0, true);
             rendition.reportLocation();
-            return;
+            return Promise.resolve();
         }
     }
-    rendition.next();
+    return rendition.next();
+};
+var _pendingAutoSelect = false;
+window._nextThenAutoSelect = function() {
+    _pendingAutoSelect = true;
+    window._next();
 };
 
 window._displayHref = function(href) { rendition.display(href); };
@@ -4050,7 +4062,8 @@ private class EpubBridge(
     private val onSearchResultsPartialCallback: (resultsJson: String) -> Unit = {},
     private val onSearchCompleteCallback: () -> Unit = {},
     private val onTextSelectedCallback: (text: String, x: Float, y: Float, bottom: Float) -> Unit = { _, _, _, _ -> },
-    private val onSelectionTappedCallback: (text: String, x: Float, y: Float, bottom: Float, cfi: String, isAtPageEnd: Boolean) -> Unit = { _, _, _, _, _, _ -> }
+    private val onSelectionTappedCallback: (text: String, x: Float, y: Float, bottom: Float, cfi: String, isAtPageEnd: Boolean) -> Unit = { _, _, _, _, _, _ -> },
+    private val onAutoSelectReadyCallback: (cssX: Float, cssY: Float) -> Unit = { _, _ -> }
 ) {
     private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
 
@@ -4120,6 +4133,11 @@ private class EpubBridge(
     @android.webkit.JavascriptInterface
     fun onSelectionTapped(text: String, x: Float, y: Float, bottom: Float, cfi: String, isAtPageEnd: Boolean) {
         mainHandler.post { onSelectionTappedCallback(text, x, y, bottom, cfi, isAtPageEnd) }
+    }
+
+    @android.webkit.JavascriptInterface
+    fun onAutoSelectReady(cssX: Float, cssY: Float) {
+        mainHandler.post { onAutoSelectReadyCallback(cssX, cssY) }
     }
 
 }
