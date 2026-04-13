@@ -430,7 +430,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                     } catch (_: Exception) {}
                 },
                 onContentRendered = {
-                    isLoading = false
+                    if (savedCfi.isNullOrEmpty()) isLoading = false
                     isContentRendered = true
                     if (scanCacheValid && spinePageOffsets.isNotEmpty()) {
                         val jsonObj = org.json.JSONObject()
@@ -568,6 +568,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                 },
                 onSearchComplete = { isSearching = false },
                 onNavigationComplete = {
+                    isLoading = false
                     onNavigationCompleteRef.value?.invoke()
                     onNavigationCompleteRef.value = null
                 },
@@ -614,7 +615,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
         // 로딩 오버레이
         if (isLoading) {
             Box(
-                modifier = Modifier.fillMaxSize().clickable(enabled = false) {},
+                modifier = Modifier.fillMaxSize().background(Color.White).clickable(enabled = false) {},
                 contentAlignment = Alignment.Center
             ) {
                 CircularProgressIndicator(color = Color.Black)
@@ -3106,8 +3107,13 @@ rendition.on("relocated", function(location) {
                 var iDoc = iframe && (iframe.contentDocument || (iframe.contentWindow && iframe.contentWindow.document));
                 if (iDoc && iDoc.fonts && iDoc.fonts.status === 'loading' && _savedCfi) {
                     _waitingForFonts = true;
+                    _navigating = true;
                     iDoc.fonts.ready.then(function() {
-                        rendition.display(_savedCfi);
+                        rendition.display(_savedCfi).then(function() {
+                            setTimeout(function() {
+                                rendition.display(_savedCfi).then(_finishNavigation).catch(_finishNavigation);
+                            }, 0);
+                        }).catch(_finishNavigation);
                     });
                     return;
                 }
@@ -3129,7 +3135,9 @@ rendition.on("relocated", function(location) {
             window._currentCfi = cfi;
             var endCfi = (location.end && location.end.cfi) ? location.end.cfi : "";
             window._currentEndCfi = endCfi;
-            Android.onLocationChanged(0, cfi, "");
+            if (!_navigating) {
+                Android.onLocationChanged(0, cfi, "");
+            }
         }
     } catch(e) {}
     if (_locationsReady || _totalVisualPages > 0) {
@@ -3688,7 +3696,30 @@ window._autoSelectFirstWord = function() {
 };
 
 var _savedCfi = "${savedCfi.replace("\"", "\\\"")}";
-rendition.display(_savedCfi.length > 0 ? _savedCfi : undefined);
+var _navigating = false;
+function _finishNavigation() {
+    _navigating = false;
+    try {
+        var loc = rendition.currentLocation();
+        if (loc && loc.start && loc.start.cfi) {
+            window._currentCfi = loc.start.cfi;
+            var endCfi = (loc.end && loc.end.cfi) ? loc.end.cfi : "";
+            window._currentEndCfi = endCfi;
+            Android.onLocationChanged(0, loc.start.cfi, "");
+        }
+    } catch(e) {}
+    Android.onNavigationComplete();
+}
+if (_savedCfi.length > 0) {
+    _navigating = true;
+    rendition.display(_savedCfi).then(function() {
+        setTimeout(function() {
+            rendition.display(_savedCfi).then(_finishNavigation).catch(_finishNavigation);
+        }, 0);
+    }).catch(_finishNavigation);
+} else {
+    rendition.display();
+}
 window._prev = function() { rendition.prev(); };
 window._next = function() {
     // epub.js는 scrollLeft + offsetWidth + delta <= scrollWidth 로 같은 챕터 내 다음 페이지 존재 여부를 판단한다.
@@ -3718,18 +3749,20 @@ window._nextThenAutoSelect = function() {
 };
 
 window._displayHref = function(href) {
+    _navigating = true;
     rendition.display(href).then(function() {
-        Android.onNavigationComplete();
-    });
+        setTimeout(function() {
+            rendition.display(href).then(_finishNavigation).catch(_finishNavigation);
+        }, 0);
+    }).catch(_finishNavigation);
 };
 window._displayCfi = function(cfi) {
+    _navigating = true;
     rendition.display(cfi).then(function() {
         setTimeout(function() {
-            rendition.display(cfi).then(function() {
-                Android.onNavigationComplete();
-            });
+            rendition.display(cfi).then(_finishNavigation).catch(_finishNavigation);
         }, 0);
-    });
+    }).catch(_finishNavigation);
 };
 window._displayPageNum = function(pageNum) {
     try {
