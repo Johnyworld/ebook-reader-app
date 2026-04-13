@@ -92,4 +92,80 @@ class ReaderHelpersTest {
         val fp = settings.layoutFingerprint()
         assertEquals("NotoSans|20|1.8|5|30|15|true|LEFT", fp)
     }
+
+    // --- readerBottomInfoText ---
+
+    private val testBook = BookFile(
+        name = "test-book.epub",
+        path = "/books/test-book.epub",
+        extension = "epub",
+        size = 1024,
+        dateAdded = 0,
+        dateModified = 0,
+        metadata = BookMetadata(
+            title = "테스트 책",
+            author = "작가",
+            language = null,
+            publisher = null,
+            publishedDate = null,
+            description = null
+        )
+    )
+
+    @Test
+    fun `readerBottomInfoText - NONE`() {
+        assertNull(readerBottomInfoText(ReaderBottomInfo.NONE, testBook, "Ch1", 5, 100, 0.05f, "12:00"))
+    }
+
+    @Test
+    fun `readerBottomInfoText - BOOK_TITLE with metadata`() {
+        assertEquals("테스트 책", readerBottomInfoText(ReaderBottomInfo.BOOK_TITLE, testBook, "", 0, 0, 0f, ""))
+    }
+
+    @Test
+    fun `readerBottomInfoText - BOOK_TITLE without metadata`() {
+        val bookNoMeta = testBook.copy(metadata = null)
+        assertEquals("test-book.epub", readerBottomInfoText(ReaderBottomInfo.BOOK_TITLE, bookNoMeta, "", 0, 0, 0f, ""))
+    }
+
+    @Test
+    fun `readerBottomInfoText - BOOK_TITLE with null title`() {
+        val bookNullTitle = testBook.copy(metadata = BookMetadata(null, null, null, null, null, null))
+        assertEquals("test-book.epub", readerBottomInfoText(ReaderBottomInfo.BOOK_TITLE, bookNullTitle, "", 0, 0, 0f, ""))
+    }
+
+    @Test
+    fun `readerBottomInfoText - CHAPTER_TITLE`() {
+        assertEquals("Chapter 1", readerBottomInfoText(ReaderBottomInfo.CHAPTER_TITLE, testBook, "Chapter 1", 0, 0, 0f, ""))
+    }
+
+    @Test
+    fun `readerBottomInfoText - CHAPTER_TITLE empty`() {
+        assertNull(readerBottomInfoText(ReaderBottomInfo.CHAPTER_TITLE, testBook, "", 0, 0, 0f, ""))
+    }
+
+    @Test
+    fun `readerBottomInfoText - PAGE`() {
+        assertEquals("5 / 100", readerBottomInfoText(ReaderBottomInfo.PAGE, testBook, "", 5, 100, 0f, ""))
+    }
+
+    @Test
+    fun `readerBottomInfoText - PAGE with zero totalPages`() {
+        assertNull(readerBottomInfoText(ReaderBottomInfo.PAGE, testBook, "", 0, 0, 0f, ""))
+    }
+
+    @Test
+    fun `readerBottomInfoText - CLOCK`() {
+        assertEquals("14:30", readerBottomInfoText(ReaderBottomInfo.CLOCK, testBook, "", 0, 0, 0f, "14:30"))
+    }
+
+    @Test
+    fun `readerBottomInfoText - CLOCK empty`() {
+        assertNull(readerBottomInfoText(ReaderBottomInfo.CLOCK, testBook, "", 0, 0, 0f, ""))
+    }
+
+    @Test
+    fun `readerBottomInfoText - PROGRESS`() {
+        assertEquals("45%", readerBottomInfoText(ReaderBottomInfo.PROGRESS, testBook, "", 0, 0, 0.45f, ""))
+    }
 }
