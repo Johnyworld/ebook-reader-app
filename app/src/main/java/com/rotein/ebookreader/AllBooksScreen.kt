@@ -11,7 +11,6 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -19,17 +18,13 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.IntrinsicSize
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
@@ -38,7 +33,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -51,16 +45,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import com.rotein.ebookreader.ui.theme.EreaderColors
+import com.rotein.ebookreader.ui.theme.EreaderSpacing
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Popup
-import androidx.compose.ui.window.PopupProperties
+import com.rotein.ebookreader.ui.components.EreaderDropdownMenu
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -171,9 +164,9 @@ fun AllBooksScreen(
             when {
                 !hasPermission -> {
                     Column(
-                        modifier = Modifier.align(Alignment.Center).padding(24.dp),
+                        modifier = Modifier.align(Alignment.Center).padding(EreaderSpacing.XL),
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                        verticalArrangement = Arrangement.spacedBy(EreaderSpacing.M)
                     ) {
                         Text("기기 내 파일을 검색하려면\n저장소 접근 권한이 필요합니다.")
                         Button(onClick = {
@@ -200,7 +193,7 @@ fun AllBooksScreen(
                     Text(
                         if (searchQuery.isBlank()) "epub, txt, mobi, pdf 파일을 찾을 수 없습니다."
                         else "\"$searchQuery\"에 해당하는 파일이 없습니다.",
-                        modifier = Modifier.align(Alignment.Center).padding(24.dp)
+                        modifier = Modifier.align(Alignment.Center).padding(EreaderSpacing.XL)
                     )
                 }
 
@@ -215,7 +208,7 @@ fun AllBooksScreen(
                                 lastReadTimes = lastReadTimes + (book.path to now)
                                 onBookClick(book)
                             })
-                            HorizontalDivider()
+                            HorizontalDivider(color = EreaderColors.Gray)
                         }
                     }
                 }
@@ -235,9 +228,6 @@ private fun TopBar(
     onSortChange: (SortPreference) -> Unit
 ) {
     val focusRequester = remember { FocusRequester() }
-    var dropdownExpanded by remember { mutableStateOf(false) }
-    var anchorHeight by remember { mutableStateOf(0) }
-
     LaunchedEffect(isSearchActive) {
         if (isSearchActive) focusRequester.requestFocus()
     }
@@ -251,77 +241,26 @@ private fun TopBar(
         Row(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 4.dp),
+                .padding(horizontal = EreaderSpacing.XS),
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(onClick = onSearchClick) {
                 Icon(
                     imageVector = Icons.Default.Search,
                     contentDescription = "검색",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    tint = EreaderColors.DarkGray
                 )
             }
 
             Box(modifier = Modifier.weight(1f))
 
             // 정렬 필드 드롭다운
-            Box(modifier = Modifier.onGloballyPositioned { anchorHeight = it.size.height }) {
-                TextButton(onClick = { dropdownExpanded = true }) {
-                    Text(
-                        text = sortPref.field.label,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                }
-                if (dropdownExpanded) {
-                    Popup(
-                        alignment = Alignment.TopEnd,
-                        offset = IntOffset(0, anchorHeight),
-                        onDismissRequest = { dropdownExpanded = false },
-                        properties = PopupProperties(focusable = true)
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .width(IntrinsicSize.Max)
-                                .background(Color.White)
-                                .border(1.dp, Color.Black)
-                        ) {
-                            SortField.entries.forEachIndexed { index, field ->
-                                val isSelected = sortPref.field == field
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clickable {
-                                            onSortChange(sortPref.copy(field = field))
-                                            dropdownExpanded = false
-                                        }
-                                        .padding(start = 16.dp, end = 12.dp, top = 12.dp, bottom = 12.dp)
-                                ) {
-                                    Text(
-                                        text = field.label,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = Color.Black,
-                                        modifier = Modifier.weight(1f)
-                                    )
-                                    if (isSelected) {
-                                        Spacer(modifier = Modifier.width(16.dp))
-                                        Icon(
-                                            imageVector = Icons.Default.Check,
-                                            contentDescription = null,
-                                            tint = Color.Black,
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                    }
-                                }
-                                if (index < SortField.entries.lastIndex) {
-                                    HorizontalDivider(color = Color(0xFFE0E0E0))
-                                }
-                            }
-                        }
-                    }
-                }
-            }
+            EreaderDropdownMenu(
+                items = SortField.entries.toList(),
+                selectedItem = sortPref.field,
+                onSelect = { onSortChange(sortPref.copy(field = it)) },
+                label = { it.label },
+            )
 
         }
 
@@ -330,15 +269,15 @@ private fun TopBar(
             Row(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.surface)
-                    .padding(horizontal = 4.dp),
+                    .background(EreaderColors.White)
+                    .padding(horizontal = EreaderSpacing.XS),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = {}) {
                     Icon(
                         imageVector = Icons.Default.Search,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary
+                        tint = EreaderColors.Black
                     )
                 }
 
@@ -350,16 +289,16 @@ private fun TopBar(
                         .focusRequester(focusRequester),
                     singleLine = true,
                     textStyle = MaterialTheme.typography.bodyLarge.copy(
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = EreaderColors.Black
                     ),
-                    cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                    cursorBrush = SolidColor(EreaderColors.Black),
                     decorationBox = { innerTextField ->
                         Box {
                             if (searchQuery.isEmpty()) {
                                 Text(
                                     text = "책 제목, 저자 검색...",
                                     style = MaterialTheme.typography.bodyLarge,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    color = EreaderColors.DarkGray
                                 )
                             }
                             innerTextField()
@@ -371,14 +310,14 @@ private fun TopBar(
                     Icon(
                         imageVector = Icons.Default.Close,
                         contentDescription = "검색 닫기",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        tint = EreaderColors.DarkGray
                     )
                 }
             }
         }
     }
 
-    HorizontalDivider()
+    HorizontalDivider(color = EreaderColors.Gray)
 }
 
 @Composable
@@ -395,14 +334,14 @@ private fun BookItem(book: BookFile, onClick: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onClick() }
-            .padding(horizontal = 16.dp, vertical = 10.dp),
+            .padding(horizontal = EreaderSpacing.L, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
+        horizontalArrangement = Arrangement.spacedBy(EreaderSpacing.M)
     ) {
         Box(
             modifier = Modifier
                 .size(width = 44.dp, height = 60.dp)
-                .background(MaterialTheme.colorScheme.surfaceVariant),
+                .background(EreaderColors.Gray),
             contentAlignment = Alignment.Center
         ) {
             if (cover != null) {
@@ -416,7 +355,7 @@ private fun BookItem(book: BookFile, onClick: () -> Unit) {
                 Text(
                     text = book.extension.uppercase(),
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = EreaderColors.DarkGray
                 )
             }
         }
@@ -431,7 +370,7 @@ private fun BookItem(book: BookFile, onClick: () -> Unit) {
             Text(
                 text = author ?: book.path,
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = EreaderColors.DarkGray,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -441,7 +380,7 @@ private fun BookItem(book: BookFile, onClick: () -> Unit) {
             Text(
                 text = book.extension.uppercase(),
                 style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.primary
+                color = EreaderColors.Black
             )
         }
     }
