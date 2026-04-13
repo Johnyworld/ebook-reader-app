@@ -264,6 +264,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
     var isSearching by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
     val epubWebView = remember { mutableStateOf<WebView?>(null) }
+    val onNavigationCompleteRef = remember { mutableStateOf<(() -> Unit)?>(null) }
     var currentPage by remember(book.path) { mutableStateOf(0) }
     var totalPages by remember(book.path) { mutableStateOf(0) }
     var currentCfi by remember(book.path) { mutableStateOf("") }
@@ -566,6 +567,10 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                     } catch (_: Exception) {}
                 },
                 onSearchComplete = { isSearching = false },
+                onNavigationComplete = {
+                    onNavigationCompleteRef.value?.invoke()
+                    onNavigationCompleteRef.value = null
+                },
                 readerSettings = readerSettings
             )
             "pdf"  -> PdfViewer(book.path, onCenterTap)
@@ -844,15 +849,14 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                 currentChapterTitle = chapterTitle,
                 totalBookPages = totalPages,
                 onNavigate = { href ->
-                    epubWebView.value?.visibility = View.INVISIBLE
+                    if (onNavigationCompleteRef.value != null) return@TocPopup
+                    onNavigationCompleteRef.value = { showTocPopup = false; showMenu = false }
                     epubWebView.value?.post {
                         epubWebView.value?.evaluateJavascript(
                             "window._displayHref(\"${href.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n")}\")",
                             null
                         )
                     }
-                    showTocPopup = false
-                    showMenu = false
                 },
                 onDismiss = { showTocPopup = false }
             )
@@ -876,13 +880,12 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                     }
                 },
                 onNavigate = { cfi, page ->
-                    epubWebView.value?.visibility = View.INVISIBLE
+                    if (onNavigationCompleteRef.value != null) return@SearchPopup
+                    onNavigationCompleteRef.value = { showSearchPopup = false; showMenu = false }
                     epubWebView.value?.post {
                         val escaped = cfi.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n")
                         epubWebView.value?.evaluateJavascript("window._displayCfi(\"$escaped\")", null)
                     }
-                    showSearchPopup = false
-                    showMenu = false
                 },
                 onClear = {
                     searchQuery = ""
@@ -903,13 +906,12 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                 spinePageOffsets = spinePageOffsets,
                 cfiPageMap = cfiPageMap,
                 onNavigate = { cfi ->
-                    epubWebView.value?.visibility = View.INVISIBLE
+                    if (onNavigationCompleteRef.value != null) return@HighlightPopup
+                    onNavigationCompleteRef.value = { showHighlightPopup = false; showMenu = false }
                     epubWebView.value?.post {
                         val escaped = cfi.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n")
                         epubWebView.value?.evaluateJavascript("window._displayCfi(\"$escaped\")", null)
                     }
-                    showHighlightPopup = false
-                    showMenu = false
                 },
                 onDelete = { highlight ->
                     scope.launch {
@@ -1072,13 +1074,12 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                 spinePageOffsets = spinePageOffsets,
                 cfiPageMap = cfiPageMap,
                 onNavigate = { memo ->
-                    epubWebView.value?.visibility = View.INVISIBLE
+                    if (onNavigationCompleteRef.value != null) return@MemoListPopup
+                    onNavigationCompleteRef.value = { showMemoListPopup = false; showMenu = false }
                     epubWebView.value?.post {
                         val escaped = memo.cfi.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n")
                         epubWebView.value?.evaluateJavascript("window._displayCfi(\"$escaped\")", null)
                     }
-                    showMemoListPopup = false
-                    showMenu = false
                 },
                 onEdit = { memo ->
                     editingMemo = memo
@@ -1146,11 +1147,9 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                     }
                 }) else null,
                 onNavigate = if (editingMemo != null) ({
+                    if (onNavigationCompleteRef.value != null) return@MemoEditorScreen
                     val cfi = editingMemo!!.cfi
-                    epubWebView.value?.visibility = View.INVISIBLE
-                    showMemoEditor = false
-                    showMenu = false
-                    editingMemo = null
+                    onNavigationCompleteRef.value = { showMemoEditor = false; showMenu = false; editingMemo = null }
                     epubWebView.value?.post {
                         val escaped = cfi.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n")
                         epubWebView.value?.evaluateJavascript("window._displayCfi(\"$escaped\")", null)
@@ -1207,13 +1206,12 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                 spinePageOffsets = spinePageOffsets,
                 cfiPageMap = cfiPageMap,
                 onNavigate = { cfi ->
-                    epubWebView.value?.visibility = View.INVISIBLE
+                    if (onNavigationCompleteRef.value != null) return@BookmarkPopup
+                    onNavigationCompleteRef.value = { showBookmarkPopup = false; showMenu = false }
                     epubWebView.value?.post {
                         val escaped = cfi.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n")
                         epubWebView.value?.evaluateJavascript("window._displayCfi(\"$escaped\")", null)
                     }
-                    showBookmarkPopup = false
-                    showMenu = false
                 },
                 onDelete = { bookmark ->
                     scope.launch {
@@ -2373,6 +2371,7 @@ private fun EpubViewer(
     onMemo: (text: String, cfi: String) -> Unit = { _, _ -> },
     onHighlightLongPress: (id: Long, x: Float, y: Float, bottom: Float) -> Unit = { _, _, _, _ -> },
     onMemoLongPress: (id: Long, x: Float, y: Float, bottom: Float) -> Unit = { _, _, _, _ -> },
+    onNavigationComplete: () -> Unit = {},
     readerSettings: ReaderSettings = ReaderSettings()
 ) {
     val context = LocalContext.current
@@ -2503,7 +2502,7 @@ private fun EpubViewer(
                                 }, 100)
                             },
                             onNavigationCompleteCallback = {
-                                webViewRef.get()?.visibility = View.VISIBLE
+                                onNavigationComplete()
                             }
                         ), "Android")
                     }
