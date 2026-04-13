@@ -13,56 +13,25 @@ enum class BookmarkSortOrder(val label: String) {
     PAGE_ASC("페이지순")
 }
 
-object BookmarkSortStore {
-    private const val PREF_NAME = "bookmark_sort_pref"
-    private const val KEY_ORDER = "sort_order"
+class AnnotationSortStore(private val prefName: String) {
+    private val keyOrder = "sort_order"
 
     fun load(context: Context): BookmarkSortOrder {
-        val prefs = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
-        return BookmarkSortOrder.entries.firstOrNull { it.name == prefs.getString(KEY_ORDER, null) }
+        val prefs = context.getSharedPreferences(prefName, Context.MODE_PRIVATE)
+        return BookmarkSortOrder.entries.firstOrNull { it.name == prefs.getString(keyOrder, null) }
             ?: BookmarkSortOrder.CREATED_ASC
     }
 
     fun save(context: Context, order: BookmarkSortOrder) {
-        context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE).edit()
-            .putString(KEY_ORDER, order.name)
+        context.getSharedPreferences(prefName, Context.MODE_PRIVATE).edit()
+            .putString(keyOrder, order.name)
             .apply()
     }
 }
 
-object MemoSortStore {
-    private const val PREF_NAME = "memo_sort_pref"
-    private const val KEY_ORDER = "sort_order"
-
-    fun load(context: Context): BookmarkSortOrder {
-        val prefs = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
-        return BookmarkSortOrder.entries.firstOrNull { it.name == prefs.getString(KEY_ORDER, null) }
-            ?: BookmarkSortOrder.CREATED_ASC
-    }
-
-    fun save(context: Context, order: BookmarkSortOrder) {
-        context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE).edit()
-            .putString(KEY_ORDER, order.name)
-            .apply()
-    }
-}
-
-object HighlightSortStore {
-    private const val PREF_NAME = "highlight_sort_pref"
-    private const val KEY_ORDER = "sort_order"
-
-    fun load(context: Context): BookmarkSortOrder {
-        val prefs = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
-        return BookmarkSortOrder.entries.firstOrNull { it.name == prefs.getString(KEY_ORDER, null) }
-            ?: BookmarkSortOrder.CREATED_ASC
-    }
-
-    fun save(context: Context, order: BookmarkSortOrder) {
-        context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE).edit()
-            .putString(KEY_ORDER, order.name)
-            .apply()
-    }
-}
+val BookmarkSortStore = AnnotationSortStore("bookmark_sort_pref")
+val MemoSortStore = AnnotationSortStore("memo_sort_pref")
+val HighlightSortStore = AnnotationSortStore("highlight_sort_pref")
 
 enum class SortField(val label: String) {
     TITLE("제목순"),
