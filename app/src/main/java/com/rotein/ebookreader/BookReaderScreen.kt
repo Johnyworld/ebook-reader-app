@@ -75,6 +75,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.graphics.Color
+import com.rotein.ebookreader.ui.components.PopupHeaderBar
 import com.rotein.ebookreader.ui.theme.EreaderColors
 import com.rotein.ebookreader.ui.theme.EreaderSpacing
 import androidx.compose.ui.graphics.StrokeCap
@@ -750,23 +751,10 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                     modifier = Modifier.fillMaxWidth(),
                     color = EreaderColors.White
                 ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = EreaderSpacing.XS)
-                            .height(56.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                    PopupHeaderBar(
+                        title = book.metadata?.title ?: book.name,
+                        onBack = onClose
                     ) {
-                        IconButton(onClick = onClose) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "뒤로가기")
-                        }
-                        Text(
-                            text = book.metadata?.title ?: book.name,
-                            style = MaterialTheme.typography.titleMedium,
-                            modifier = Modifier.weight(1f),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
                         IconButton(onClick = {
                             if (currentCfi.isEmpty()) return@IconButton
                             if (isCurrentPageBookmarked) {
@@ -840,7 +828,6 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                         }
                     }
                 }
-                HorizontalDivider(color = EreaderColors.Black)
             }
         }
 
@@ -1266,25 +1253,7 @@ private fun TocPopup(
 
     Surface(modifier = Modifier.fillMaxSize(), color = EreaderColors.White) {
         Column(modifier = Modifier.fillMaxSize()) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp)
-                    .padding(horizontal = EreaderSpacing.XS),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(onClick = onDismiss) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "닫기")
-                }
-                Text(
-                    "목차: $bookTitle",
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.weight(1f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-            HorizontalDivider(color = EreaderColors.Black)
+            PopupHeaderBar(title = "목차: $bookTitle", onBack = onDismiss)
             Column(modifier = Modifier.weight(1f)) {
                 if (flatItems.isEmpty()) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -1426,23 +1395,7 @@ private fun SearchPopup(
 
     Surface(modifier = Modifier.fillMaxSize(), color = EreaderColors.White) {
         Column(modifier = Modifier.fillMaxSize()) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp)
-                    .padding(horizontal = EreaderSpacing.XS),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(onClick = onDismiss) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "닫기")
-                }
-                Text(
-                    "본문 검색",
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.weight(1f)
-                )
-            }
-            HorizontalDivider(color = EreaderColors.Black)
+            PopupHeaderBar(title = "본문 검색", onBack = onDismiss)
 
             Box(modifier = Modifier.weight(1f)) {
                 when {
@@ -1682,21 +1635,7 @@ private fun BookmarkPopup(
 
     Surface(modifier = Modifier.fillMaxSize(), color = EreaderColors.White) {
         Column(modifier = Modifier.fillMaxSize()) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp)
-                    .padding(horizontal = EreaderSpacing.XS),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(onClick = onDismiss) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "닫기")
-                }
-                Text(
-                    "북마크",
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.weight(1f)
-                )
+            PopupHeaderBar(title = "북마크", onBack = onDismiss) {
                 Box(modifier = Modifier.onGloballyPositioned { anchorHeight = it.size.height }) {
                     TextButton(onClick = { dropdownExpanded = true }) {
                         Text(
@@ -1755,7 +1694,6 @@ private fun BookmarkPopup(
                     }
                 }
             }
-            HorizontalDivider(color = EreaderColors.Black)
 
             Box(modifier = Modifier.weight(1f)) {
                 if (bookmarks.isEmpty()) {
@@ -1922,14 +1860,7 @@ private fun HighlightPopup(
 
     Surface(modifier = Modifier.fillMaxSize(), color = EreaderColors.White) {
         Column(modifier = Modifier.fillMaxSize()) {
-            Row(
-                modifier = Modifier.fillMaxWidth().height(56.dp).padding(horizontal = EreaderSpacing.XS),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(onClick = onDismiss) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "닫기")
-                }
-                Text("하이라이트", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+            PopupHeaderBar(title = "하이라이트", onBack = onDismiss) {
                 Box(modifier = Modifier.onGloballyPositioned { anchorHeight = it.size.height }) {
                     TextButton(onClick = { dropdownExpanded = true }) {
                         Text(sortOrder.label, style = MaterialTheme.typography.labelMedium, color = EreaderColors.Black)
@@ -1962,7 +1893,6 @@ private fun HighlightPopup(
                     }
                 }
             }
-            HorizontalDivider(color = EreaderColors.Black)
 
             Box(modifier = Modifier.weight(1f)) {
                 if (highlights.isEmpty()) {
@@ -2060,19 +1990,11 @@ private fun MemoEditorScreen(
 
     Surface(modifier = Modifier.fillMaxSize(), color = EreaderColors.White) {
         Column(modifier = Modifier.fillMaxSize()) {
-            Row(
-                modifier = Modifier.fillMaxWidth().height(56.dp).padding(horizontal = EreaderSpacing.XS),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(onClick = onCancel) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "취소")
-                }
-                Text("메모", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+            PopupHeaderBar(title = "메모", onBack = onCancel) {
                 TextButton(onClick = { onSave(note) }) {
                     Text("저장", color = EreaderColors.Black)
                 }
             }
-            HorizontalDivider(color = EreaderColors.Black)
             Column(
                 modifier = Modifier
                     .weight(1f)
@@ -2176,14 +2098,7 @@ private fun MemoListPopup(
 
     Surface(modifier = Modifier.fillMaxSize(), color = EreaderColors.White) {
         Column(modifier = Modifier.fillMaxSize()) {
-            Row(
-                modifier = Modifier.fillMaxWidth().height(56.dp).padding(horizontal = EreaderSpacing.XS),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(onClick = onDismiss) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "닫기")
-                }
-                Text("메모", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+            PopupHeaderBar(title = "메모", onBack = onDismiss) {
                 Box(modifier = Modifier.onGloballyPositioned { anchorHeight = it.size.height }) {
                     TextButton(onClick = { dropdownExpanded = true }) {
                         Text(sortOrder.label, style = MaterialTheme.typography.labelMedium, color = EreaderColors.Black)
@@ -2216,7 +2131,6 @@ private fun MemoListPopup(
                     }
                 }
             }
-            HorizontalDivider(color = EreaderColors.Black)
 
             Box(modifier = Modifier.weight(1f)) {
                 if (memos.isEmpty()) {
