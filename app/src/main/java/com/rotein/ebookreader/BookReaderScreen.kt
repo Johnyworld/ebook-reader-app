@@ -210,13 +210,13 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
         if (!isContentRendered) return@LaunchedEffect
         if (highlights.isNotEmpty()) {
             val json = highlights.joinToString(",", "[", "]") {
-                """{"id":${it.id},"cfi":"${it.cfi.replace("\\", "\\\\").replace("\"", "\\\"")}"}"""
+                """{"id":${it.id},"cfi":"${it.cfi.escapeCfiForJs()}"}"""
             }
             epubWebView.value?.evaluateJavascript("window._applyHighlights('$json')", null)
         }
         if (memos.isNotEmpty()) {
             val json = memos.joinToString(",", "[", "]") {
-                """{"id":${it.id},"cfi":"${it.cfi.replace("\\", "\\\\").replace("\"", "\\\"")}"}"""
+                """{"id":${it.id},"cfi":"${it.cfi.escapeCfiForJs()}"}"""
             }
             epubWebView.value?.evaluateJavascript("window._applyMemos('$json')", null)
         }
@@ -316,7 +316,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                             val id = withContext(Dispatchers.IO) { highlightDao.insert(highlight) }
                             val saved = highlight.copy(id = id)
                             highlights = highlights + saved
-                            val escapedCfi = cfi.replace("\\", "\\\\").replace("\"", "\\\"")
+                            val escapedCfi = cfi.escapeCfiForJs()
                             epubWebView.value?.evaluateJavascript("window._addHighlight(\"$escapedCfi\", $id)", null)
                         }
                     }
@@ -690,7 +690,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                     onNavigationCompleteRef.value = { showTocPopup = false; showMenu = false }
                     epubWebView.value?.post {
                         epubWebView.value?.evaluateJavascript(
-                            "window._displayHref(\"${href.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n")}\")",
+                            "window._displayHref(\"${href.escapeCfiForJs()}\")",
                             null
                         )
                     }
@@ -710,7 +710,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                     searchQuery = query
                     isSearching = true
                     searchResults = emptyList()
-                    val escaped = query.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n")
+                    val escaped = query.escapeCfiForJs()
                     epubWebView.value?.post {
                         epubWebView.value?.evaluateJavascript("window._setSearchHighlight(\"$escaped\")", null)
                         epubWebView.value?.evaluateJavascript("window._search(\"$escaped\")", null)
@@ -720,7 +720,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                     if (onNavigationCompleteRef.value != null) return@SearchPopup
                     onNavigationCompleteRef.value = { showSearchPopup = false; showMenu = false }
                     epubWebView.value?.post {
-                        val escaped = cfi.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n")
+                        val escaped = cfi.escapeCfiForJs()
                         epubWebView.value?.evaluateJavascript("window._displayCfi(\"$escaped\")", null)
                     }
                 },
@@ -746,7 +746,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                     if (onNavigationCompleteRef.value != null) return@HighlightPopup
                     onNavigationCompleteRef.value = { showHighlightPopup = false; showMenu = false }
                     epubWebView.value?.post {
-                        val escaped = cfi.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n")
+                        val escaped = cfi.escapeCfiForJs()
                         epubWebView.value?.evaluateJavascript("window._displayCfi(\"$escaped\")", null)
                     }
                 },
@@ -874,7 +874,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                                 val id = withContext(Dispatchers.IO) { highlightDao.insert(highlight) }
                                 val saved = highlight.copy(id = id)
                                 highlights = highlights + saved
-                                val escapedCfi = memo.cfi.replace("\\", "\\\\").replace("\"", "\\\"")
+                                val escapedCfi = memo.cfi.escapeCfiForJs()
                                 epubWebView.value?.evaluateJavascript("window._addHighlight(\"$escapedCfi\", $id)", null)
                             }
                         }
@@ -920,7 +920,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                     if (onNavigationCompleteRef.value != null) return@MemoListPopup
                     onNavigationCompleteRef.value = { showMemoListPopup = false; showMenu = false }
                     epubWebView.value?.post {
-                        val escaped = memo.cfi.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n")
+                        val escaped = memo.cfi.escapeCfiForJs()
                         epubWebView.value?.evaluateJavascript("window._displayCfi(\"$escaped\")", null)
                     }
                 },
@@ -970,7 +970,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                             val id = withContext(Dispatchers.IO) { memoDao.insert(newMemo) }
                             val saved = newMemo.copy(id = id)
                             memos = memos + saved
-                            val escapedCfi = pendingMemoCfi.replace("\\", "\\\\").replace("\"", "\\\"")
+                            val escapedCfi = pendingMemoCfi.escapeCfiForJs()
                             epubWebView.value?.evaluateJavascript("window._addMemo(\"$escapedCfi\", $id)", null)
                             showMemoEditor = false
                         }
@@ -994,7 +994,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                     val cfi = editingMemo!!.cfi
                     onNavigationCompleteRef.value = { showMemoEditor = false; showMenu = false; editingMemo = null }
                     epubWebView.value?.post {
-                        val escaped = cfi.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n")
+                        val escaped = cfi.escapeCfiForJs()
                         epubWebView.value?.evaluateJavascript("window._displayCfi(\"$escaped\")", null)
                     }
                 }) else null
@@ -1052,7 +1052,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                     if (onNavigationCompleteRef.value != null) return@BookmarkPopup
                     onNavigationCompleteRef.value = { showBookmarkPopup = false; showMenu = false }
                     epubWebView.value?.post {
-                        val escaped = cfi.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n")
+                        val escaped = cfi.escapeCfiForJs()
                         epubWebView.value?.evaluateJavascript("window._displayCfi(\"$escaped\")", null)
                     }
                 },
