@@ -91,15 +91,6 @@ fun HomeScreen(modifier: Modifier = Modifier) {
         }
     }
 
-    if (currentBook != null) {
-        BookReaderScreen(
-            book = currentBook!!,
-            onClose = { currentBook = null },
-            modifier = modifier
-        )
-        return
-    }
-
     Box(modifier = modifier.fillMaxSize()) {
         // 실제 콘텐츠 (스플래시 뒤에서 로딩 진행)
         Column(modifier = Modifier.fillMaxSize()) {
@@ -140,6 +131,15 @@ fun HomeScreen(modifier: Modifier = Modifier) {
                     Text(text = tabs[1], modifier = Modifier.padding(16.dp))
                 }
             }
+        }
+
+        // 뷰어 오버레이
+        if (currentBook != null) {
+            BookReaderScreen(
+                book = currentBook!!,
+                onClose = { currentBook = null },
+                modifier = Modifier.fillMaxSize()
+            )
         }
 
         // 스플래시 오버레이
