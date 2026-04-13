@@ -112,4 +112,47 @@ class ReaderModelsTest {
     fun `flattenToc - 빈 목록`() {
         assertTrue(flattenToc(emptyList()).isEmpty())
     }
+
+    // --- recalcSearchPages ---
+
+    @Test
+    fun `recalcSearchPages - 페이지 재계산`() {
+        val results = listOf(
+            SearchResultItem("cfi1", "text1", "ch1", 0, spineIndex = 0, charPos = 50),
+            SearchResultItem("cfi2", "text2", "ch1", 0, spineIndex = 1, charPos = 200)
+        )
+        val spinePageOffsets = mapOf(0 to 0, 1 to 5)
+        // spine 0: 페이지 경계 [0, 100, 200] → charPos 50은 인덱스 0
+        // spine 1: 페이지 경계 [0, 150, 300] → charPos 200은 인덱스 1
+        val charPageBreaksJson = JSONObject().apply {
+            put("0", JSONArray(listOf(0, 100, 200)))
+            put("1", JSONArray(listOf(0, 150, 300)))
+        }.toString()
+
+        val recalculated = recalcSearchPages(results, spinePageOffsets, charPageBreaksJson)
+
+        assertEquals(0 + 0 + 1, recalculated[0].page)  // baseOffset(0) + pageWithin(0) + 1 = 1
+        assertEquals(5 + 1 + 1, recalculated[1].page)   // baseOffset(5) + pageWithin(1) + 1 = 7
+    }
+
+    @Test
+    fun `recalcSearchPages - 빈 결과`() {
+        val results = recalcSearchPages(emptyList(), emptyMap(), "{}")
+        assertTrue(results.isEmpty())
+    }
+
+    @Test
+    fun `recalcSearchPages - 빈 charPageBreaksJson`() {
+        val results = listOf(SearchResultItem("cfi", "text", "ch", 5, 0, 100))
+        val unchanged = recalcSearchPages(results, mapOf(0 to 0), "")
+        assertEquals(5, unchanged[0].page) // 원래 page 유지
+    }
+
+    @Test
+    fun `recalcSearchPages - spineIndex가 음수면 건너뜀`() {
+        val results = listOf(SearchResultItem("cfi", "text", "ch", 5, spineIndex = -1, charPos = 100))
+        val charBreaks = JSONObject().apply { put("0", JSONArray(listOf(0, 50))) }.toString()
+        val unchanged = recalcSearchPages(results, mapOf(0 to 0), charBreaks)
+        assertEquals(5, unchanged[0].page) // 원래 page 유지
+    }
 }
