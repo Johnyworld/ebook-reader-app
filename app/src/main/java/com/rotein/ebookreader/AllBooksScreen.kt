@@ -11,7 +11,6 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -19,17 +18,13 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.IntrinsicSize
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
@@ -38,7 +33,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -56,13 +50,10 @@ import com.rotein.ebookreader.ui.theme.EreaderSpacing
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Popup
-import androidx.compose.ui.window.PopupProperties
+import com.rotein.ebookreader.ui.components.EreaderDropdownMenu
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -237,9 +228,6 @@ private fun TopBar(
     onSortChange: (SortPreference) -> Unit
 ) {
     val focusRequester = remember { FocusRequester() }
-    var dropdownExpanded by remember { mutableStateOf(false) }
-    var anchorHeight by remember { mutableStateOf(0) }
-
     LaunchedEffect(isSearchActive) {
         if (isSearchActive) focusRequester.requestFocus()
     }
@@ -267,63 +255,12 @@ private fun TopBar(
             Box(modifier = Modifier.weight(1f))
 
             // 정렬 필드 드롭다운
-            Box(modifier = Modifier.onGloballyPositioned { anchorHeight = it.size.height }) {
-                TextButton(onClick = { dropdownExpanded = true }) {
-                    Text(
-                        text = sortPref.field.label,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = EreaderColors.Black
-                    )
-                }
-                if (dropdownExpanded) {
-                    Popup(
-                        alignment = Alignment.TopEnd,
-                        offset = IntOffset(0, anchorHeight),
-                        onDismissRequest = { dropdownExpanded = false },
-                        properties = PopupProperties(focusable = true)
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .width(IntrinsicSize.Max)
-                                .background(EreaderColors.White)
-                                .border(1.dp, EreaderColors.Black)
-                        ) {
-                            SortField.entries.forEachIndexed { index, field ->
-                                val isSelected = sortPref.field == field
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clickable {
-                                            onSortChange(sortPref.copy(field = field))
-                                            dropdownExpanded = false
-                                        }
-                                        .padding(start = EreaderSpacing.L, end = EreaderSpacing.M, top = EreaderSpacing.M, bottom = EreaderSpacing.M)
-                                ) {
-                                    Text(
-                                        text = field.label,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = EreaderColors.Black,
-                                        modifier = Modifier.weight(1f)
-                                    )
-                                    if (isSelected) {
-                                        Spacer(modifier = Modifier.width(EreaderSpacing.L))
-                                        Icon(
-                                            imageVector = Icons.Default.Check,
-                                            contentDescription = null,
-                                            tint = EreaderColors.Black,
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                    }
-                                }
-                                if (index < SortField.entries.lastIndex) {
-                                    HorizontalDivider(color = EreaderColors.Gray)
-                                }
-                            }
-                        }
-                    }
-                }
-            }
+            EreaderDropdownMenu(
+                items = SortField.entries.toList(),
+                selectedItem = sortPref.field,
+                onSelect = { onSortChange(sortPref.copy(field = it)) },
+                label = { it.label },
+            )
 
         }
 

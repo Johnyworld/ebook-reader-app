@@ -76,6 +76,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.graphics.Color
+import com.rotein.ebookreader.ui.components.EreaderDropdownMenu
 import com.rotein.ebookreader.ui.components.FullScreenPopup
 import com.rotein.ebookreader.ui.components.PopupHeaderBar
 import com.rotein.ebookreader.ui.theme.EreaderColors
@@ -1529,8 +1530,6 @@ private fun BookmarkPopup(
     val itemsPerPage = maxOf(1, (screenHeightDp - statusBarHeightDp - headerHeightDp - paginationHeightDp) / itemHeightDp)
     var currentPage by remember { mutableStateOf(0) }
     var sortOrder by remember { mutableStateOf(BookmarkSortStore.load(context)) }
-    var dropdownExpanded by remember { mutableStateOf(false) }
-    var anchorHeight by remember { mutableStateOf(0) }
     val sortedBookmarks = remember(bookmarks, sortOrder) {
         when (sortOrder) {
             BookmarkSortOrder.CREATED_ASC -> bookmarks.sortedBy { it.createdAt }
@@ -1549,63 +1548,12 @@ private fun BookmarkPopup(
 
     FullScreenPopup {
             PopupHeaderBar(title = "북마크", onBack = onDismiss) {
-                Box(modifier = Modifier.onGloballyPositioned { anchorHeight = it.size.height }) {
-                    TextButton(onClick = { dropdownExpanded = true }) {
-                        Text(
-                            text = sortOrder.label,
-                            style = MaterialTheme.typography.labelMedium,
-                            color = EreaderColors.Black
-                        )
-                    }
-                    if (dropdownExpanded) {
-                        Popup(
-                            alignment = Alignment.TopEnd,
-                            offset = IntOffset(0, anchorHeight),
-                            onDismissRequest = { dropdownExpanded = false },
-                            properties = PopupProperties(focusable = true)
-                        ) {
-                            Column(
-                                modifier = Modifier
-                                    .width(IntrinsicSize.Max)
-                                    .background(EreaderColors.White)
-                                    .border(1.dp, EreaderColors.Black)
-                            ) {
-                                BookmarkSortOrder.entries.forEachIndexed { index, order ->
-                                    val isSelected = sortOrder == order
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .clickable {
-                                                sortOrder = order
-                                                dropdownExpanded = false
-                                            }
-                                            .padding(start = EreaderSpacing.L, end = EreaderSpacing.M, top = EreaderSpacing.M, bottom = EreaderSpacing.M)
-                                    ) {
-                                        Text(
-                                            text = order.label,
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = EreaderColors.Black,
-                                            modifier = Modifier.weight(1f)
-                                        )
-                                        if (isSelected) {
-                                            Spacer(modifier = Modifier.width(EreaderSpacing.L))
-                                            Icon(
-                                                imageVector = Icons.Default.Check,
-                                                contentDescription = null,
-                                                tint = EreaderColors.Black,
-                                                modifier = Modifier.size(16.dp)
-                                            )
-                                        }
-                                    }
-                                    if (index < BookmarkSortOrder.entries.lastIndex) {
-                                        HorizontalDivider(color = EreaderColors.Gray)
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
+                EreaderDropdownMenu(
+                    items = BookmarkSortOrder.entries.toList(),
+                    selectedItem = sortOrder,
+                    onSelect = { sortOrder = it },
+                    label = { it.label },
+                )
             }
 
             Box(modifier = Modifier.weight(1f)) {
@@ -1711,8 +1659,6 @@ private fun HighlightPopup(
     val itemsPerPage = maxOf(1, (screenHeightDp - statusBarHeightDp - headerHeightDp - paginationHeightDp) / itemHeightDp)
     var currentPage by remember { mutableStateOf(0) }
     var sortOrder by remember { mutableStateOf(HighlightSortStore.load(context)) }
-    var dropdownExpanded by remember { mutableStateOf(false) }
-    var anchorHeight by remember { mutableStateOf(0) }
     val sortedHighlights = remember(highlights, sortOrder) {
         when (sortOrder) {
             BookmarkSortOrder.CREATED_ASC -> highlights.sortedBy { it.createdAt }
@@ -1731,37 +1677,12 @@ private fun HighlightPopup(
 
     FullScreenPopup {
             PopupHeaderBar(title = "하이라이트", onBack = onDismiss) {
-                Box(modifier = Modifier.onGloballyPositioned { anchorHeight = it.size.height }) {
-                    TextButton(onClick = { dropdownExpanded = true }) {
-                        Text(sortOrder.label, style = MaterialTheme.typography.labelMedium, color = EreaderColors.Black)
-                    }
-                    if (dropdownExpanded) {
-                        Popup(
-                            alignment = Alignment.TopEnd,
-                            offset = IntOffset(0, anchorHeight),
-                            onDismissRequest = { dropdownExpanded = false },
-                            properties = PopupProperties(focusable = true)
-                        ) {
-                            Column(modifier = Modifier.width(IntrinsicSize.Max).background(EreaderColors.White).border(1.dp, EreaderColors.Black)) {
-                                BookmarkSortOrder.entries.forEachIndexed { index, order ->
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        modifier = Modifier.fillMaxWidth()
-                                            .clickable { sortOrder = order; dropdownExpanded = false }
-                                            .padding(start = EreaderSpacing.L, end = EreaderSpacing.M, top = EreaderSpacing.M, bottom = EreaderSpacing.M)
-                                    ) {
-                                        Text(order.label, style = MaterialTheme.typography.bodyMedium, color = EreaderColors.Black, modifier = Modifier.weight(1f))
-                                        if (sortOrder == order) {
-                                            Spacer(Modifier.width(EreaderSpacing.L))
-                                            Icon(Icons.Default.Check, contentDescription = null, tint = EreaderColors.Black, modifier = Modifier.size(16.dp))
-                                        }
-                                    }
-                                    if (index < BookmarkSortOrder.entries.lastIndex) HorizontalDivider(color = EreaderColors.Gray)
-                                }
-                            }
-                        }
-                    }
-                }
+                EreaderDropdownMenu(
+                    items = BookmarkSortOrder.entries.toList(),
+                    selectedItem = sortOrder,
+                    onSelect = { sortOrder = it },
+                    label = { it.label },
+                )
             }
 
             Box(modifier = Modifier.weight(1f)) {
@@ -1931,8 +1852,6 @@ private fun MemoListPopup(
     val itemsPerPage = maxOf(1, (screenHeightDp - statusBarHeightDp - headerHeightDp - paginationHeightDp) / itemHeightDp)
     var currentPage by remember { mutableStateOf(0) }
     var sortOrder by remember { mutableStateOf(MemoSortStore.load(context)) }
-    var dropdownExpanded by remember { mutableStateOf(false) }
-    var anchorHeight by remember { mutableStateOf(0) }
     val sortedMemos = remember(memos, sortOrder) {
         when (sortOrder) {
             BookmarkSortOrder.CREATED_ASC -> memos.sortedBy { it.createdAt }
@@ -1951,37 +1870,12 @@ private fun MemoListPopup(
 
     FullScreenPopup {
             PopupHeaderBar(title = "메모", onBack = onDismiss) {
-                Box(modifier = Modifier.onGloballyPositioned { anchorHeight = it.size.height }) {
-                    TextButton(onClick = { dropdownExpanded = true }) {
-                        Text(sortOrder.label, style = MaterialTheme.typography.labelMedium, color = EreaderColors.Black)
-                    }
-                    if (dropdownExpanded) {
-                        Popup(
-                            alignment = Alignment.TopEnd,
-                            offset = IntOffset(0, anchorHeight),
-                            onDismissRequest = { dropdownExpanded = false },
-                            properties = PopupProperties(focusable = true)
-                        ) {
-                            Column(modifier = Modifier.width(IntrinsicSize.Max).background(EreaderColors.White).border(1.dp, EreaderColors.Black)) {
-                                BookmarkSortOrder.entries.forEachIndexed { index, order ->
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        modifier = Modifier.fillMaxWidth()
-                                            .clickable { sortOrder = order; dropdownExpanded = false }
-                                            .padding(start = EreaderSpacing.L, end = EreaderSpacing.M, top = EreaderSpacing.M, bottom = EreaderSpacing.M)
-                                    ) {
-                                        Text(order.label, style = MaterialTheme.typography.bodyMedium, color = EreaderColors.Black, modifier = Modifier.weight(1f))
-                                        if (sortOrder == order) {
-                                            Spacer(Modifier.width(EreaderSpacing.L))
-                                            Icon(Icons.Default.Check, contentDescription = null, tint = EreaderColors.Black, modifier = Modifier.size(16.dp))
-                                        }
-                                    }
-                                    if (index < BookmarkSortOrder.entries.lastIndex) HorizontalDivider(color = EreaderColors.Gray)
-                                }
-                            }
-                        }
-                    }
-                }
+                EreaderDropdownMenu(
+                    items = BookmarkSortOrder.entries.toList(),
+                    selectedItem = sortOrder,
+                    onSelect = { sortOrder = it },
+                    label = { it.label },
+                )
             }
 
             Box(modifier = Modifier.weight(1f)) {
@@ -4321,163 +4215,42 @@ private fun <T> ReaderCycleSelectorField(
     labelFor: (T) -> String,
     forceAbove: Boolean = false
 ) {
-    var dropdownOpen by remember { mutableStateOf(false) }
-    var currentPage by remember { mutableStateOf(0) }
     val currentIndex = options.indexOf(selected)
-    val density = LocalDensity.current
-    val screenHeightPx = with(density) { LocalConfiguration.current.screenHeightDp.dp.toPx() }
-    var buttonPositionY by remember { mutableStateOf(0f) }
-    var buttonHeightPx by remember { mutableStateOf(0f) }
-    var dropdownHeightPx by remember { mutableStateOf(0) }
 
-    Box(
-        modifier = Modifier
-            .width(160.dp)
-            .onGloballyPositioned { coords ->
-                buttonPositionY = coords.positionInRoot().y
-                buttonHeightPx = coords.size.height.toFloat()
-            }
+    Row(
+        modifier = Modifier.width(160.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(
-            modifier = Modifier.width(160.dp),
-            verticalAlignment = Alignment.CenterVertically
+        IconButton(
+            onClick = { onSelect(options[(currentIndex - 1 + options.size) % options.size]) },
+            modifier = Modifier.size(40.dp)
         ) {
-            IconButton(
-                onClick = { onSelect(options[(currentIndex - 1 + options.size) % options.size]) },
-                modifier = Modifier.size(40.dp)
-            ) {
-                Icon(
-                    Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = null,
-                    modifier = Modifier.size(16.dp)
-                )
-            }
-            Text(
-                labelFor(selected),
-                modifier = Modifier
-                    .weight(1f)
-                    .clickable { dropdownOpen = true; currentPage = 0 },
-                style = MaterialTheme.typography.bodyMedium,
-                textAlign = TextAlign.Center
+            Icon(
+                Icons.AutoMirrored.Filled.ArrowBack,
+                contentDescription = null,
+                modifier = Modifier.size(16.dp)
             )
-            IconButton(
-                onClick = { onSelect(options[(currentIndex + 1) % options.size]) },
-                modifier = Modifier.size(40.dp)
-            ) {
-                Icon(
-                    Icons.AutoMirrored.Filled.ArrowForward,
-                    contentDescription = null,
-                    modifier = Modifier.size(16.dp)
-                )
-            }
         }
-
-        if (dropdownOpen) {
-            val itemHeightPx = with(density) { 44.dp.toPx() }
-            val paginationHeightPx = with(density) { 44.dp.toPx() }
-            val maxDropdownHeightPx = screenHeightPx * 0.6f
-            val needsPagination = options.size * itemHeightPx > maxDropdownHeightPx
-            val itemsPerPage = if (needsPagination) {
-                ((maxDropdownHeightPx - paginationHeightPx) / itemHeightPx).toInt().coerceAtLeast(1)
-            } else {
-                options.size
-            }
-            val totalPages = if (needsPagination) {
-                (options.size + itemsPerPage - 1) / itemsPerPage
-            } else 1
-            val pageStart = currentPage * itemsPerPage
-            val pageEnd = minOf(pageStart + itemsPerPage, options.size)
-            val visibleOptions = options.subList(pageStart, pageEnd)
-
-            val estimatedDropdownHeightPx = if (needsPagination) maxDropdownHeightPx.toInt() else (options.size * itemHeightPx).toInt()
-            val spaceBelow = screenHeightPx - buttonPositionY - buttonHeightPx
-            val showAbove = forceAbove || spaceBelow < estimatedDropdownHeightPx
-            val offsetY = if (showAbove) {
-                -(if (dropdownHeightPx > 0) dropdownHeightPx else estimatedDropdownHeightPx)
-            } else {
-                buttonHeightPx.toInt()
-            }
-
-            Popup(
-                alignment = Alignment.TopStart,
-                offset = IntOffset(0, offsetY),
-                onDismissRequest = { dropdownOpen = false },
-                properties = PopupProperties(focusable = true)
-            ) {
-                Column(
-                    modifier = Modifier
-                        .width(160.dp)
-                        .background(EreaderColors.White)
-                        .border(1.dp, EreaderColors.Black)
-                        .onGloballyPositioned { dropdownHeightPx = it.size.height }
-                ) {
-                    visibleOptions.forEachIndexed { index, option ->
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { onSelect(option); dropdownOpen = false }
-                                .padding(horizontal = EreaderSpacing.M, vertical = EreaderSpacing.M)
-                        ) {
-                            Text(
-                                labelFor(option),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = EreaderColors.Black,
-                                modifier = Modifier.weight(1f)
-                            )
-                            if (option == selected) {
-                                Icon(
-                                    Icons.Default.Check,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                            }
-                        }
-                        if (index < visibleOptions.lastIndex || needsPagination) {
-                            HorizontalDivider(color = EreaderColors.Gray)
-                        }
-                    }
-                    if (needsPagination) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(44.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            IconButton(
-                                onClick = { if (currentPage > 0) currentPage-- },
-                                modifier = Modifier.size(44.dp),
-                                enabled = currentPage > 0
-                            ) {
-                                Icon(
-                                    Icons.AutoMirrored.Filled.ArrowBack,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(16.dp),
-                                    tint = if (currentPage > 0) EreaderColors.Black else EreaderColors.DarkGray
-                                )
-                            }
-                            Text(
-                                "${currentPage + 1} / $totalPages",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = EreaderColors.Black
-                            )
-                            IconButton(
-                                onClick = { if (currentPage < totalPages - 1) currentPage++ },
-                                modifier = Modifier.size(44.dp),
-                                enabled = currentPage < totalPages - 1
-                            ) {
-                                Icon(
-                                    Icons.AutoMirrored.Filled.ArrowForward,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(16.dp),
-                                    tint = if (currentPage < totalPages - 1) EreaderColors.Black else EreaderColors.DarkGray
-                                )
-                            }
-                        }
-                    }
-                }
-            }
+        Box(modifier = Modifier.weight(1f)) {
+            EreaderDropdownMenu(
+                items = options,
+                selectedItem = selected,
+                onSelect = onSelect,
+                label = labelFor,
+                popupWidth = 160.dp,
+                popupAlignment = Alignment.TopStart,
+                forceAbove = forceAbove,
+            )
+        }
+        IconButton(
+            onClick = { onSelect(options[(currentIndex + 1) % options.size]) },
+            modifier = Modifier.size(40.dp)
+        ) {
+            Icon(
+                Icons.AutoMirrored.Filled.ArrowForward,
+                contentDescription = null,
+                modifier = Modifier.size(16.dp)
+            )
         }
     }
 }
@@ -4497,8 +4270,6 @@ private fun FontLayerPopup(
     var selectedTab by remember { mutableStateOf(0) }
     var fontSortOrder by remember { mutableStateOf(FontSortOrder.NAME_ASC) }
     var systemFontSortOrder by remember { mutableStateOf(SystemFontSortOrder.NAME_ASC) }
-    var sortDropdownExpanded by remember { mutableStateOf(false) }
-    var sortAnchorHeight by remember { mutableStateOf(0) }
     var currentPage by remember { mutableStateOf(0) }
     var confirmImportFont by remember { mutableStateOf<Pair<String, String>?>(null) }
     var confirmDeleteFont by remember { mutableStateOf<String?>(null) }
@@ -4594,58 +4365,20 @@ private fun FontLayerPopup(
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "닫기")
                 }
                 Text("글꼴", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-                Box(modifier = Modifier.onGloballyPositioned { sortAnchorHeight = it.size.height }) {
-                    TextButton(onClick = { sortDropdownExpanded = true }) {
-                        Text(
-                            if (selectedTab == 0) fontSortOrder.label else systemFontSortOrder.label,
-                            style = MaterialTheme.typography.labelMedium,
-                            color = EreaderColors.Black
-                        )
-                    }
-                    if (sortDropdownExpanded) {
-                        Popup(
-                            alignment = Alignment.TopEnd,
-                            offset = IntOffset(0, sortAnchorHeight),
-                            onDismissRequest = { sortDropdownExpanded = false },
-                            properties = PopupProperties(focusable = true)
-                        ) {
-                            Column(modifier = Modifier.width(IntrinsicSize.Max).background(EreaderColors.White).border(1.dp, EreaderColors.Black)) {
-                                if (selectedTab == 0) {
-                                    FontSortOrder.entries.forEachIndexed { i, order ->
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            modifier = Modifier.fillMaxWidth()
-                                                .clickable { fontSortOrder = order; sortDropdownExpanded = false }
-                                                .padding(start = EreaderSpacing.L, end = EreaderSpacing.M, top = EreaderSpacing.M, bottom = EreaderSpacing.M)
-                                        ) {
-                                            Text(order.label, style = MaterialTheme.typography.bodyMedium, color = EreaderColors.Black, modifier = Modifier.weight(1f))
-                                            if (fontSortOrder == order) {
-                                                Spacer(Modifier.width(EreaderSpacing.L))
-                                                Icon(Icons.Default.Check, contentDescription = null, tint = EreaderColors.Black, modifier = Modifier.size(16.dp))
-                                            }
-                                        }
-                                        if (i < FontSortOrder.entries.lastIndex) HorizontalDivider(color = EreaderColors.Gray)
-                                    }
-                                } else {
-                                    SystemFontSortOrder.entries.forEachIndexed { i, order ->
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            modifier = Modifier.fillMaxWidth()
-                                                .clickable { systemFontSortOrder = order; sortDropdownExpanded = false }
-                                                .padding(start = EreaderSpacing.L, end = EreaderSpacing.M, top = EreaderSpacing.M, bottom = EreaderSpacing.M)
-                                        ) {
-                                            Text(order.label, style = MaterialTheme.typography.bodyMedium, color = EreaderColors.Black, modifier = Modifier.weight(1f))
-                                            if (systemFontSortOrder == order) {
-                                                Spacer(Modifier.width(EreaderSpacing.L))
-                                                Icon(Icons.Default.Check, contentDescription = null, tint = EreaderColors.Black, modifier = Modifier.size(16.dp))
-                                            }
-                                        }
-                                        if (i < SystemFontSortOrder.entries.lastIndex) HorizontalDivider(color = EreaderColors.Gray)
-                                    }
-                                }
-                            }
-                        }
-                    }
+                if (selectedTab == 0) {
+                    EreaderDropdownMenu(
+                        items = FontSortOrder.entries.toList(),
+                        selectedItem = fontSortOrder,
+                        onSelect = { fontSortOrder = it },
+                        label = { it.label },
+                    )
+                } else {
+                    EreaderDropdownMenu(
+                        items = SystemFontSortOrder.entries.toList(),
+                        selectedItem = systemFontSortOrder,
+                        onSelect = { systemFontSortOrder = it },
+                        label = { it.label },
+                    )
                 }
             }
             // Tabs
