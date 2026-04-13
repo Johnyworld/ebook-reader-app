@@ -76,27 +76,27 @@ interface BookReadRecordDao {
 
 }
 
-private val MIGRATION_1_2 = object : Migration(1, 2) {
+internal val MIGRATION_1_2 = object : Migration(1, 2) {
     override fun migrate(database: SupportSQLiteDatabase) {
         database.execSQL("ALTER TABLE book_read_records ADD COLUMN readingProgress REAL NOT NULL DEFAULT 0.0")
         database.execSQL("ALTER TABLE book_read_records ADD COLUMN lastCfi TEXT NOT NULL DEFAULT ''")
     }
 }
 
-private val MIGRATION_2_3 = object : Migration(2, 3) {
+internal val MIGRATION_2_3 = object : Migration(2, 3) {
     override fun migrate(database: SupportSQLiteDatabase) {
         database.execSQL("ALTER TABLE book_read_records ADD COLUMN tocJson TEXT NOT NULL DEFAULT ''")
     }
 }
 
-private val MIGRATION_3_4 = object : Migration(3, 4) {
+internal val MIGRATION_3_4 = object : Migration(3, 4) {
     override fun migrate(database: SupportSQLiteDatabase) {
         database.execSQL("ALTER TABLE book_read_records ADD COLUMN totalPages INTEGER NOT NULL DEFAULT 0")
         database.execSQL("ALTER TABLE book_read_records ADD COLUMN currentPage INTEGER NOT NULL DEFAULT 0")
     }
 }
 
-private val MIGRATION_4_5 = object : Migration(4, 5) {
+internal val MIGRATION_4_5 = object : Migration(4, 5) {
     override fun migrate(database: SupportSQLiteDatabase) {
         // currentPage 컬럼은 SQLite에서 DROP COLUMN이 불가하므로 테이블 재생성
         database.execSQL("CREATE TABLE book_read_records_new (bookPath TEXT NOT NULL PRIMARY KEY, lastReadAt INTEGER NOT NULL, readingProgress REAL NOT NULL DEFAULT 0.0, lastCfi TEXT NOT NULL DEFAULT '', tocJson TEXT NOT NULL DEFAULT '', totalPages INTEGER NOT NULL DEFAULT 0)")
@@ -132,7 +132,7 @@ interface BookmarkDao {
     suspend fun updatePage(id: Long, page: Int)
 }
 
-private val MIGRATION_5_6 = object : Migration(5, 6) {
+internal val MIGRATION_5_6 = object : Migration(5, 6) {
     override fun migrate(database: SupportSQLiteDatabase) {
         database.execSQL("CREATE TABLE book_read_records_new (bookPath TEXT NOT NULL PRIMARY KEY, lastReadAt INTEGER NOT NULL, lastCfi TEXT NOT NULL DEFAULT '', tocJson TEXT NOT NULL DEFAULT '', totalPages INTEGER NOT NULL DEFAULT 0)")
         database.execSQL("INSERT INTO book_read_records_new SELECT bookPath, lastReadAt, lastCfi, tocJson, totalPages FROM book_read_records")
@@ -141,14 +141,14 @@ private val MIGRATION_5_6 = object : Migration(5, 6) {
     }
 }
 
-private val MIGRATION_6_7 = object : Migration(6, 7) {
+internal val MIGRATION_6_7 = object : Migration(6, 7) {
     override fun migrate(database: SupportSQLiteDatabase) {
         database.execSQL("CREATE TABLE bookmarks (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, bookPath TEXT NOT NULL, cfi TEXT NOT NULL, chapterTitle TEXT NOT NULL DEFAULT '', page INTEGER NOT NULL DEFAULT 0, createdAt INTEGER NOT NULL DEFAULT 0)")
         database.execSQL("CREATE INDEX index_bookmarks_bookPath ON bookmarks (bookPath)")
     }
 }
 
-private val MIGRATION_7_8 = object : Migration(7, 8) {
+internal val MIGRATION_7_8 = object : Migration(7, 8) {
     override fun migrate(database: SupportSQLiteDatabase) {
         database.execSQL("ALTER TABLE bookmarks ADD COLUMN excerpt TEXT NOT NULL DEFAULT ''")
     }
@@ -180,14 +180,14 @@ interface HighlightDao {
     suspend fun updatePage(id: Long, page: Int)
 }
 
-private val MIGRATION_8_9 = object : Migration(8, 9) {
+internal val MIGRATION_8_9 = object : Migration(8, 9) {
     override fun migrate(database: SupportSQLiteDatabase) {
         database.execSQL("CREATE TABLE IF NOT EXISTS highlights (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, bookPath TEXT NOT NULL, cfi TEXT NOT NULL, text TEXT NOT NULL DEFAULT '', chapterTitle TEXT NOT NULL DEFAULT '', page INTEGER NOT NULL DEFAULT 0, createdAt INTEGER NOT NULL DEFAULT 0)")
         database.execSQL("CREATE INDEX IF NOT EXISTS index_highlights_bookPath ON highlights (bookPath)")
     }
 }
 
-private val MIGRATION_9_10 = object : Migration(9, 10) {
+internal val MIGRATION_9_10 = object : Migration(9, 10) {
     override fun migrate(database: SupportSQLiteDatabase) {
         // highlights 테이블 스키마가 잘못된 경우(selectedText 컬럼 등) 재생성
         database.execSQL("DROP TABLE IF EXISTS highlights")
@@ -229,14 +229,14 @@ interface MemoDao {
     suspend fun updatePage(id: Long, page: Int)
 }
 
-private val MIGRATION_10_11 = object : Migration(10, 11) {
+internal val MIGRATION_10_11 = object : Migration(10, 11) {
     override fun migrate(database: SupportSQLiteDatabase) {
         database.execSQL("CREATE TABLE memos (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, bookPath TEXT NOT NULL, cfi TEXT NOT NULL, text TEXT NOT NULL DEFAULT '', note TEXT NOT NULL DEFAULT '', chapterTitle TEXT NOT NULL DEFAULT '', page INTEGER NOT NULL DEFAULT 0, createdAt INTEGER NOT NULL DEFAULT 0)")
         database.execSQL("CREATE INDEX index_memos_bookPath ON memos (bookPath)")
     }
 }
 
-private val MIGRATION_11_12 = object : Migration(11, 12) {
+internal val MIGRATION_11_12 = object : Migration(11, 12) {
     override fun migrate(database: SupportSQLiteDatabase) {
         // book_read_records: totalPages 컬럼 제거
         database.execSQL("CREATE TABLE book_read_records_new (bookPath TEXT NOT NULL PRIMARY KEY, lastReadAt INTEGER NOT NULL, lastCfi TEXT NOT NULL DEFAULT '', tocJson TEXT NOT NULL DEFAULT '')")
@@ -264,7 +264,7 @@ private val MIGRATION_11_12 = object : Migration(11, 12) {
     }
 }
 
-private val MIGRATION_12_13 = object : Migration(12, 13) {
+internal val MIGRATION_12_13 = object : Migration(12, 13) {
     override fun migrate(database: SupportSQLiteDatabase) {
         database.execSQL("ALTER TABLE book_read_records ADD COLUMN cachedTotalPages INTEGER NOT NULL DEFAULT 0")
         database.execSQL("ALTER TABLE book_read_records ADD COLUMN cachedSpinePageOffsetsJson TEXT NOT NULL DEFAULT ''")
@@ -272,7 +272,7 @@ private val MIGRATION_12_13 = object : Migration(12, 13) {
     }
 }
 
-private val MIGRATION_13_14 = object : Migration(13, 14) {
+internal val MIGRATION_13_14 = object : Migration(13, 14) {
     override fun migrate(database: SupportSQLiteDatabase) {
         database.execSQL("ALTER TABLE bookmarks ADD COLUMN page INTEGER NOT NULL DEFAULT 0")
         database.execSQL("ALTER TABLE highlights ADD COLUMN page INTEGER NOT NULL DEFAULT 0")
@@ -280,11 +280,18 @@ private val MIGRATION_13_14 = object : Migration(13, 14) {
     }
 }
 
-private val MIGRATION_14_15 = object : Migration(14, 15) {
+internal val MIGRATION_14_15 = object : Migration(14, 15) {
     override fun migrate(database: SupportSQLiteDatabase) {
         database.execSQL("ALTER TABLE book_read_records ADD COLUMN cachedSpineCharPageBreaksJson TEXT NOT NULL DEFAULT ''")
     }
 }
+
+internal val ALL_MIGRATIONS = arrayOf(
+    MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5,
+    MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9,
+    MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13,
+    MIGRATION_13_14, MIGRATION_14_15
+)
 
 @Database(entities = [BookReadRecord::class, Bookmark::class, Highlight::class, Memo::class], version = 15)
 abstract class BookDatabase : RoomDatabase() {
@@ -302,7 +309,7 @@ abstract class BookDatabase : RoomDatabase() {
                     context.applicationContext,
                     BookDatabase::class.java,
                     "book_database"
-                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15).build().also { INSTANCE = it }
+                ).addMigrations(*ALL_MIGRATIONS).build().also { INSTANCE = it }
             }
     }
 }
