@@ -75,6 +75,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.graphics.Color
+import com.rotein.ebookreader.ui.components.FullScreenPopup
 import com.rotein.ebookreader.ui.components.PopupHeaderBar
 import com.rotein.ebookreader.ui.theme.EreaderColors
 import com.rotein.ebookreader.ui.theme.EreaderSpacing
@@ -1251,8 +1252,7 @@ private fun TocPopup(
     var currentPage by remember { mutableStateOf(0) }
     val pageItems = flatItems.drop(currentPage * itemsPerPage).take(itemsPerPage)
 
-    Surface(modifier = Modifier.fillMaxSize(), color = EreaderColors.White) {
-        Column(modifier = Modifier.fillMaxSize()) {
+    FullScreenPopup {
             PopupHeaderBar(title = "목차: $bookTitle", onBack = onDismiss)
             Column(modifier = Modifier.weight(1f)) {
                 if (flatItems.isEmpty()) {
@@ -1350,7 +1350,6 @@ private fun TocPopup(
                     )
                 }
             }
-        }
     }
 }
 
@@ -1393,8 +1392,7 @@ private fun SearchPopup(
     LaunchedEffect(Unit) { focusRequester.requestFocus() }
     LaunchedEffect(searchedQuery) { currentPage = 0 }
 
-    Surface(modifier = Modifier.fillMaxSize(), color = EreaderColors.White) {
-        Column(modifier = Modifier.fillMaxSize()) {
+    FullScreenPopup {
             PopupHeaderBar(title = "본문 검색", onBack = onDismiss)
 
             Box(modifier = Modifier.weight(1f)) {
@@ -1592,7 +1590,6 @@ private fun SearchPopup(
                     }
                 }
             }
-        }
     }
 }
 
@@ -1633,8 +1630,7 @@ private fun BookmarkPopup(
         if (currentPage >= totalPages) currentPage = maxOf(0, totalPages - 1)
     }
 
-    Surface(modifier = Modifier.fillMaxSize(), color = EreaderColors.White) {
-        Column(modifier = Modifier.fillMaxSize()) {
+    FullScreenPopup {
             PopupHeaderBar(title = "북마크", onBack = onDismiss) {
                 Box(modifier = Modifier.onGloballyPositioned { anchorHeight = it.size.height }) {
                     TextButton(onClick = { dropdownExpanded = true }) {
@@ -1817,7 +1813,6 @@ private fun BookmarkPopup(
                 }
                 HorizontalDivider(color = EreaderColors.Black)
             }
-        }
     }
 }
 
@@ -1858,8 +1853,7 @@ private fun HighlightPopup(
         if (currentPage >= totalPages) currentPage = maxOf(0, totalPages - 1)
     }
 
-    Surface(modifier = Modifier.fillMaxSize(), color = EreaderColors.White) {
-        Column(modifier = Modifier.fillMaxSize()) {
+    FullScreenPopup {
             PopupHeaderBar(title = "하이라이트", onBack = onDismiss) {
                 Box(modifier = Modifier.onGloballyPositioned { anchorHeight = it.size.height }) {
                     TextButton(onClick = { dropdownExpanded = true }) {
@@ -1973,7 +1967,6 @@ private fun HighlightPopup(
                 }
                 HorizontalDivider(color = EreaderColors.Black)
             }
-        }
     }
 }
 
@@ -1988,8 +1981,7 @@ private fun MemoEditorScreen(
 ) {
     var note by remember { mutableStateOf(initialNote) }
 
-    Surface(modifier = Modifier.fillMaxSize(), color = EreaderColors.White) {
-        Column(modifier = Modifier.fillMaxSize()) {
+    FullScreenPopup {
             PopupHeaderBar(title = "메모", onBack = onCancel) {
                 TextButton(onClick = { onSave(note) }) {
                     Text("저장", color = EreaderColors.Black)
@@ -2054,7 +2046,6 @@ private fun MemoEditorScreen(
                     }
                 }
             }
-        }
     }
 }
 
@@ -2096,8 +2087,7 @@ private fun MemoListPopup(
         if (currentPage >= totalPages) currentPage = maxOf(0, totalPages - 1)
     }
 
-    Surface(modifier = Modifier.fillMaxSize(), color = EreaderColors.White) {
-        Column(modifier = Modifier.fillMaxSize()) {
+    FullScreenPopup {
             PopupHeaderBar(title = "메모", onBack = onDismiss) {
                 Box(modifier = Modifier.onGloballyPositioned { anchorHeight = it.size.height }) {
                     TextButton(onClick = { dropdownExpanded = true }) {
@@ -2221,7 +2211,6 @@ private fun MemoListPopup(
                 }
                 HorizontalDivider(color = EreaderColors.Black)
             }
-        }
     }
 }
 
@@ -4747,8 +4736,7 @@ private fun FontLayerPopup(
         )
     }
 
-    Surface(modifier = Modifier.fillMaxSize(), color = EreaderColors.White) {
-        Column(modifier = Modifier.fillMaxSize()) {
+    FullScreenPopup {
             // Header
             Row(
                 modifier = Modifier.fillMaxWidth().height(56.dp).padding(horizontal = EreaderSpacing.XS),
@@ -4912,7 +4900,6 @@ private fun FontLayerPopup(
                 }
                 HorizontalDivider(color = EreaderColors.Black)
             }
-        }
     }
 }
 
