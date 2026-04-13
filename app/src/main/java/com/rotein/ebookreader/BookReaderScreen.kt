@@ -264,6 +264,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
     var isSearching by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
     val epubWebView = remember { mutableStateOf<WebView?>(null) }
+    val onNavigationCompleteRef = remember { mutableStateOf<(() -> Unit)?>(null) }
     var currentPage by remember(book.path) { mutableStateOf(0) }
     var totalPages by remember(book.path) { mutableStateOf(0) }
     var currentCfi by remember(book.path) { mutableStateOf("") }
@@ -429,7 +430,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                     } catch (_: Exception) {}
                 },
                 onContentRendered = {
-                    isLoading = false
+                    if (savedCfi.isNullOrEmpty()) isLoading = false
                     isContentRendered = true
                     if (scanCacheValid && spinePageOffsets.isNotEmpty()) {
                         val jsonObj = org.json.JSONObject()
@@ -566,6 +567,11 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                     } catch (_: Exception) {}
                 },
                 onSearchComplete = { isSearching = false },
+                onNavigationComplete = {
+                    isLoading = false
+                    onNavigationCompleteRef.value?.invoke()
+                    onNavigationCompleteRef.value = null
+                },
                 readerSettings = readerSettings
             )
             "pdf"  -> PdfViewer(book.path, onCenterTap)
@@ -609,7 +615,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
         // 로딩 오버레이
         if (isLoading) {
             Box(
-                modifier = Modifier.fillMaxSize().clickable(enabled = false) {},
+                modifier = Modifier.fillMaxSize().background(Color.White).clickable(enabled = false) {},
                 contentAlignment = Alignment.Center
             ) {
                 CircularProgressIndicator(color = Color.Black)
@@ -844,14 +850,14 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                 currentChapterTitle = chapterTitle,
                 totalBookPages = totalPages,
                 onNavigate = { href ->
+                    if (onNavigationCompleteRef.value != null) return@TocPopup
+                    onNavigationCompleteRef.value = { showTocPopup = false; showMenu = false }
                     epubWebView.value?.post {
                         epubWebView.value?.evaluateJavascript(
                             "window._displayHref(\"${href.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n")}\")",
                             null
                         )
                     }
-                    showTocPopup = false
-                    showMenu = false
                 },
                 onDismiss = { showTocPopup = false }
             )
@@ -875,12 +881,12 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                     }
                 },
                 onNavigate = { cfi, page ->
+                    if (onNavigationCompleteRef.value != null) return@SearchPopup
+                    onNavigationCompleteRef.value = { showSearchPopup = false; showMenu = false }
                     epubWebView.value?.post {
                         val escaped = cfi.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n")
                         epubWebView.value?.evaluateJavascript("window._displayCfi(\"$escaped\")", null)
                     }
-                    showSearchPopup = false
-                    showMenu = false
                 },
                 onClear = {
                     searchQuery = ""
@@ -901,12 +907,12 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                 spinePageOffsets = spinePageOffsets,
                 cfiPageMap = cfiPageMap,
                 onNavigate = { cfi ->
+                    if (onNavigationCompleteRef.value != null) return@HighlightPopup
+                    onNavigationCompleteRef.value = { showHighlightPopup = false; showMenu = false }
                     epubWebView.value?.post {
                         val escaped = cfi.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n")
                         epubWebView.value?.evaluateJavascript("window._displayCfi(\"$escaped\")", null)
                     }
-                    showHighlightPopup = false
-                    showMenu = false
                 },
                 onDelete = { highlight ->
                     scope.launch {
@@ -1069,12 +1075,12 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                 spinePageOffsets = spinePageOffsets,
                 cfiPageMap = cfiPageMap,
                 onNavigate = { memo ->
+                    if (onNavigationCompleteRef.value != null) return@MemoListPopup
+                    onNavigationCompleteRef.value = { showMemoListPopup = false; showMenu = false }
                     epubWebView.value?.post {
                         val escaped = memo.cfi.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n")
                         epubWebView.value?.evaluateJavascript("window._displayCfi(\"$escaped\")", null)
                     }
-                    showMemoListPopup = false
-                    showMenu = false
                 },
                 onEdit = { memo ->
                     editingMemo = memo
@@ -1142,10 +1148,9 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                     }
                 }) else null,
                 onNavigate = if (editingMemo != null) ({
+                    if (onNavigationCompleteRef.value != null) return@MemoEditorScreen
                     val cfi = editingMemo!!.cfi
-                    showMemoEditor = false
-                    showMenu = false
-                    editingMemo = null
+                    onNavigationCompleteRef.value = { showMemoEditor = false; showMenu = false; editingMemo = null }
                     epubWebView.value?.post {
                         val escaped = cfi.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n")
                         epubWebView.value?.evaluateJavascript("window._displayCfi(\"$escaped\")", null)
@@ -1202,12 +1207,12 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                 spinePageOffsets = spinePageOffsets,
                 cfiPageMap = cfiPageMap,
                 onNavigate = { cfi ->
+                    if (onNavigationCompleteRef.value != null) return@BookmarkPopup
+                    onNavigationCompleteRef.value = { showBookmarkPopup = false; showMenu = false }
                     epubWebView.value?.post {
                         val escaped = cfi.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n")
                         epubWebView.value?.evaluateJavascript("window._displayCfi(\"$escaped\")", null)
                     }
-                    showBookmarkPopup = false
-                    showMenu = false
                 },
                 onDelete = { bookmark ->
                     scope.launch {
@@ -2367,6 +2372,7 @@ private fun EpubViewer(
     onMemo: (text: String, cfi: String) -> Unit = { _, _ -> },
     onHighlightLongPress: (id: Long, x: Float, y: Float, bottom: Float) -> Unit = { _, _, _, _ -> },
     onMemoLongPress: (id: Long, x: Float, y: Float, bottom: Float) -> Unit = { _, _, _, _ -> },
+    onNavigationComplete: () -> Unit = {},
     readerSettings: ReaderSettings = ReaderSettings()
 ) {
     val context = LocalContext.current
@@ -2475,26 +2481,31 @@ private fun EpubViewer(
                         isHorizontalScrollBarEnabled = false
                         isVerticalScrollBarEnabled = false
                         webViewClient = WebViewClient()
-                        addJavascriptInterface(EpubBridge(onLocationUpdate, onTocLoaded, onContentRendered, onChapterChanged, onTocReady, onPageInfoChanged, onDebugInfo, onScanStart, onScanComplete, onSearchResultsPartial, onSearchComplete, selectionOnTextSelected, selectionOnSelectionTapped) { cssX, cssY ->
-                            val wv = webViewRef.get() ?: return@EpubBridge
-                            val ov = overlayRef.get()
-                            ov?.visibility = View.GONE
-                            val density = wv.context.resources.displayMetrics.density
-                            val px = cssX * density
-                            val py = cssY * density
-                            wv.postDelayed({
-                                val downTime = SystemClock.uptimeMillis()
-                                val down = MotionEvent.obtain(downTime, downTime, MotionEvent.ACTION_DOWN, px, py, 0)
-                                wv.dispatchTouchEvent(down)
-                                down.recycle()
+                        addJavascriptInterface(EpubBridge(onLocationUpdate, onTocLoaded, onContentRendered, onChapterChanged, onTocReady, onPageInfoChanged, onDebugInfo, onScanStart, onScanComplete, onSearchResultsPartial, onSearchComplete, selectionOnTextSelected, selectionOnSelectionTapped,
+                            onAutoSelectReadyCallback = autoSelect@{ cssX, cssY ->
+                                val wv = webViewRef.get() ?: return@autoSelect
+                                val ov = overlayRef.get()
+                                ov?.visibility = View.GONE
+                                val density = wv.context.resources.displayMetrics.density
+                                val px = cssX * density
+                                val py = cssY * density
                                 wv.postDelayed({
-                                    val up = MotionEvent.obtain(downTime, SystemClock.uptimeMillis(), MotionEvent.ACTION_UP, px, py, 0)
-                                    wv.dispatchTouchEvent(up)
-                                    up.recycle()
-                                    ov?.visibility = View.VISIBLE
-                                }, 600)
-                            }, 100)
-                        }, "Android")
+                                    val downTime = SystemClock.uptimeMillis()
+                                    val down = MotionEvent.obtain(downTime, downTime, MotionEvent.ACTION_DOWN, px, py, 0)
+                                    wv.dispatchTouchEvent(down)
+                                    down.recycle()
+                                    wv.postDelayed({
+                                        val up = MotionEvent.obtain(downTime, SystemClock.uptimeMillis(), MotionEvent.ACTION_UP, px, py, 0)
+                                        wv.dispatchTouchEvent(up)
+                                        up.recycle()
+                                        ov?.visibility = View.VISIBLE
+                                    }, 600)
+                                }, 100)
+                            },
+                            onNavigationCompleteCallback = {
+                                onNavigationComplete()
+                            }
+                        ), "Android")
                     }
                     webViewRef.set(webView)
                     onWebViewCreated(webView)
@@ -3096,8 +3107,13 @@ rendition.on("relocated", function(location) {
                 var iDoc = iframe && (iframe.contentDocument || (iframe.contentWindow && iframe.contentWindow.document));
                 if (iDoc && iDoc.fonts && iDoc.fonts.status === 'loading' && _savedCfi) {
                     _waitingForFonts = true;
+                    _navigating = true;
                     iDoc.fonts.ready.then(function() {
-                        rendition.display(_savedCfi);
+                        rendition.display(_savedCfi).then(function() {
+                            setTimeout(function() {
+                                rendition.display(_savedCfi).then(_finishNavigation).catch(_finishNavigation);
+                            }, 0);
+                        }).catch(_finishNavigation);
                     });
                     return;
                 }
@@ -3119,7 +3135,9 @@ rendition.on("relocated", function(location) {
             window._currentCfi = cfi;
             var endCfi = (location.end && location.end.cfi) ? location.end.cfi : "";
             window._currentEndCfi = endCfi;
-            Android.onLocationChanged(0, cfi, "");
+            if (!_navigating) {
+                Android.onLocationChanged(0, cfi, "");
+            }
         }
     } catch(e) {}
     if (_locationsReady || _totalVisualPages > 0) {
@@ -3678,7 +3696,30 @@ window._autoSelectFirstWord = function() {
 };
 
 var _savedCfi = "${savedCfi.replace("\"", "\\\"")}";
-rendition.display(_savedCfi.length > 0 ? _savedCfi : undefined);
+var _navigating = false;
+function _finishNavigation() {
+    _navigating = false;
+    try {
+        var loc = rendition.currentLocation();
+        if (loc && loc.start && loc.start.cfi) {
+            window._currentCfi = loc.start.cfi;
+            var endCfi = (loc.end && loc.end.cfi) ? loc.end.cfi : "";
+            window._currentEndCfi = endCfi;
+            Android.onLocationChanged(0, loc.start.cfi, "");
+        }
+    } catch(e) {}
+    Android.onNavigationComplete();
+}
+if (_savedCfi.length > 0) {
+    _navigating = true;
+    rendition.display(_savedCfi).then(function() {
+        setTimeout(function() {
+            rendition.display(_savedCfi).then(_finishNavigation).catch(_finishNavigation);
+        }, 0);
+    }).catch(_finishNavigation);
+} else {
+    rendition.display();
+}
 window._prev = function() { rendition.prev(); };
 window._next = function() {
     // epub.js는 scrollLeft + offsetWidth + delta <= scrollWidth 로 같은 챕터 내 다음 페이지 존재 여부를 판단한다.
@@ -3707,23 +3748,21 @@ window._nextThenAutoSelect = function() {
     window._next();
 };
 
-window._displayHref = function(href) { rendition.display(href); };
+window._displayHref = function(href) {
+    _navigating = true;
+    rendition.display(href).then(function() {
+        setTimeout(function() {
+            rendition.display(href).then(_finishNavigation).catch(_finishNavigation);
+        }, 0);
+    }).catch(_finishNavigation);
+};
 window._displayCfi = function(cfi) {
-    var prevIndex = -1;
-    try {
-        var loc = rendition.currentLocation();
-        if (loc && loc.start) prevIndex = loc.start.index;
-    } catch(e) {}
+    _navigating = true;
     rendition.display(cfi).then(function() {
-        var newIndex = -1;
-        try {
-            var loc2 = rendition.currentLocation();
-            if (loc2 && loc2.start) newIndex = loc2.start.index;
-        } catch(e) {}
-        if (prevIndex !== newIndex) {
-            setTimeout(function() { rendition.display(cfi); }, 0);
-        }
-    });
+        setTimeout(function() {
+            rendition.display(cfi).then(_finishNavigation).catch(_finishNavigation);
+        }, 0);
+    }).catch(_finishNavigation);
 };
 window._displayPageNum = function(pageNum) {
     try {
@@ -3949,7 +3988,8 @@ private class EpubBridge(
     private val onSearchCompleteCallback: () -> Unit = {},
     private val onTextSelectedCallback: (text: String, x: Float, y: Float, bottom: Float) -> Unit = { _, _, _, _ -> },
     private val onSelectionTappedCallback: (text: String, x: Float, y: Float, bottom: Float, cfi: String, isAtPageEnd: Boolean) -> Unit = { _, _, _, _, _, _ -> },
-    private val onAutoSelectReadyCallback: (cssX: Float, cssY: Float) -> Unit = { _, _ -> }
+    private val onAutoSelectReadyCallback: (cssX: Float, cssY: Float) -> Unit = { _, _ -> },
+    private val onNavigationCompleteCallback: () -> Unit = {}
 ) {
     private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
 
@@ -4024,6 +4064,11 @@ private class EpubBridge(
     @android.webkit.JavascriptInterface
     fun onAutoSelectReady(cssX: Float, cssY: Float) {
         mainHandler.post { onAutoSelectReadyCallback(cssX, cssY) }
+    }
+
+    @android.webkit.JavascriptInterface
+    fun onNavigationComplete() {
+        mainHandler.post { onNavigationCompleteCallback() }
     }
 
 }
