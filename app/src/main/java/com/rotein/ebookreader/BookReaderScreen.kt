@@ -146,97 +146,6 @@ import java.util.Date
 import java.util.Locale
 import java.util.zip.ZipFile
 
-data class TocItem(
-    val label: String,
-    val href: String,
-    val depth: Int,
-    val page: Int = 0,
-    val subitems: List<TocItem> = emptyList()
-)
-
-data class SearchResultItem(
-    val cfi: String,
-    val excerpt: String,
-    val chapter: String = "",
-    val page: Int = 0,
-    val spineIndex: Int = -1,
-    val charPos: Int = -1
-)
-
-private fun parseSearchResults(json: JSONArray): List<SearchResultItem> {
-    val items = mutableListOf<SearchResultItem>()
-    for (i in 0 until json.length()) {
-        val obj = json.getJSONObject(i)
-        items.add(SearchResultItem(
-            cfi = obj.optString("cfi", ""),
-            excerpt = obj.optString("excerpt", ""),
-            chapter = obj.optString("chapter", ""),
-            page = obj.optInt("page", 0),
-            spineIndex = obj.optInt("spineIndex", -1),
-            charPos = obj.optInt("charPos", -1)
-        ))
-    }
-    return items
-}
-
-private fun recalcSearchPages(
-    results: List<SearchResultItem>,
-    spinePageOffsets: Map<Int, Int>,
-    charPageBreaksJson: String
-): List<SearchResultItem> {
-    if (results.isEmpty() || charPageBreaksJson.isEmpty()) return results
-    val breaksMap = try {
-        val obj = org.json.JSONObject(charPageBreaksJson)
-        val map = mutableMapOf<Int, List<Int>>()
-        obj.keys().forEach { key ->
-            val arr = obj.getJSONArray(key)
-            val list = mutableListOf<Int>()
-            for (i in 0 until arr.length()) list.add(arr.getInt(i))
-            map[key.toInt()] = list
-        }
-        map
-    } catch (_: Exception) { return results }
-
-    return results.map { r ->
-        if (r.spineIndex < 0 || r.charPos < 0) return@map r
-        val breaks = breaksMap[r.spineIndex]
-        val baseOffset = spinePageOffsets[r.spineIndex] ?: 0
-        val pageWithin = if (breaks != null && breaks.size > 1) {
-            var pw = 0
-            for (bi in breaks.indices.reversed()) {
-                if (r.charPos >= breaks[bi]) { pw = bi; break }
-            }
-            pw
-        } else 0
-        r.copy(page = baseOffset + pageWithin + 1)
-    }
-}
-
-private fun parseTocJson(json: JSONArray, depth: Int = 0): List<TocItem> {
-    val items = mutableListOf<TocItem>()
-    for (i in 0 until json.length()) {
-        val obj = json.getJSONObject(i)
-        val subitems = if (obj.has("subitems")) parseTocJson(obj.getJSONArray("subitems"), depth + 1) else emptyList()
-        items.add(TocItem(
-            label = obj.getString("label"),
-            href = obj.getString("href"),
-            depth = depth,
-            page = if (obj.has("page")) obj.getInt("page") else 0,
-            subitems = subitems
-        ))
-    }
-    return items
-}
-
-private fun flattenToc(items: List<TocItem>): List<TocItem> {
-    val result = mutableListOf<TocItem>()
-    for (item in items) {
-        result.add(item)
-        result.addAll(flattenToc(item.subitems))
-    }
-    return result
-}
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = Modifier) {
@@ -2425,28 +2334,6 @@ private fun findOpfPath(dir: File): String? {
     return null
 }
 
-private fun readerBottomInfoText(
-    info: ReaderBottomInfo,
-    book: BookFile,
-    chapterTitle: String,
-    currentPage: Int,
-    totalPages: Int,
-    readingProgress: Float,
-    currentTime: String
-): String? = when (info) {
-    ReaderBottomInfo.NONE -> null
-    ReaderBottomInfo.BOOK_TITLE -> book.metadata?.title ?: book.name
-    ReaderBottomInfo.CHAPTER_TITLE -> chapterTitle.ifEmpty { null }
-    ReaderBottomInfo.PAGE -> if (totalPages > 0) "$currentPage / $totalPages" else null
-    ReaderBottomInfo.CLOCK -> currentTime.ifEmpty { null }
-    ReaderBottomInfo.PROGRESS -> "${(readingProgress * 100).toInt()}%"
-}
-
-private fun fontFamilyForJs(fontName: String): String = when (fontName) {
-    FONT_EPUB_ORIGINAL -> FONT_EPUB_ORIGINAL
-    FONT_SYSTEM -> ""
-    else -> fontName
-}
 
 private fun buildEpubJsHtml(opfPath: String, savedCfi: String, settings: ReaderSettings, fontFilePath: String = "") = """<!DOCTYPE html>
 <html>
@@ -4209,25 +4096,3 @@ private fun FontLayerPopup(
     }
 }
 
-private fun cfiToPage(cfi: String, spinePageOffsets: Map<Int, Int>, cfiPageMap: Map<String, Int> = emptyMap()): Int {
-    if (cfi.isEmpty()) return 0
-    cfiPageMap[cfi]?.let { return it }
-    if (spinePageOffsets.isEmpty()) return 0
-    val step = Regex("/6/(\\d+)").find(cfi)?.groupValues?.get(1)?.toIntOrNull() ?: return 0
-    val spineIndex = (step / 2 - 1).coerceAtLeast(0)
-    return (spinePageOffsets[spineIndex] ?: 0) + 1
-}
-
-@Composable
-private fun CenteredMessage(text: String) {
-    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Text(text)
-    }
-}
-
-@Composable
-private fun LoadingIndicator() {
-    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        CircularProgressIndicator()
-    }
-}
