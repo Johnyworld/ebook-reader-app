@@ -76,6 +76,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.graphics.Color
 import com.rotein.ebookreader.ui.theme.EreaderColors
+import com.rotein.ebookreader.ui.theme.EreaderSpacing
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextAlign
@@ -604,7 +605,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .fillMaxWidth()
-                        .padding(horizontal = maxOf(readerSettings.paddingHorizontal, 4).dp, vertical = 4.dp),
+                        .padding(horizontal = maxOf(readerSettings.paddingHorizontal, 4).dp, vertical = EreaderSpacing.XS),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(leftText ?: "", style = MaterialTheme.typography.bodySmall, color = EreaderColors.DarkGray)
@@ -634,7 +635,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 16.dp)
+                    .padding(horizontal = EreaderSpacing.L, vertical = EreaderSpacing.L)
             ) {
                 Surface(
                     modifier = Modifier
@@ -647,7 +648,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 16.dp),
+                                .padding(horizontal = EreaderSpacing.L, vertical = EreaderSpacing.L),
                             contentAlignment = Alignment.Center
                         ) {
                             Text("도서 정보를 읽고 있습니다.", style = MaterialTheme.typography.bodyMedium)
@@ -655,7 +656,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                     } else {
                     Column(modifier = Modifier.fillMaxWidth()) {
                         // 진행 상황
-                        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
+                        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = EreaderSpacing.L, vertical = EreaderSpacing.M)) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -673,7 +674,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                                 }
                             }
                             if (!isLoading) {
-                            Spacer(Modifier.height(8.dp))
+                            Spacer(Modifier.height(EreaderSpacing.S))
                             LinearProgressIndicator(
                                 progress = { readingProgress },
                                 modifier = Modifier.fillMaxWidth(),
@@ -684,13 +685,13 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                                 drawStopIndicator = {}
                             )
                             }
-                            Spacer(Modifier.height(12.dp))
+                            Spacer(Modifier.height(EreaderSpacing.M))
                             Row(
                                 modifier = Modifier
                                     .align(Alignment.CenterHorizontally)
                                     .clickable { showTocPopup = true }
                                     .border(1.dp, EreaderColors.Black, RoundedCornerShape(4.dp))
-                                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                                    .padding(horizontal = EreaderSpacing.S, vertical = EreaderSpacing.XS),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
@@ -731,7 +732,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                             showMenu = false
                         })
 
-                        Spacer(Modifier.height(2.dp))
+                        Spacer(Modifier.height(EreaderSpacing.XXS))
                     }
                     } // else
                 }
@@ -752,7 +753,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 4.dp)
+                            .padding(horizontal = EreaderSpacing.XS)
                             .height(56.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -1171,7 +1172,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 16.dp)
+                    .padding(horizontal = EreaderSpacing.L, vertical = EreaderSpacing.L)
             ) {
                 Surface(
                     modifier = Modifier
@@ -1234,9 +1235,9 @@ private fun ReaderMenuItem(icon: ImageVector, label: String, onClick: () -> Unit
             .fillMaxWidth()
             .height(52.dp)
             .clickable { onClick() }
-            .padding(horizontal = 16.dp),
+            .padding(horizontal = EreaderSpacing.L),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
+        horizontalArrangement = Arrangement.spacedBy(EreaderSpacing.M)
     ) {
         Icon(icon, contentDescription = null)
         Text(label, style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp))
@@ -1269,7 +1270,7 @@ private fun TocPopup(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp)
-                    .padding(horizontal = 4.dp),
+                    .padding(horizontal = EreaderSpacing.XS),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = onDismiss) {
@@ -1296,13 +1297,13 @@ private fun TocPopup(
                                 .fillMaxWidth()
                                 .clickable { onNavigate(item.href) }
                                 .padding(
-                                    start = 16.dp,
-                                    end = 16.dp,
-                                    top = 12.dp,
-                                    bottom = 12.dp
+                                    start = EreaderSpacing.L,
+                                    end = EreaderSpacing.L,
+                                    top = EreaderSpacing.M,
+                                    bottom = EreaderSpacing.M
                                 ),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            horizontalArrangement = Arrangement.spacedBy(EreaderSpacing.S)
                         ) {
                             Box(
                                 modifier = Modifier.width(40.dp),
@@ -1332,7 +1333,7 @@ private fun TocPopup(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 16.dp)
+                    .padding(bottom = EreaderSpacing.L)
                     .onSizeChanged { bottomBarHeightPx = it.height },
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
@@ -1340,9 +1341,9 @@ private fun TocPopup(
                 Row(
                     modifier = Modifier
                         .clickable(enabled = currentPage > 0) { currentPage-- }
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                        .padding(horizontal = EreaderSpacing.L, vertical = EreaderSpacing.M),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    horizontalArrangement = Arrangement.spacedBy(EreaderSpacing.XS)
                 ) {
                     Icon(
                         Icons.AutoMirrored.Filled.ArrowBack,
@@ -1363,9 +1364,9 @@ private fun TocPopup(
                 Row(
                     modifier = Modifier
                         .clickable(enabled = currentPage < totalPages - 1) { currentPage++ }
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                        .padding(horizontal = EreaderSpacing.L, vertical = EreaderSpacing.M),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    horizontalArrangement = Arrangement.spacedBy(EreaderSpacing.XS)
                 ) {
                     Text(
                         "다음",
@@ -1429,7 +1430,7 @@ private fun SearchPopup(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp)
-                    .padding(horizontal = 4.dp),
+                    .padding(horizontal = EreaderSpacing.XS),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = onDismiss) {
@@ -1472,11 +1473,11 @@ private fun SearchPopup(
                                     .fillMaxWidth()
                                     .height(80.dp)
                                     .clickable { onNavigate(result.cfi, effectivePage) }
-                                    .padding(horizontal = 16.dp, vertical = 12.dp)
+                                    .padding(horizontal = EreaderSpacing.L, vertical = EreaderSpacing.M)
                             ) {
                                 if (result.chapter.isNotEmpty() || effectivePage > 0) {
                                     Row(
-                                        modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
+                                        modifier = Modifier.fillMaxWidth().padding(bottom = EreaderSpacing.XS),
                                         horizontalArrangement = Arrangement.SpaceBetween,
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
@@ -1536,9 +1537,9 @@ private fun SearchPopup(
                         Row(
                             modifier = Modifier
                                 .clickable(enabled = currentPage > 0) { currentPage-- }
-                                .padding(horizontal = 16.dp, vertical = 12.dp),
+                                .padding(horizontal = EreaderSpacing.L, vertical = EreaderSpacing.M),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            horizontalArrangement = Arrangement.spacedBy(EreaderSpacing.XS)
                         ) {
                             Icon(
                                 Icons.AutoMirrored.Filled.ArrowBack,
@@ -1559,9 +1560,9 @@ private fun SearchPopup(
                         Row(
                             modifier = Modifier
                                 .clickable(enabled = currentPage < totalPages - 1) { currentPage++ }
-                                .padding(horizontal = 16.dp, vertical = 12.dp),
+                                .padding(horizontal = EreaderSpacing.L, vertical = EreaderSpacing.M),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            horizontalArrangement = Arrangement.spacedBy(EreaderSpacing.XS)
                         ) {
                             Text(
                                 "다음",
@@ -1582,13 +1583,13 @@ private fun SearchPopup(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(44.dp)
-                        .padding(start = 4.dp, end = 16.dp),
+                        .padding(start = EreaderSpacing.XS, end = EreaderSpacing.L),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
                         Icons.Default.Search,
                         contentDescription = null,
-                        modifier = Modifier.padding(horizontal = 12.dp).size(24.dp),
+                        modifier = Modifier.padding(horizontal = EreaderSpacing.M).size(24.dp),
                         tint = EreaderColors.Black
                     )
                     BasicTextField(
@@ -1631,7 +1632,7 @@ private fun SearchPopup(
                         modifier = Modifier
                             .border(1.dp, EreaderColors.Black, RoundedCornerShape(4.dp))
                             .clickable { if (query.length >= 2) { val q = query.trim().replace(Regex("\\s+"), " "); searchedQuery = q; onSearch(q) } }
-                            .padding(horizontal = 16.dp, vertical = 10.dp),
+                            .padding(horizontal = EreaderSpacing.L, vertical = 10.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Text("검색", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
@@ -1685,7 +1686,7 @@ private fun BookmarkPopup(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp)
-                    .padding(horizontal = 4.dp),
+                    .padding(horizontal = EreaderSpacing.XS),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = onDismiss) {
@@ -1727,7 +1728,7 @@ private fun BookmarkPopup(
                                                 sortOrder = order
                                                 dropdownExpanded = false
                                             }
-                                            .padding(start = 16.dp, end = 12.dp, top = 12.dp, bottom = 12.dp)
+                                            .padding(start = EreaderSpacing.L, end = EreaderSpacing.M, top = EreaderSpacing.M, bottom = EreaderSpacing.M)
                                     ) {
                                         Text(
                                             text = order.label,
@@ -1736,7 +1737,7 @@ private fun BookmarkPopup(
                                             modifier = Modifier.weight(1f)
                                         )
                                         if (isSelected) {
-                                            Spacer(modifier = Modifier.width(16.dp))
+                                            Spacer(modifier = Modifier.width(EreaderSpacing.L))
                                             Icon(
                                                 imageVector = Icons.Default.Check,
                                                 contentDescription = null,
@@ -1774,10 +1775,10 @@ private fun BookmarkPopup(
                                         .weight(1f)
                                         .fillMaxHeight()
                                         .clickable { onNavigate(bookmark.cfi) }
-                                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                                        .padding(horizontal = EreaderSpacing.L, vertical = EreaderSpacing.M)
                                 ) {
                                     Row(
-                                        modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
+                                        modifier = Modifier.fillMaxWidth().padding(bottom = EreaderSpacing.XS),
                                         horizontalArrangement = Arrangement.SpaceBetween,
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
@@ -1793,7 +1794,7 @@ private fun BookmarkPopup(
                                             bookmark.chapterTitle,
                                             style = MaterialTheme.typography.labelSmall,
                                             color = EreaderColors.DarkGray,
-                                            modifier = Modifier.weight(1f).padding(start = if (bookmarkPage > 0) 8.dp else 0.dp),
+                                            modifier = Modifier.weight(1f).padding(start = if (bookmarkPage > 0) EreaderSpacing.S else 0.dp),
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis,
                                             textAlign = TextAlign.End
@@ -1804,7 +1805,7 @@ private fun BookmarkPopup(
                                         style = MaterialTheme.typography.bodyMedium,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis,
-                                        modifier = Modifier.padding(bottom = 4.dp)
+                                        modifier = Modifier.padding(bottom = EreaderSpacing.XS)
                                     )
                                     Text(
                                         dateFormat.format(Date(bookmark.createdAt)),
@@ -1835,9 +1836,9 @@ private fun BookmarkPopup(
                         Row(
                             modifier = Modifier
                                 .clickable(enabled = currentPage > 0) { currentPage-- }
-                                .padding(horizontal = 16.dp, vertical = 12.dp),
+                                .padding(horizontal = EreaderSpacing.L, vertical = EreaderSpacing.M),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            horizontalArrangement = Arrangement.spacedBy(EreaderSpacing.XS)
                         ) {
                             Icon(
                                 Icons.AutoMirrored.Filled.ArrowBack,
@@ -1858,9 +1859,9 @@ private fun BookmarkPopup(
                         Row(
                             modifier = Modifier
                                 .clickable(enabled = currentPage < totalPages - 1) { currentPage++ }
-                                .padding(horizontal = 16.dp, vertical = 12.dp),
+                                .padding(horizontal = EreaderSpacing.L, vertical = EreaderSpacing.M),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            horizontalArrangement = Arrangement.spacedBy(EreaderSpacing.XS)
                         ) {
                             Text(
                                 "다음",
@@ -1922,7 +1923,7 @@ private fun HighlightPopup(
     Surface(modifier = Modifier.fillMaxSize(), color = EreaderColors.White) {
         Column(modifier = Modifier.fillMaxSize()) {
             Row(
-                modifier = Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 4.dp),
+                modifier = Modifier.fillMaxWidth().height(56.dp).padding(horizontal = EreaderSpacing.XS),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = onDismiss) {
@@ -1946,11 +1947,11 @@ private fun HighlightPopup(
                                         verticalAlignment = Alignment.CenterVertically,
                                         modifier = Modifier.fillMaxWidth()
                                             .clickable { sortOrder = order; dropdownExpanded = false }
-                                            .padding(start = 16.dp, end = 12.dp, top = 12.dp, bottom = 12.dp)
+                                            .padding(start = EreaderSpacing.L, end = EreaderSpacing.M, top = EreaderSpacing.M, bottom = EreaderSpacing.M)
                                     ) {
                                         Text(order.label, style = MaterialTheme.typography.bodyMedium, color = EreaderColors.Black, modifier = Modifier.weight(1f))
                                         if (sortOrder == order) {
-                                            Spacer(Modifier.width(16.dp))
+                                            Spacer(Modifier.width(EreaderSpacing.L))
                                             Icon(Icons.Default.Check, contentDescription = null, tint = EreaderColors.Black, modifier = Modifier.size(16.dp))
                                         }
                                     }
@@ -1980,10 +1981,10 @@ private fun HighlightPopup(
                                     modifier = Modifier
                                         .weight(1f).fillMaxHeight()
                                         .clickable { onNavigate(highlight.cfi) }
-                                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                                        .padding(horizontal = EreaderSpacing.L, vertical = EreaderSpacing.M)
                                 ) {
                                     Row(
-                                        modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
+                                        modifier = Modifier.fillMaxWidth().padding(bottom = EreaderSpacing.XS),
                                         horizontalArrangement = Arrangement.SpaceBetween,
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
@@ -1995,7 +1996,7 @@ private fun HighlightPopup(
                                             highlight.chapterTitle,
                                             style = MaterialTheme.typography.labelSmall,
                                             color = EreaderColors.DarkGray,
-                                            modifier = Modifier.weight(1f).padding(start = if (highlightPage > 0) 8.dp else 0.dp),
+                                            modifier = Modifier.weight(1f).padding(start = if (highlightPage > 0) EreaderSpacing.S else 0.dp),
                                             maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.End
                                         )
                                     }
@@ -2003,7 +2004,7 @@ private fun HighlightPopup(
                                         highlight.text,
                                         style = MaterialTheme.typography.bodyMedium,
                                         maxLines = 1, overflow = TextOverflow.Ellipsis,
-                                        modifier = Modifier.padding(bottom = 4.dp)
+                                        modifier = Modifier.padding(bottom = EreaderSpacing.XS)
                                     )
                                     Text(dateFormat.format(Date(highlight.createdAt)), style = MaterialTheme.typography.labelSmall, color = EreaderColors.DarkGray)
                                 }
@@ -2024,16 +2025,16 @@ private fun HighlightPopup(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Row(
-                            modifier = Modifier.clickable(enabled = currentPage > 0) { currentPage-- }.padding(horizontal = 16.dp, vertical = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            modifier = Modifier.clickable(enabled = currentPage > 0) { currentPage-- }.padding(horizontal = EreaderSpacing.L, vertical = EreaderSpacing.M),
+                            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(EreaderSpacing.XS)
                         ) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "이전", modifier = Modifier.height(16.dp), tint = if (currentPage > 0) EreaderColors.Black else EreaderColors.DarkGray)
                             Text("이전", style = MaterialTheme.typography.bodyMedium, color = if (currentPage > 0) EreaderColors.Black else EreaderColors.DarkGray)
                         }
                         Text("${currentPage + 1}/$totalPages (${sortedHighlights.size}건)", style = MaterialTheme.typography.bodyMedium)
                         Row(
-                            modifier = Modifier.clickable(enabled = currentPage < totalPages - 1) { currentPage++ }.padding(horizontal = 16.dp, vertical = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            modifier = Modifier.clickable(enabled = currentPage < totalPages - 1) { currentPage++ }.padding(horizontal = EreaderSpacing.L, vertical = EreaderSpacing.M),
+                            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(EreaderSpacing.XS)
                         ) {
                             Text("다음", style = MaterialTheme.typography.bodyMedium, color = if (currentPage < totalPages - 1) EreaderColors.Black else EreaderColors.DarkGray)
                             Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = "다음", modifier = Modifier.height(16.dp), tint = if (currentPage < totalPages - 1) EreaderColors.Black else EreaderColors.DarkGray)
@@ -2060,7 +2061,7 @@ private fun MemoEditorScreen(
     Surface(modifier = Modifier.fillMaxSize(), color = EreaderColors.White) {
         Column(modifier = Modifier.fillMaxSize()) {
             Row(
-                modifier = Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 4.dp),
+                modifier = Modifier.fillMaxWidth().height(56.dp).padding(horizontal = EreaderSpacing.XS),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = onCancel) {
@@ -2075,8 +2076,8 @@ private fun MemoEditorScreen(
             Column(
                 modifier = Modifier
                     .weight(1f)
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                    .padding(EreaderSpacing.L),
+                verticalArrangement = Arrangement.spacedBy(EreaderSpacing.L)
             ) {
                 if (selectedText.isNotEmpty()) {
                     Text(
@@ -2087,7 +2088,7 @@ private fun MemoEditorScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .border(1.dp, EreaderColors.Gray, RoundedCornerShape(4.dp))
-                            .padding(12.dp)
+                            .padding(EreaderSpacing.M)
                     )
                 }
                 BasicTextField(
@@ -2097,7 +2098,7 @@ private fun MemoEditorScreen(
                         .fillMaxWidth()
                         .weight(1f)
                         .border(1.dp, EreaderColors.Gray, RoundedCornerShape(4.dp))
-                        .padding(12.dp),
+                        .padding(EreaderSpacing.M),
                     textStyle = MaterialTheme.typography.bodyMedium.copy(color = EreaderColors.Black),
                     decorationBox = { inner ->
                         Box {
@@ -2176,7 +2177,7 @@ private fun MemoListPopup(
     Surface(modifier = Modifier.fillMaxSize(), color = EreaderColors.White) {
         Column(modifier = Modifier.fillMaxSize()) {
             Row(
-                modifier = Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 4.dp),
+                modifier = Modifier.fillMaxWidth().height(56.dp).padding(horizontal = EreaderSpacing.XS),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = onDismiss) {
@@ -2200,11 +2201,11 @@ private fun MemoListPopup(
                                         verticalAlignment = Alignment.CenterVertically,
                                         modifier = Modifier.fillMaxWidth()
                                             .clickable { sortOrder = order; dropdownExpanded = false }
-                                            .padding(start = 16.dp, end = 12.dp, top = 12.dp, bottom = 12.dp)
+                                            .padding(start = EreaderSpacing.L, end = EreaderSpacing.M, top = EreaderSpacing.M, bottom = EreaderSpacing.M)
                                     ) {
                                         Text(order.label, style = MaterialTheme.typography.bodyMedium, color = EreaderColors.Black, modifier = Modifier.weight(1f))
                                         if (sortOrder == order) {
-                                            Spacer(Modifier.width(16.dp))
+                                            Spacer(Modifier.width(EreaderSpacing.L))
                                             Icon(Icons.Default.Check, contentDescription = null, tint = EreaderColors.Black, modifier = Modifier.size(16.dp))
                                         }
                                     }
@@ -2234,10 +2235,10 @@ private fun MemoListPopup(
                                     modifier = Modifier
                                         .weight(1f).fillMaxHeight()
                                         .clickable { onNavigate(memo); onEdit(memo) }
-                                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                                        .padding(horizontal = EreaderSpacing.L, vertical = EreaderSpacing.M)
                                 ) {
                                     Row(
-                                        modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
+                                        modifier = Modifier.fillMaxWidth().padding(bottom = EreaderSpacing.XS),
                                         horizontalArrangement = Arrangement.SpaceBetween,
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
@@ -2249,7 +2250,7 @@ private fun MemoListPopup(
                                             memo.chapterTitle,
                                             style = MaterialTheme.typography.labelSmall,
                                             color = EreaderColors.DarkGray,
-                                            modifier = Modifier.weight(1f).padding(start = if (memoPage > 0) 8.dp else 0.dp),
+                                            modifier = Modifier.weight(1f).padding(start = if (memoPage > 0) EreaderSpacing.S else 0.dp),
                                             maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.End
                                         )
                                     }
@@ -2257,13 +2258,13 @@ private fun MemoListPopup(
                                         memo.text,
                                         style = MaterialTheme.typography.bodyMedium,
                                         maxLines = 1, overflow = TextOverflow.Ellipsis,
-                                        modifier = Modifier.padding(bottom = 4.dp)
+                                        modifier = Modifier.padding(bottom = EreaderSpacing.XS)
                                     )
                                     if (memo.note.isNotEmpty()) {
                                         Row(
                                             verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                            modifier = Modifier.padding(bottom = 4.dp)
+                                            horizontalArrangement = Arrangement.spacedBy(EreaderSpacing.XS),
+                                            modifier = Modifier.padding(bottom = EreaderSpacing.XS)
                                         ) {
                                             Icon(Icons.Default.ModeComment, contentDescription = null, modifier = Modifier.size(12.dp), tint = EreaderColors.DarkGray)
                                             Text(memo.note, style = MaterialTheme.typography.labelSmall, color = EreaderColors.DarkGray, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -2288,16 +2289,16 @@ private fun MemoListPopup(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Row(
-                            modifier = Modifier.clickable(enabled = currentPage > 0) { currentPage-- }.padding(horizontal = 16.dp, vertical = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            modifier = Modifier.clickable(enabled = currentPage > 0) { currentPage-- }.padding(horizontal = EreaderSpacing.L, vertical = EreaderSpacing.M),
+                            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(EreaderSpacing.XS)
                         ) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "이전", modifier = Modifier.height(16.dp), tint = if (currentPage > 0) EreaderColors.Black else EreaderColors.DarkGray)
                             Text("이전", style = MaterialTheme.typography.bodyMedium, color = if (currentPage > 0) EreaderColors.Black else EreaderColors.DarkGray)
                         }
                         Text("${currentPage + 1}/$totalPages (${sortedMemos.size}건)", style = MaterialTheme.typography.bodyMedium)
                         Row(
-                            modifier = Modifier.clickable(enabled = currentPage < totalPages - 1) { currentPage++ }.padding(horizontal = 16.dp, vertical = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            modifier = Modifier.clickable(enabled = currentPage < totalPages - 1) { currentPage++ }.padding(horizontal = EreaderSpacing.L, vertical = EreaderSpacing.M),
+                            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(EreaderSpacing.XS)
                         ) {
                             Text("다음", style = MaterialTheme.typography.bodyMedium, color = if (currentPage < totalPages - 1) EreaderColors.Black else EreaderColors.DarkGray)
                             Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = "다음", modifier = Modifier.height(16.dp), tint = if (currentPage < totalPages - 1) EreaderColors.Black else EreaderColors.DarkGray)
@@ -2341,7 +2342,7 @@ private fun TxtViewer(path: String, onCenterTap: () -> Unit) {
                     }
                 }
                 .verticalScroll(rememberScrollState())
-                .padding(16.dp)
+                .padding(EreaderSpacing.L)
         )
     }
 }
@@ -2759,7 +2760,7 @@ private fun ActionPopupContainer(
                     )
                     .border(1.dp, EreaderColors.Black, RoundedCornerShape(8.dp))
                     .background(EreaderColors.White, RoundedCornerShape(8.dp))
-                    .padding(horizontal = 4.dp)
+                    .padding(horizontal = EreaderSpacing.XS)
                     .pointerInput(Unit) { detectTapGestures { } },
                 verticalAlignment = Alignment.CenterVertically,
                 content = content
@@ -4490,7 +4491,7 @@ private fun ReaderViewerTab(settings: ReaderSettings, onSettingsChange: (ReaderS
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
+                .padding(horizontal = EreaderSpacing.L, vertical = EreaderSpacing.S),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
@@ -4518,7 +4519,7 @@ private fun ReaderSettingRow(label: String, field: @Composable () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+            .padding(horizontal = EreaderSpacing.L, vertical = EreaderSpacing.S),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
@@ -4665,7 +4666,7 @@ private fun <T> ReaderCycleSelectorField(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clickable { onSelect(option); dropdownOpen = false }
-                                .padding(horizontal = 12.dp, vertical = 12.dp)
+                                .padding(horizontal = EreaderSpacing.M, vertical = EreaderSpacing.M)
                         ) {
                             Text(
                                 labelFor(option),
@@ -4836,7 +4837,7 @@ private fun FontLayerPopup(
         Column(modifier = Modifier.fillMaxSize()) {
             // Header
             Row(
-                modifier = Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 4.dp),
+                modifier = Modifier.fillMaxWidth().height(56.dp).padding(horizontal = EreaderSpacing.XS),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = onDismiss) {
@@ -4865,11 +4866,11 @@ private fun FontLayerPopup(
                                             verticalAlignment = Alignment.CenterVertically,
                                             modifier = Modifier.fillMaxWidth()
                                                 .clickable { fontSortOrder = order; sortDropdownExpanded = false }
-                                                .padding(start = 16.dp, end = 12.dp, top = 12.dp, bottom = 12.dp)
+                                                .padding(start = EreaderSpacing.L, end = EreaderSpacing.M, top = EreaderSpacing.M, bottom = EreaderSpacing.M)
                                         ) {
                                             Text(order.label, style = MaterialTheme.typography.bodyMedium, color = EreaderColors.Black, modifier = Modifier.weight(1f))
                                             if (fontSortOrder == order) {
-                                                Spacer(Modifier.width(16.dp))
+                                                Spacer(Modifier.width(EreaderSpacing.L))
                                                 Icon(Icons.Default.Check, contentDescription = null, tint = EreaderColors.Black, modifier = Modifier.size(16.dp))
                                             }
                                         }
@@ -4881,11 +4882,11 @@ private fun FontLayerPopup(
                                             verticalAlignment = Alignment.CenterVertically,
                                             modifier = Modifier.fillMaxWidth()
                                                 .clickable { systemFontSortOrder = order; sortDropdownExpanded = false }
-                                                .padding(start = 16.dp, end = 12.dp, top = 12.dp, bottom = 12.dp)
+                                                .padding(start = EreaderSpacing.L, end = EreaderSpacing.M, top = EreaderSpacing.M, bottom = EreaderSpacing.M)
                                         ) {
                                             Text(order.label, style = MaterialTheme.typography.bodyMedium, color = EreaderColors.Black, modifier = Modifier.weight(1f))
                                             if (systemFontSortOrder == order) {
-                                                Spacer(Modifier.width(16.dp))
+                                                Spacer(Modifier.width(EreaderSpacing.L))
                                                 Icon(Icons.Default.Check, contentDescription = null, tint = EreaderColors.Black, modifier = Modifier.size(16.dp))
                                             }
                                         }
@@ -4945,7 +4946,7 @@ private fun FontLayerPopup(
                                             if (filePath.isNotEmpty()) confirmImportFont = Pair(fontName, filePath)
                                         }
                                     }
-                                    .padding(start = 16.dp, end = if (isImported) 4.dp else 16.dp),
+                                    .padding(start = EreaderSpacing.L, end = if (isImported) EreaderSpacing.XS else EreaderSpacing.L),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
@@ -4979,16 +4980,16 @@ private fun FontLayerPopup(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Row(
-                            modifier = Modifier.clickable(enabled = currentPage > 0) { currentPage-- }.padding(horizontal = 16.dp, vertical = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            modifier = Modifier.clickable(enabled = currentPage > 0) { currentPage-- }.padding(horizontal = EreaderSpacing.L, vertical = EreaderSpacing.M),
+                            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(EreaderSpacing.XS)
                         ) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "이전", modifier = Modifier.height(16.dp), tint = if (currentPage > 0) EreaderColors.Black else EreaderColors.DarkGray)
                             Text("이전", style = MaterialTheme.typography.bodyMedium, color = if (currentPage > 0) EreaderColors.Black else EreaderColors.DarkGray)
                         }
                         Text("${currentPage + 1}/$totalPages (${currentItems.size}개)", style = MaterialTheme.typography.bodyMedium)
                         Row(
-                            modifier = Modifier.clickable(enabled = currentPage < totalPages - 1) { currentPage++ }.padding(horizontal = 16.dp, vertical = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            modifier = Modifier.clickable(enabled = currentPage < totalPages - 1) { currentPage++ }.padding(horizontal = EreaderSpacing.L, vertical = EreaderSpacing.M),
+                            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(EreaderSpacing.XS)
                         ) {
                             Text("다음", style = MaterialTheme.typography.bodyMedium, color = if (currentPage < totalPages - 1) EreaderColors.Black else EreaderColors.DarkGray)
                             Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = "다음", modifier = Modifier.height(16.dp), tint = if (currentPage < totalPages - 1) EreaderColors.Black else EreaderColors.DarkGray)

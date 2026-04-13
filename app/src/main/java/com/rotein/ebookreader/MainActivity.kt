@@ -35,6 +35,7 @@ import androidx.compose.ui.graphics.Color
 import com.rotein.ebookreader.ui.theme.EreaderColors
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.rotein.ebookreader.ui.theme.EreaderSpacing
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 import com.rotein.ebookreader.ui.theme.EbookReaderAppTheme
@@ -131,7 +132,7 @@ fun HomeScreen(modifier: Modifier = Modifier) {
                     onLoadComplete = { fileScanComplete = true }
                 )
                 1 -> Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.TopStart) {
-                    Text(text = tabs[1], modifier = Modifier.padding(16.dp))
+                    Text(text = tabs[1], modifier = Modifier.padding(EreaderSpacing.L))
                 }
             }
         }

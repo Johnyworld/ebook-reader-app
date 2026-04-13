@@ -52,6 +52,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import com.rotein.ebookreader.ui.theme.EreaderColors
+import com.rotein.ebookreader.ui.theme.EreaderSpacing
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
@@ -172,9 +173,9 @@ fun AllBooksScreen(
             when {
                 !hasPermission -> {
                     Column(
-                        modifier = Modifier.align(Alignment.Center).padding(24.dp),
+                        modifier = Modifier.align(Alignment.Center).padding(EreaderSpacing.XL),
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                        verticalArrangement = Arrangement.spacedBy(EreaderSpacing.M)
                     ) {
                         Text("기기 내 파일을 검색하려면\n저장소 접근 권한이 필요합니다.")
                         Button(onClick = {
@@ -201,7 +202,7 @@ fun AllBooksScreen(
                     Text(
                         if (searchQuery.isBlank()) "epub, txt, mobi, pdf 파일을 찾을 수 없습니다."
                         else "\"$searchQuery\"에 해당하는 파일이 없습니다.",
-                        modifier = Modifier.align(Alignment.Center).padding(24.dp)
+                        modifier = Modifier.align(Alignment.Center).padding(EreaderSpacing.XL)
                     )
                 }
 
@@ -252,7 +253,7 @@ private fun TopBar(
         Row(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 4.dp),
+                .padding(horizontal = EreaderSpacing.XS),
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(onClick = onSearchClick) {
@@ -297,7 +298,7 @@ private fun TopBar(
                                             onSortChange(sortPref.copy(field = field))
                                             dropdownExpanded = false
                                         }
-                                        .padding(start = 16.dp, end = 12.dp, top = 12.dp, bottom = 12.dp)
+                                        .padding(start = EreaderSpacing.L, end = EreaderSpacing.M, top = EreaderSpacing.M, bottom = EreaderSpacing.M)
                                 ) {
                                     Text(
                                         text = field.label,
@@ -306,7 +307,7 @@ private fun TopBar(
                                         modifier = Modifier.weight(1f)
                                     )
                                     if (isSelected) {
-                                        Spacer(modifier = Modifier.width(16.dp))
+                                        Spacer(modifier = Modifier.width(EreaderSpacing.L))
                                         Icon(
                                             imageVector = Icons.Default.Check,
                                             contentDescription = null,
@@ -332,7 +333,7 @@ private fun TopBar(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(EreaderColors.White)
-                    .padding(horizontal = 4.dp),
+                    .padding(horizontal = EreaderSpacing.XS),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = {}) {
@@ -396,9 +397,9 @@ private fun BookItem(book: BookFile, onClick: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onClick() }
-            .padding(horizontal = 16.dp, vertical = 10.dp),
+            .padding(horizontal = EreaderSpacing.L, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
+        horizontalArrangement = Arrangement.spacedBy(EreaderSpacing.M)
     ) {
         Box(
             modifier = Modifier
