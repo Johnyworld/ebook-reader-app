@@ -221,7 +221,7 @@ enum class ReaderBottomInfo(val label: String) {
     CHAPTER_TITLE("챕터 제목"),
     PAGE("페이지 수"),
     CLOCK("시계"),
-    PROGRESS("독서 진행률")
+    PROGRESS("진행률")
 }
 
 data class ReaderSettings(

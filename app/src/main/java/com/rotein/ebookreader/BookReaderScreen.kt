@@ -4164,7 +4164,8 @@ private fun ReaderSettingRow(label: String, field: @Composable () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = EreaderSpacing.L, vertical = EreaderSpacing.S),
+            .height(56.dp)
+            .padding(horizontal = EreaderSpacing.L),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
@@ -4231,7 +4232,7 @@ private fun <T> ReaderCycleSelectorField(
                 modifier = Modifier.size(16.dp)
             )
         }
-        Box(modifier = Modifier.weight(1f)) {
+        Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
             EreaderDropdownMenu(
                 items = options,
                 selectedItem = selected,
