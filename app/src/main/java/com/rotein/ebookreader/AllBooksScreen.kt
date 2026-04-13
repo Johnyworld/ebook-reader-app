@@ -51,6 +51,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import com.rotein.ebookreader.ui.theme.EreaderColors
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
@@ -215,7 +216,7 @@ fun AllBooksScreen(
                                 lastReadTimes = lastReadTimes + (book.path to now)
                                 onBookClick(book)
                             })
-                            HorizontalDivider()
+                            HorizontalDivider(color = EreaderColors.Gray)
                         }
                     }
                 }
@@ -258,7 +259,7 @@ private fun TopBar(
                 Icon(
                     imageVector = Icons.Default.Search,
                     contentDescription = "검색",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    tint = EreaderColors.DarkGray
                 )
             }
 
@@ -270,7 +271,7 @@ private fun TopBar(
                     Text(
                         text = sortPref.field.label,
                         style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = EreaderColors.Black
                     )
                 }
                 if (dropdownExpanded) {
@@ -283,8 +284,8 @@ private fun TopBar(
                         Column(
                             modifier = Modifier
                                 .width(IntrinsicSize.Max)
-                                .background(Color.White)
-                                .border(1.dp, Color.Black)
+                                .background(EreaderColors.White)
+                                .border(1.dp, EreaderColors.Black)
                         ) {
                             SortField.entries.forEachIndexed { index, field ->
                                 val isSelected = sortPref.field == field
@@ -301,7 +302,7 @@ private fun TopBar(
                                     Text(
                                         text = field.label,
                                         style = MaterialTheme.typography.bodyMedium,
-                                        color = Color.Black,
+                                        color = EreaderColors.Black,
                                         modifier = Modifier.weight(1f)
                                     )
                                     if (isSelected) {
@@ -309,13 +310,13 @@ private fun TopBar(
                                         Icon(
                                             imageVector = Icons.Default.Check,
                                             contentDescription = null,
-                                            tint = Color.Black,
+                                            tint = EreaderColors.Black,
                                             modifier = Modifier.size(16.dp)
                                         )
                                     }
                                 }
                                 if (index < SortField.entries.lastIndex) {
-                                    HorizontalDivider(color = Color(0xFFE0E0E0))
+                                    HorizontalDivider(color = EreaderColors.Gray)
                                 }
                             }
                         }
@@ -330,7 +331,7 @@ private fun TopBar(
             Row(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.surface)
+                    .background(EreaderColors.White)
                     .padding(horizontal = 4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -338,7 +339,7 @@ private fun TopBar(
                     Icon(
                         imageVector = Icons.Default.Search,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary
+                        tint = EreaderColors.Black
                     )
                 }
 
@@ -350,16 +351,16 @@ private fun TopBar(
                         .focusRequester(focusRequester),
                     singleLine = true,
                     textStyle = MaterialTheme.typography.bodyLarge.copy(
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = EreaderColors.Black
                     ),
-                    cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                    cursorBrush = SolidColor(EreaderColors.Black),
                     decorationBox = { innerTextField ->
                         Box {
                             if (searchQuery.isEmpty()) {
                                 Text(
                                     text = "책 제목, 저자 검색...",
                                     style = MaterialTheme.typography.bodyLarge,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    color = EreaderColors.DarkGray
                                 )
                             }
                             innerTextField()
@@ -371,14 +372,14 @@ private fun TopBar(
                     Icon(
                         imageVector = Icons.Default.Close,
                         contentDescription = "검색 닫기",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        tint = EreaderColors.DarkGray
                     )
                 }
             }
         }
     }
 
-    HorizontalDivider()
+    HorizontalDivider(color = EreaderColors.Gray)
 }
 
 @Composable
@@ -402,7 +403,7 @@ private fun BookItem(book: BookFile, onClick: () -> Unit) {
         Box(
             modifier = Modifier
                 .size(width = 44.dp, height = 60.dp)
-                .background(MaterialTheme.colorScheme.surfaceVariant),
+                .background(EreaderColors.Gray),
             contentAlignment = Alignment.Center
         ) {
             if (cover != null) {
@@ -416,7 +417,7 @@ private fun BookItem(book: BookFile, onClick: () -> Unit) {
                 Text(
                     text = book.extension.uppercase(),
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = EreaderColors.DarkGray
                 )
             }
         }
@@ -431,7 +432,7 @@ private fun BookItem(book: BookFile, onClick: () -> Unit) {
             Text(
                 text = author ?: book.path,
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = EreaderColors.DarkGray,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -441,7 +442,7 @@ private fun BookItem(book: BookFile, onClick: () -> Unit) {
             Text(
                 text = book.extension.uppercase(),
                 style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.primary
+                color = EreaderColors.Black
             )
         }
     }

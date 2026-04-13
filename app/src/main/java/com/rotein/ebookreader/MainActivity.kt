@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentSize
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
@@ -31,6 +32,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import com.rotein.ebookreader.ui.theme.EreaderColors
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -96,8 +98,9 @@ fun HomeScreen(modifier: Modifier = Modifier) {
         Column(modifier = Modifier.fillMaxSize()) {
             TabRow(
                 selectedTabIndex = selectedTabIndex,
-                containerColor = Color.White,
-                contentColor = Color.Black,
+                containerColor = EreaderColors.White,
+                contentColor = EreaderColors.Black,
+                divider = { HorizontalDivider(color = EreaderColors.Gray) },
                 indicator = { tabPositions ->
                     val tab = tabPositions[selectedTabIndex]
                     Box(
@@ -107,7 +110,7 @@ fun HomeScreen(modifier: Modifier = Modifier) {
                             .offset(x = tab.left)
                             .width(tab.width)
                             .height(2.dp)
-                            .background(Color.Black)
+                            .background(EreaderColors.Black)
                     )
                 }
             ) {
@@ -116,8 +119,8 @@ fun HomeScreen(modifier: Modifier = Modifier) {
                         selected = selectedTabIndex == index,
                         onClick = { selectedTabIndex = index },
                         text = { Text(title) },
-                        selectedContentColor = Color.Black,
-                        unselectedContentColor = Color(0xFF888888)
+                        selectedContentColor = EreaderColors.Black,
+                        unselectedContentColor = EreaderColors.DarkGray
                     )
                 }
             }
@@ -147,14 +150,14 @@ fun HomeScreen(modifier: Modifier = Modifier) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.White),
+                    .background(EreaderColors.White),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = "ebook-reader",
                     fontSize = 24.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color.Black
+                    color = EreaderColors.Black
                 )
             }
         }

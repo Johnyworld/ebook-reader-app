@@ -75,6 +75,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.graphics.Color
+import com.rotein.ebookreader.ui.theme.EreaderColors
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextAlign
@@ -586,9 +587,9 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
         //         modifier = Modifier
         //             .align(Alignment.TopCenter)
         //             .padding(top = 4.dp)
-        //             .background(Color.White),
+        //             .background(EreaderColors.White),
         //         style = MaterialTheme.typography.bodySmall,
-        //         color = Color.Black
+        //         color = EreaderColors.Black
         //     )
         // }
 
@@ -606,8 +607,8 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                         .padding(horizontal = maxOf(readerSettings.paddingHorizontal, 4).dp, vertical = 4.dp),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text(leftText ?: "", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
-                    Text(rightText ?: "", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                    Text(leftText ?: "", style = MaterialTheme.typography.bodySmall, color = EreaderColors.DarkGray)
+                    Text(rightText ?: "", style = MaterialTheme.typography.bodySmall, color = EreaderColors.DarkGray)
                 }
             }
         }
@@ -615,10 +616,10 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
         // 로딩 오버레이
         if (isLoading) {
             Box(
-                modifier = Modifier.fillMaxSize().background(Color.White).clickable(enabled = false) {},
+                modifier = Modifier.fillMaxSize().background(EreaderColors.White).clickable(enabled = false) {},
                 contentAlignment = Alignment.Center
             ) {
-                CircularProgressIndicator(color = Color.Black)
+                CircularProgressIndicator(color = EreaderColors.Black)
             }
         }
 
@@ -638,9 +639,9 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                 Surface(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .border(1.dp, Color.Black)
+                        .border(1.dp, EreaderColors.Black)
                         .pointerInput(Unit) { detectTapGestures {} },
-                    color = Color.White
+                    color = EreaderColors.White
                 ) {
                     if (isScanning) {
                         Box(
@@ -676,8 +677,8 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                             LinearProgressIndicator(
                                 progress = { readingProgress },
                                 modifier = Modifier.fillMaxWidth(),
-                                color = Color.Black,
-                                trackColor = Color(0xFFCCCCCC),
+                                color = EreaderColors.Black,
+                                trackColor = EreaderColors.Gray,
                                 strokeCap = StrokeCap.Square,
                                 gapSize = 0.dp,
                                 drawStopIndicator = {}
@@ -688,7 +689,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                                 modifier = Modifier
                                     .align(Alignment.CenterHorizontally)
                                     .clickable { showTocPopup = true }
-                                    .border(1.dp, MaterialTheme.colorScheme.onSurfaceVariant, RoundedCornerShape(4.dp))
+                                    .border(1.dp, EreaderColors.Black, RoundedCornerShape(4.dp))
                                     .padding(horizontal = 8.dp, vertical = 4.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -697,34 +698,34 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                                     Icons.Default.FormatListBulleted,
                                     contentDescription = null,
                                     modifier = Modifier.size(14.dp),
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    tint = EreaderColors.Black
                                 )
                                 Text(
                                     chapterTitle.ifEmpty { "목차" },
                                     style = MaterialTheme.typography.bodySmall.copy(fontSize = 14.sp),
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    color = EreaderColors.Black
                                 )
                             }
                         }
 
-                        HorizontalDivider(color = Color.Black)
+                        HorizontalDivider(color = EreaderColors.Black)
 
                         ReaderMenuItem(Icons.Default.Search, "본문 검색", onClick = {
                             showSearchPopup = true
                         })
-                        HorizontalDivider(color = Color(0xFFCCCCCC))
+                        HorizontalDivider(color = EreaderColors.Gray)
                         ReaderMenuItem(Icons.Default.Star, "하이라이트", onClick = {
                             showHighlightPopup = true
                         })
-                        HorizontalDivider(color = Color(0xFFCCCCCC))
+                        HorizontalDivider(color = EreaderColors.Gray)
                         ReaderMenuItem(Icons.Default.Edit, "메모", onClick = {
                             showMemoListPopup = true
                         })
-                        HorizontalDivider(color = Color(0xFFCCCCCC))
+                        HorizontalDivider(color = EreaderColors.Gray)
                         ReaderMenuItem(Icons.Default.Bookmark, "북마크", onClick = {
                             showBookmarkPopup = true
                         })
-                        HorizontalDivider(color = Color(0xFFCCCCCC))
+                        HorizontalDivider(color = EreaderColors.Gray)
                         ReaderMenuItem(Icons.Default.Settings, "설정", onClick = {
                             showSettingsPopup = true
                             showMenu = false
@@ -746,7 +747,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
             ) {
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
-                    color = Color.White
+                    color = EreaderColors.White
                 ) {
                     Row(
                         modifier = Modifier
@@ -833,12 +834,12 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                             Icon(
                                 if (isCurrentPageBookmarked) Icons.Filled.Bookmark else Icons.Filled.BookmarkBorder,
                                 contentDescription = "북마크",
-                                tint = Color.Black
+                                tint = EreaderColors.Black
                             )
                         }
                     }
                 }
-                HorizontalDivider(color = Color.Black)
+                HorizontalDivider(color = EreaderColors.Black)
             }
         }
 
@@ -1175,9 +1176,9 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                 Surface(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .border(1.dp, Color.Black)
+                        .border(1.dp, EreaderColors.Black)
                         .pointerInput(Unit) { detectTapGestures {} },
-                    color = Color.White
+                    color = EreaderColors.White
                 ) {
                     ReaderSettingsBottomSheet(
                         settings = readerSettings,
@@ -1262,7 +1263,7 @@ private fun TocPopup(
     var currentPage by remember { mutableStateOf(0) }
     val pageItems = flatItems.drop(currentPage * itemsPerPage).take(itemsPerPage)
 
-    Surface(modifier = Modifier.fillMaxSize(), color = Color.White) {
+    Surface(modifier = Modifier.fillMaxSize(), color = EreaderColors.White) {
         Column(modifier = Modifier.fillMaxSize()) {
             Row(
                 modifier = Modifier
@@ -1282,7 +1283,7 @@ private fun TocPopup(
                     overflow = TextOverflow.Ellipsis
                 )
             }
-            HorizontalDivider(color = Color.Black)
+            HorizontalDivider(color = EreaderColors.Black)
             Column(modifier = Modifier.weight(1f)) {
                 if (flatItems.isEmpty()) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -1311,20 +1312,20 @@ private fun TocPopup(
                                     Text(
                                         "${item.page}",
                                         style = MaterialTheme.typography.labelSmall,
-                                        color = Color(0xFFBBBBBB)
+                                        color = EreaderColors.DarkGray
                                     )
                                 }
                             }
                             Text(
                                 item.label,
                                 style = if (item.depth == 0) MaterialTheme.typography.bodyLarge else MaterialTheme.typography.bodyMedium,
-                                color = if (item.label == currentChapterTitle) Color.Black else MaterialTheme.colorScheme.onSurface,
+                                color = if (item.label == currentChapterTitle) EreaderColors.Black else EreaderColors.Black,
                                 modifier = Modifier
                                     .weight(1f)
                                     .padding(start = (item.depth * 16).dp)
                             )
                         }
-                        HorizontalDivider(color = Color(0xFFCCCCCC))
+                        HorizontalDivider(color = EreaderColors.Gray)
                     }
                 }
             }
@@ -1347,12 +1348,12 @@ private fun TocPopup(
                         Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = "이전",
                         modifier = Modifier.height(16.dp),
-                        tint = if (currentPage > 0) Color.Black else Color(0xFFCCCCCC)
+                        tint = if (currentPage > 0) EreaderColors.Black else EreaderColors.DarkGray
                     )
                     Text(
                         "이전",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = if (currentPage > 0) Color.Black else Color(0xFFCCCCCC)
+                        color = if (currentPage > 0) EreaderColors.Black else EreaderColors.DarkGray
                     )
                 }
                 Text(
@@ -1369,13 +1370,13 @@ private fun TocPopup(
                     Text(
                         "다음",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = if (currentPage < totalPages - 1) Color.Black else Color(0xFFCCCCCC)
+                        color = if (currentPage < totalPages - 1) EreaderColors.Black else EreaderColors.DarkGray
                     )
                     Icon(
                         Icons.AutoMirrored.Filled.ArrowForward,
                         contentDescription = "다음",
                         modifier = Modifier.height(16.dp),
-                        tint = if (currentPage < totalPages - 1) Color.Black else Color(0xFFCCCCCC)
+                        tint = if (currentPage < totalPages - 1) EreaderColors.Black else EreaderColors.DarkGray
                     )
                 }
             }
@@ -1422,7 +1423,7 @@ private fun SearchPopup(
     LaunchedEffect(Unit) { focusRequester.requestFocus() }
     LaunchedEffect(searchedQuery) { currentPage = 0 }
 
-    Surface(modifier = Modifier.fillMaxSize(), color = Color.White) {
+    Surface(modifier = Modifier.fillMaxSize(), color = EreaderColors.White) {
         Column(modifier = Modifier.fillMaxSize()) {
             Row(
                 modifier = Modifier
@@ -1440,7 +1441,7 @@ private fun SearchPopup(
                     modifier = Modifier.weight(1f)
                 )
             }
-            HorizontalDivider(color = Color.Black)
+            HorizontalDivider(color = EreaderColors.Black)
 
             Box(modifier = Modifier.weight(1f)) {
                 when {
@@ -1454,7 +1455,7 @@ private fun SearchPopup(
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center
                     ) {
-                        CircularProgressIndicator(color = Color.Black)
+                        CircularProgressIndicator(color = EreaderColors.Black)
                     }
                     searchResults.isEmpty() -> Box(
                         modifier = Modifier.fillMaxSize(),
@@ -1464,7 +1465,7 @@ private fun SearchPopup(
                     }
                     else -> Column(modifier = Modifier.fillMaxSize()) {
                         pageItems.forEachIndexed { index, result ->
-                            if (index > 0) HorizontalDivider(color = Color(0xFFCCCCCC))
+                            if (index > 0) HorizontalDivider(color = EreaderColors.Gray)
                             val effectivePage = if (result.page > 0) result.page else (tocPageMap[result.chapter] ?: 0)
                             Column(
                                 modifier = Modifier
@@ -1482,7 +1483,7 @@ private fun SearchPopup(
                                         Text(
                                             result.chapter,
                                             style = MaterialTheme.typography.labelSmall,
-                                            color = Color(0xFFBBBBBB),
+                                            color = EreaderColors.DarkGray,
                                             modifier = Modifier.weight(1f),
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis
@@ -1491,7 +1492,7 @@ private fun SearchPopup(
                                             Text(
                                                 "p.$effectivePage",
                                                 style = MaterialTheme.typography.labelSmall,
-                                                color = Color(0xFFBBBBBB)
+                                                color = EreaderColors.DarkGray
                                             )
                                         }
                                     }
@@ -1543,12 +1544,12 @@ private fun SearchPopup(
                                 Icons.AutoMirrored.Filled.ArrowBack,
                                 contentDescription = "이전",
                                 modifier = Modifier.height(16.dp),
-                                tint = if (currentPage > 0) Color.Black else Color(0xFFCCCCCC)
+                                tint = if (currentPage > 0) EreaderColors.Black else EreaderColors.DarkGray
                             )
                             Text(
                                 "이전",
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = if (currentPage > 0) Color.Black else Color(0xFFCCCCCC)
+                                color = if (currentPage > 0) EreaderColors.Black else EreaderColors.DarkGray
                             )
                         }
                         Text(
@@ -1565,18 +1566,18 @@ private fun SearchPopup(
                             Text(
                                 "다음",
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = if (currentPage < totalPages - 1) Color.Black else Color(0xFFCCCCCC)
+                                color = if (currentPage < totalPages - 1) EreaderColors.Black else EreaderColors.DarkGray
                             )
                             Icon(
                                 Icons.AutoMirrored.Filled.ArrowForward,
                                 contentDescription = "다음",
                                 modifier = Modifier.height(16.dp),
-                                tint = if (currentPage < totalPages - 1) Color.Black else Color(0xFFCCCCCC)
+                                tint = if (currentPage < totalPages - 1) EreaderColors.Black else EreaderColors.DarkGray
                             )
                         }
                     }
                 }
-                HorizontalDivider(color = Color.Black)
+                HorizontalDivider(color = EreaderColors.Black)
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -1588,14 +1589,14 @@ private fun SearchPopup(
                         Icons.Default.Search,
                         contentDescription = null,
                         modifier = Modifier.padding(horizontal = 12.dp).size(24.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        tint = EreaderColors.Black
                     )
                     BasicTextField(
                         value = query,
                         onValueChange = { query = it },
                         modifier = Modifier.weight(1f).focusRequester(focusRequester),
                         singleLine = true,
-                        textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
+                        textStyle = MaterialTheme.typography.bodyLarge.copy(color = EreaderColors.Black),
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                         keyboardActions = KeyboardActions(onSearch = {
                             if (query.length >= 2) { val q = query.trim().replace(Regex("\\s+"), " "); searchedQuery = q; onSearch(q) }
@@ -1606,7 +1607,7 @@ private fun SearchPopup(
                                     Text(
                                         "검색어를 두 글자 이상 입력하세요.",
                                         style = MaterialTheme.typography.bodyLarge,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        color = EreaderColors.DarkGray
                                     )
                                 }
                                 innerTextField()
@@ -1622,13 +1623,13 @@ private fun SearchPopup(
                                 Icons.Default.Close,
                                 contentDescription = "검색어 지우기",
                                 modifier = Modifier.size(20.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                tint = EreaderColors.Black
                             )
                         }
                     }
                     Box(
                         modifier = Modifier
-                            .border(1.dp, Color.Black, RoundedCornerShape(4.dp))
+                            .border(1.dp, EreaderColors.Black, RoundedCornerShape(4.dp))
                             .clickable { if (query.length >= 2) { val q = query.trim().replace(Regex("\\s+"), " "); searchedQuery = q; onSearch(q) } }
                             .padding(horizontal = 16.dp, vertical = 10.dp),
                         contentAlignment = Alignment.Center
@@ -1678,7 +1679,7 @@ private fun BookmarkPopup(
         if (currentPage >= totalPages) currentPage = maxOf(0, totalPages - 1)
     }
 
-    Surface(modifier = Modifier.fillMaxSize(), color = Color.White) {
+    Surface(modifier = Modifier.fillMaxSize(), color = EreaderColors.White) {
         Column(modifier = Modifier.fillMaxSize()) {
             Row(
                 modifier = Modifier
@@ -1700,7 +1701,7 @@ private fun BookmarkPopup(
                         Text(
                             text = sortOrder.label,
                             style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurface
+                            color = EreaderColors.Black
                         )
                     }
                     if (dropdownExpanded) {
@@ -1713,8 +1714,8 @@ private fun BookmarkPopup(
                             Column(
                                 modifier = Modifier
                                     .width(IntrinsicSize.Max)
-                                    .background(Color.White)
-                                    .border(1.dp, Color.Black)
+                                    .background(EreaderColors.White)
+                                    .border(1.dp, EreaderColors.Black)
                             ) {
                                 BookmarkSortOrder.entries.forEachIndexed { index, order ->
                                     val isSelected = sortOrder == order
@@ -1731,7 +1732,7 @@ private fun BookmarkPopup(
                                         Text(
                                             text = order.label,
                                             style = MaterialTheme.typography.bodyMedium,
-                                            color = Color.Black,
+                                            color = EreaderColors.Black,
                                             modifier = Modifier.weight(1f)
                                         )
                                         if (isSelected) {
@@ -1739,13 +1740,13 @@ private fun BookmarkPopup(
                                             Icon(
                                                 imageVector = Icons.Default.Check,
                                                 contentDescription = null,
-                                                tint = Color.Black,
+                                                tint = EreaderColors.Black,
                                                 modifier = Modifier.size(16.dp)
                                             )
                                         }
                                     }
                                     if (index < BookmarkSortOrder.entries.lastIndex) {
-                                        HorizontalDivider(color = Color(0xFFE0E0E0))
+                                        HorizontalDivider(color = EreaderColors.Gray)
                                     }
                                 }
                             }
@@ -1753,7 +1754,7 @@ private fun BookmarkPopup(
                     }
                 }
             }
-            HorizontalDivider(color = Color.Black)
+            HorizontalDivider(color = EreaderColors.Black)
 
             Box(modifier = Modifier.weight(1f)) {
                 if (bookmarks.isEmpty()) {
@@ -1763,7 +1764,7 @@ private fun BookmarkPopup(
                 } else {
                     Column(modifier = Modifier.fillMaxSize()) {
                         pageItems.forEachIndexed { index, bookmark ->
-                            if (index > 0) HorizontalDivider(color = Color(0xFFCCCCCC))
+                            if (index > 0) HorizontalDivider(color = EreaderColors.Gray)
                             Row(
                                 modifier = Modifier.fillMaxWidth().height(88.dp),
                                 verticalAlignment = Alignment.CenterVertically
@@ -1785,13 +1786,13 @@ private fun BookmarkPopup(
                                             Text(
                                                 "p.$bookmarkPage",
                                                 style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                                                color = Color.Black
+                                                color = EreaderColors.Black
                                             )
                                         }
                                         Text(
                                             bookmark.chapterTitle,
                                             style = MaterialTheme.typography.labelSmall,
-                                            color = Color(0xFFBBBBBB),
+                                            color = EreaderColors.DarkGray,
                                             modifier = Modifier.weight(1f).padding(start = if (bookmarkPage > 0) 8.dp else 0.dp),
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis,
@@ -1808,7 +1809,7 @@ private fun BookmarkPopup(
                                     Text(
                                         dateFormat.format(Date(bookmark.createdAt)),
                                         style = MaterialTheme.typography.labelSmall,
-                                        color = Color(0xFFBBBBBB)
+                                        color = EreaderColors.DarkGray
                                     )
                                 }
                                 IconButton(onClick = { onDelete(bookmark) }) {
@@ -1842,12 +1843,12 @@ private fun BookmarkPopup(
                                 Icons.AutoMirrored.Filled.ArrowBack,
                                 contentDescription = "이전",
                                 modifier = Modifier.height(16.dp),
-                                tint = if (currentPage > 0) Color.Black else Color(0xFFCCCCCC)
+                                tint = if (currentPage > 0) EreaderColors.Black else EreaderColors.DarkGray
                             )
                             Text(
                                 "이전",
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = if (currentPage > 0) Color.Black else Color(0xFFCCCCCC)
+                                color = if (currentPage > 0) EreaderColors.Black else EreaderColors.DarkGray
                             )
                         }
                         Text(
@@ -1864,18 +1865,18 @@ private fun BookmarkPopup(
                             Text(
                                 "다음",
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = if (currentPage < totalPages - 1) Color.Black else Color(0xFFCCCCCC)
+                                color = if (currentPage < totalPages - 1) EreaderColors.Black else EreaderColors.DarkGray
                             )
                             Icon(
                                 Icons.AutoMirrored.Filled.ArrowForward,
                                 contentDescription = "다음",
                                 modifier = Modifier.height(16.dp),
-                                tint = if (currentPage < totalPages - 1) Color.Black else Color(0xFFCCCCCC)
+                                tint = if (currentPage < totalPages - 1) EreaderColors.Black else EreaderColors.DarkGray
                             )
                         }
                     }
                 }
-                HorizontalDivider(color = Color.Black)
+                HorizontalDivider(color = EreaderColors.Black)
             }
         }
     }
@@ -1918,7 +1919,7 @@ private fun HighlightPopup(
         if (currentPage >= totalPages) currentPage = maxOf(0, totalPages - 1)
     }
 
-    Surface(modifier = Modifier.fillMaxSize(), color = Color.White) {
+    Surface(modifier = Modifier.fillMaxSize(), color = EreaderColors.White) {
         Column(modifier = Modifier.fillMaxSize()) {
             Row(
                 modifier = Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 4.dp),
@@ -1930,7 +1931,7 @@ private fun HighlightPopup(
                 Text("하이라이트", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
                 Box(modifier = Modifier.onGloballyPositioned { anchorHeight = it.size.height }) {
                     TextButton(onClick = { dropdownExpanded = true }) {
-                        Text(sortOrder.label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurface)
+                        Text(sortOrder.label, style = MaterialTheme.typography.labelMedium, color = EreaderColors.Black)
                     }
                     if (dropdownExpanded) {
                         Popup(
@@ -1939,7 +1940,7 @@ private fun HighlightPopup(
                             onDismissRequest = { dropdownExpanded = false },
                             properties = PopupProperties(focusable = true)
                         ) {
-                            Column(modifier = Modifier.width(IntrinsicSize.Max).background(Color.White).border(1.dp, Color.Black)) {
+                            Column(modifier = Modifier.width(IntrinsicSize.Max).background(EreaderColors.White).border(1.dp, EreaderColors.Black)) {
                                 BookmarkSortOrder.entries.forEachIndexed { index, order ->
                                     Row(
                                         verticalAlignment = Alignment.CenterVertically,
@@ -1947,20 +1948,20 @@ private fun HighlightPopup(
                                             .clickable { sortOrder = order; dropdownExpanded = false }
                                             .padding(start = 16.dp, end = 12.dp, top = 12.dp, bottom = 12.dp)
                                     ) {
-                                        Text(order.label, style = MaterialTheme.typography.bodyMedium, color = Color.Black, modifier = Modifier.weight(1f))
+                                        Text(order.label, style = MaterialTheme.typography.bodyMedium, color = EreaderColors.Black, modifier = Modifier.weight(1f))
                                         if (sortOrder == order) {
                                             Spacer(Modifier.width(16.dp))
-                                            Icon(Icons.Default.Check, contentDescription = null, tint = Color.Black, modifier = Modifier.size(16.dp))
+                                            Icon(Icons.Default.Check, contentDescription = null, tint = EreaderColors.Black, modifier = Modifier.size(16.dp))
                                         }
                                     }
-                                    if (index < BookmarkSortOrder.entries.lastIndex) HorizontalDivider(color = Color(0xFFE0E0E0))
+                                    if (index < BookmarkSortOrder.entries.lastIndex) HorizontalDivider(color = EreaderColors.Gray)
                                 }
                             }
                         }
                     }
                 }
             }
-            HorizontalDivider(color = Color.Black)
+            HorizontalDivider(color = EreaderColors.Black)
 
             Box(modifier = Modifier.weight(1f)) {
                 if (highlights.isEmpty()) {
@@ -1970,7 +1971,7 @@ private fun HighlightPopup(
                 } else {
                     Column(modifier = Modifier.fillMaxSize()) {
                         pageItems.forEachIndexed { index, highlight ->
-                            if (index > 0) HorizontalDivider(color = Color(0xFFCCCCCC))
+                            if (index > 0) HorizontalDivider(color = EreaderColors.Gray)
                             Row(
                                 modifier = Modifier.fillMaxWidth().height(88.dp),
                                 verticalAlignment = Alignment.CenterVertically
@@ -1988,12 +1989,12 @@ private fun HighlightPopup(
                                     ) {
                                         val highlightPage = highlight.page.takeIf { it > 0 } ?: cfiToPage(highlight.cfi, spinePageOffsets, cfiPageMap)
                                         if (highlightPage > 0) {
-                                            Text("p.$highlightPage", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold), color = Color.Black)
+                                            Text("p.$highlightPage", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold), color = EreaderColors.Black)
                                         }
                                         Text(
                                             highlight.chapterTitle,
                                             style = MaterialTheme.typography.labelSmall,
-                                            color = Color(0xFFBBBBBB),
+                                            color = EreaderColors.DarkGray,
                                             modifier = Modifier.weight(1f).padding(start = if (highlightPage > 0) 8.dp else 0.dp),
                                             maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.End
                                         )
@@ -2004,7 +2005,7 @@ private fun HighlightPopup(
                                         maxLines = 1, overflow = TextOverflow.Ellipsis,
                                         modifier = Modifier.padding(bottom = 4.dp)
                                     )
-                                    Text(dateFormat.format(Date(highlight.createdAt)), style = MaterialTheme.typography.labelSmall, color = Color(0xFFBBBBBB))
+                                    Text(dateFormat.format(Date(highlight.createdAt)), style = MaterialTheme.typography.labelSmall, color = EreaderColors.DarkGray)
                                 }
                                 IconButton(onClick = { onDelete(highlight) }) {
                                     Icon(Icons.Default.Close, contentDescription = "삭제", modifier = Modifier.size(18.dp))
@@ -2026,20 +2027,20 @@ private fun HighlightPopup(
                             modifier = Modifier.clickable(enabled = currentPage > 0) { currentPage-- }.padding(horizontal = 16.dp, vertical = 12.dp),
                             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "이전", modifier = Modifier.height(16.dp), tint = if (currentPage > 0) Color.Black else Color(0xFFCCCCCC))
-                            Text("이전", style = MaterialTheme.typography.bodyMedium, color = if (currentPage > 0) Color.Black else Color(0xFFCCCCCC))
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "이전", modifier = Modifier.height(16.dp), tint = if (currentPage > 0) EreaderColors.Black else EreaderColors.DarkGray)
+                            Text("이전", style = MaterialTheme.typography.bodyMedium, color = if (currentPage > 0) EreaderColors.Black else EreaderColors.DarkGray)
                         }
                         Text("${currentPage + 1}/$totalPages (${sortedHighlights.size}건)", style = MaterialTheme.typography.bodyMedium)
                         Row(
                             modifier = Modifier.clickable(enabled = currentPage < totalPages - 1) { currentPage++ }.padding(horizontal = 16.dp, vertical = 12.dp),
                             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
-                            Text("다음", style = MaterialTheme.typography.bodyMedium, color = if (currentPage < totalPages - 1) Color.Black else Color(0xFFCCCCCC))
-                            Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = "다음", modifier = Modifier.height(16.dp), tint = if (currentPage < totalPages - 1) Color.Black else Color(0xFFCCCCCC))
+                            Text("다음", style = MaterialTheme.typography.bodyMedium, color = if (currentPage < totalPages - 1) EreaderColors.Black else EreaderColors.DarkGray)
+                            Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = "다음", modifier = Modifier.height(16.dp), tint = if (currentPage < totalPages - 1) EreaderColors.Black else EreaderColors.DarkGray)
                         }
                     }
                 }
-                HorizontalDivider(color = Color.Black)
+                HorizontalDivider(color = EreaderColors.Black)
             }
         }
     }
@@ -2056,7 +2057,7 @@ private fun MemoEditorScreen(
 ) {
     var note by remember { mutableStateOf(initialNote) }
 
-    Surface(modifier = Modifier.fillMaxSize(), color = Color.White) {
+    Surface(modifier = Modifier.fillMaxSize(), color = EreaderColors.White) {
         Column(modifier = Modifier.fillMaxSize()) {
             Row(
                 modifier = Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 4.dp),
@@ -2067,10 +2068,10 @@ private fun MemoEditorScreen(
                 }
                 Text("메모", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
                 TextButton(onClick = { onSave(note) }) {
-                    Text("저장", color = Color.Black)
+                    Text("저장", color = EreaderColors.Black)
                 }
             }
-            HorizontalDivider(color = Color.Black)
+            HorizontalDivider(color = EreaderColors.Black)
             Column(
                 modifier = Modifier
                     .weight(1f)
@@ -2085,7 +2086,7 @@ private fun MemoEditorScreen(
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .border(1.dp, Color(0xFFCCCCCC), RoundedCornerShape(4.dp))
+                            .border(1.dp, EreaderColors.Gray, RoundedCornerShape(4.dp))
                             .padding(12.dp)
                     )
                 }
@@ -2095,13 +2096,13 @@ private fun MemoEditorScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f)
-                        .border(1.dp, Color(0xFFCCCCCC), RoundedCornerShape(4.dp))
+                        .border(1.dp, EreaderColors.Gray, RoundedCornerShape(4.dp))
                         .padding(12.dp),
-                    textStyle = MaterialTheme.typography.bodyMedium.copy(color = Color.Black),
+                    textStyle = MaterialTheme.typography.bodyMedium.copy(color = EreaderColors.Black),
                     decorationBox = { inner ->
                         Box {
                             if (note.isEmpty()) {
-                                Text("메모를 입력하세요.", style = MaterialTheme.typography.bodyMedium, color = Color(0xFFAAAAAA))
+                                Text("메모를 입력하세요.", style = MaterialTheme.typography.bodyMedium, color = EreaderColors.Gray)
                             }
                             inner()
                         }
@@ -2109,7 +2110,7 @@ private fun MemoEditorScreen(
                 )
             }
             if (onDelete != null || onNavigate != null) {
-                HorizontalDivider(color = Color.Black)
+                HorizontalDivider(color = EreaderColors.Black)
                 Row(
                     modifier = Modifier.fillMaxWidth().height(56.dp),
                     horizontalArrangement = Arrangement.SpaceEvenly,
@@ -2117,15 +2118,15 @@ private fun MemoEditorScreen(
                 ) {
                     if (onDelete != null) {
                         TextButton(onClick = onDelete, modifier = Modifier.weight(1f)) {
-                            Text("삭제", color = Color.Black)
+                            Text("삭제", color = EreaderColors.Black)
                         }
                     }
                     if (onDelete != null && onNavigate != null) {
-                        Box(Modifier.width(1.dp).height(20.dp).background(Color.Black))
+                        Box(Modifier.width(1.dp).height(20.dp).background(EreaderColors.Black))
                     }
                     if (onNavigate != null) {
                         TextButton(onClick = onNavigate, modifier = Modifier.weight(1f)) {
-                            Text("페이지로 이동", color = Color.Black)
+                            Text("페이지로 이동", color = EreaderColors.Black)
                         }
                     }
                 }
@@ -2172,7 +2173,7 @@ private fun MemoListPopup(
         if (currentPage >= totalPages) currentPage = maxOf(0, totalPages - 1)
     }
 
-    Surface(modifier = Modifier.fillMaxSize(), color = Color.White) {
+    Surface(modifier = Modifier.fillMaxSize(), color = EreaderColors.White) {
         Column(modifier = Modifier.fillMaxSize()) {
             Row(
                 modifier = Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 4.dp),
@@ -2184,7 +2185,7 @@ private fun MemoListPopup(
                 Text("메모", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
                 Box(modifier = Modifier.onGloballyPositioned { anchorHeight = it.size.height }) {
                     TextButton(onClick = { dropdownExpanded = true }) {
-                        Text(sortOrder.label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurface)
+                        Text(sortOrder.label, style = MaterialTheme.typography.labelMedium, color = EreaderColors.Black)
                     }
                     if (dropdownExpanded) {
                         Popup(
@@ -2193,7 +2194,7 @@ private fun MemoListPopup(
                             onDismissRequest = { dropdownExpanded = false },
                             properties = PopupProperties(focusable = true)
                         ) {
-                            Column(modifier = Modifier.width(IntrinsicSize.Max).background(Color.White).border(1.dp, Color.Black)) {
+                            Column(modifier = Modifier.width(IntrinsicSize.Max).background(EreaderColors.White).border(1.dp, EreaderColors.Black)) {
                                 BookmarkSortOrder.entries.forEachIndexed { index, order ->
                                     Row(
                                         verticalAlignment = Alignment.CenterVertically,
@@ -2201,20 +2202,20 @@ private fun MemoListPopup(
                                             .clickable { sortOrder = order; dropdownExpanded = false }
                                             .padding(start = 16.dp, end = 12.dp, top = 12.dp, bottom = 12.dp)
                                     ) {
-                                        Text(order.label, style = MaterialTheme.typography.bodyMedium, color = Color.Black, modifier = Modifier.weight(1f))
+                                        Text(order.label, style = MaterialTheme.typography.bodyMedium, color = EreaderColors.Black, modifier = Modifier.weight(1f))
                                         if (sortOrder == order) {
                                             Spacer(Modifier.width(16.dp))
-                                            Icon(Icons.Default.Check, contentDescription = null, tint = Color.Black, modifier = Modifier.size(16.dp))
+                                            Icon(Icons.Default.Check, contentDescription = null, tint = EreaderColors.Black, modifier = Modifier.size(16.dp))
                                         }
                                     }
-                                    if (index < BookmarkSortOrder.entries.lastIndex) HorizontalDivider(color = Color(0xFFE0E0E0))
+                                    if (index < BookmarkSortOrder.entries.lastIndex) HorizontalDivider(color = EreaderColors.Gray)
                                 }
                             }
                         }
                     }
                 }
             }
-            HorizontalDivider(color = Color.Black)
+            HorizontalDivider(color = EreaderColors.Black)
 
             Box(modifier = Modifier.weight(1f)) {
                 if (memos.isEmpty()) {
@@ -2224,7 +2225,7 @@ private fun MemoListPopup(
                 } else {
                     Column(modifier = Modifier.fillMaxSize()) {
                         pageItems.forEachIndexed { index, memo ->
-                            if (index > 0) HorizontalDivider(color = Color(0xFFCCCCCC))
+                            if (index > 0) HorizontalDivider(color = EreaderColors.Gray)
                             Row(
                                 modifier = Modifier.fillMaxWidth().height(112.dp),
                                 verticalAlignment = Alignment.CenterVertically
@@ -2242,12 +2243,12 @@ private fun MemoListPopup(
                                     ) {
                                         val memoPage = memo.page.takeIf { it > 0 } ?: cfiToPage(memo.cfi, spinePageOffsets, cfiPageMap)
                                         if (memoPage > 0) {
-                                            Text("p.$memoPage", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold), color = Color.Black)
+                                            Text("p.$memoPage", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold), color = EreaderColors.Black)
                                         }
                                         Text(
                                             memo.chapterTitle,
                                             style = MaterialTheme.typography.labelSmall,
-                                            color = Color(0xFFBBBBBB),
+                                            color = EreaderColors.DarkGray,
                                             modifier = Modifier.weight(1f).padding(start = if (memoPage > 0) 8.dp else 0.dp),
                                             maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.End
                                         )
@@ -2264,11 +2265,11 @@ private fun MemoListPopup(
                                             horizontalArrangement = Arrangement.spacedBy(4.dp),
                                             modifier = Modifier.padding(bottom = 4.dp)
                                         ) {
-                                            Icon(Icons.Default.ModeComment, contentDescription = null, modifier = Modifier.size(12.dp), tint = Color(0xFF888888))
-                                            Text(memo.note, style = MaterialTheme.typography.labelSmall, color = Color(0xFF888888), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                            Icon(Icons.Default.ModeComment, contentDescription = null, modifier = Modifier.size(12.dp), tint = EreaderColors.DarkGray)
+                                            Text(memo.note, style = MaterialTheme.typography.labelSmall, color = EreaderColors.DarkGray, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                         }
                                     }
-                                    Text(dateFormat.format(Date(memo.createdAt)), style = MaterialTheme.typography.labelSmall, color = Color(0xFFBBBBBB))
+                                    Text(dateFormat.format(Date(memo.createdAt)), style = MaterialTheme.typography.labelSmall, color = EreaderColors.DarkGray)
                                 }
                                 IconButton(onClick = { onDelete(memo) }) {
                                     Icon(Icons.Default.Close, contentDescription = "삭제", modifier = Modifier.size(18.dp))
@@ -2290,20 +2291,20 @@ private fun MemoListPopup(
                             modifier = Modifier.clickable(enabled = currentPage > 0) { currentPage-- }.padding(horizontal = 16.dp, vertical = 12.dp),
                             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "이전", modifier = Modifier.height(16.dp), tint = if (currentPage > 0) Color.Black else Color(0xFFCCCCCC))
-                            Text("이전", style = MaterialTheme.typography.bodyMedium, color = if (currentPage > 0) Color.Black else Color(0xFFCCCCCC))
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "이전", modifier = Modifier.height(16.dp), tint = if (currentPage > 0) EreaderColors.Black else EreaderColors.DarkGray)
+                            Text("이전", style = MaterialTheme.typography.bodyMedium, color = if (currentPage > 0) EreaderColors.Black else EreaderColors.DarkGray)
                         }
                         Text("${currentPage + 1}/$totalPages (${sortedMemos.size}건)", style = MaterialTheme.typography.bodyMedium)
                         Row(
                             modifier = Modifier.clickable(enabled = currentPage < totalPages - 1) { currentPage++ }.padding(horizontal = 16.dp, vertical = 12.dp),
                             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
-                            Text("다음", style = MaterialTheme.typography.bodyMedium, color = if (currentPage < totalPages - 1) Color.Black else Color(0xFFCCCCCC))
-                            Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = "다음", modifier = Modifier.height(16.dp), tint = if (currentPage < totalPages - 1) Color.Black else Color(0xFFCCCCCC))
+                            Text("다음", style = MaterialTheme.typography.bodyMedium, color = if (currentPage < totalPages - 1) EreaderColors.Black else EreaderColors.DarkGray)
+                            Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = "다음", modifier = Modifier.height(16.dp), tint = if (currentPage < totalPages - 1) EreaderColors.Black else EreaderColors.DarkGray)
                         }
                     }
                 }
-                HorizontalDivider(color = Color.Black)
+                HorizontalDivider(color = EreaderColors.Black)
             }
         }
     }
@@ -2756,8 +2757,8 @@ private fun ActionPopupContainer(
                         x = (cxDp - popupWidthDp / 2).coerceIn(marginDp, screenWidthDp - popupWidthDp - marginDp),
                         y = offsetY
                     )
-                    .border(1.dp, Color.Black, RoundedCornerShape(8.dp))
-                    .background(Color.White, RoundedCornerShape(8.dp))
+                    .border(1.dp, EreaderColors.Black, RoundedCornerShape(8.dp))
+                    .background(EreaderColors.White, RoundedCornerShape(8.dp))
                     .padding(horizontal = 4.dp)
                     .pointerInput(Unit) { detectTapGestures { } },
                 verticalAlignment = Alignment.CenterVertically,
@@ -2771,7 +2772,7 @@ private fun ActionPopupContainer(
 
 @Composable
 private fun PopupDivider() {
-    Box(Modifier.width(1.dp).height(20.dp).background(Color.Black))
+    Box(Modifier.width(1.dp).height(20.dp).background(EreaderColors.Black))
 }
 
 @Composable
@@ -2786,14 +2787,14 @@ private fun SelectionPopup(
     onDismiss: () -> Unit
 ) {
     ActionPopupContainer(selectionY, selectionBottom, selectionCx, onDismiss, usePopup = true) {
-        TextButton(onClick = onHighlight) { Text("하이라이트", color = Color.Black, fontSize = 14.sp) }
+        TextButton(onClick = onHighlight) { Text("하이라이트", color = EreaderColors.Black, fontSize = 14.sp) }
         PopupDivider()
-        TextButton(onClick = onMemo) { Text("메모", color = Color.Black, fontSize = 14.sp) }
+        TextButton(onClick = onMemo) { Text("메모", color = EreaderColors.Black, fontSize = 14.sp) }
         PopupDivider()
-        TextButton(onClick = onShare) { Text("공유", color = Color.Black, fontSize = 14.sp) }
+        TextButton(onClick = onShare) { Text("공유", color = EreaderColors.Black, fontSize = 14.sp) }
         if (onContinue != null) {
             PopupDivider()
-            TextButton(onClick = onContinue) { Text("이어서 선택", color = Color.Black, fontSize = 14.sp) }
+            TextButton(onClick = onContinue) { Text("이어서 선택", color = EreaderColors.Black, fontSize = 14.sp) }
         }
     }
 }
@@ -2809,11 +2810,11 @@ private fun HighlightActionPopup(
     onDismiss: () -> Unit
 ) {
     ActionPopupContainer(selectionY, selectionBottom, selectionCx, onDismiss) {
-        TextButton(onClick = onDelete) { Text("하이라이트 삭제", color = Color.Black, fontSize = 14.sp) }
+        TextButton(onClick = onDelete) { Text("하이라이트 삭제", color = EreaderColors.Black, fontSize = 14.sp) }
         PopupDivider()
-        TextButton(onClick = onMemo) { Text("메모", color = Color.Black, fontSize = 14.sp) }
+        TextButton(onClick = onMemo) { Text("메모", color = EreaderColors.Black, fontSize = 14.sp) }
         PopupDivider()
-        TextButton(onClick = onShare) { Text("공유", color = Color.Black, fontSize = 14.sp) }
+        TextButton(onClick = onShare) { Text("공유", color = EreaderColors.Black, fontSize = 14.sp) }
     }
 }
 
@@ -2829,13 +2830,13 @@ private fun MemoActionPopup(
     onDismiss: () -> Unit
 ) {
     ActionPopupContainer(selectionY, selectionBottom, selectionCx, onDismiss) {
-        TextButton(onClick = onHighlight) { Text("하이라이트", color = Color.Black, fontSize = 14.sp) }
+        TextButton(onClick = onHighlight) { Text("하이라이트", color = EreaderColors.Black, fontSize = 14.sp) }
         PopupDivider()
-        TextButton(onClick = onEdit) { Text("메모 편집", color = Color.Black, fontSize = 14.sp) }
+        TextButton(onClick = onEdit) { Text("메모 편집", color = EreaderColors.Black, fontSize = 14.sp) }
         PopupDivider()
-        TextButton(onClick = onDelete) { Text("메모 삭제", color = Color.Black, fontSize = 14.sp) }
+        TextButton(onClick = onDelete) { Text("메모 삭제", color = EreaderColors.Black, fontSize = 14.sp) }
         PopupDivider()
-        TextButton(onClick = onShare) { Text("공유", color = Color.Black, fontSize = 14.sp) }
+        TextButton(onClick = onShare) { Text("공유", color = EreaderColors.Black, fontSize = 14.sp) }
     }
 }
 
@@ -2851,13 +2852,13 @@ private fun CombinedAnnotationPopup(
     onDismiss: () -> Unit
 ) {
     ActionPopupContainer(selectionY, selectionBottom, selectionCx, onDismiss) {
-        TextButton(onClick = onDeleteHighlight) { Text("하이라이트 삭제", color = Color.Black, fontSize = 14.sp) }
+        TextButton(onClick = onDeleteHighlight) { Text("하이라이트 삭제", color = EreaderColors.Black, fontSize = 14.sp) }
         PopupDivider()
-        TextButton(onClick = onEditMemo) { Text("메모 편집", color = Color.Black, fontSize = 14.sp) }
+        TextButton(onClick = onEditMemo) { Text("메모 편집", color = EreaderColors.Black, fontSize = 14.sp) }
         PopupDivider()
-        TextButton(onClick = onDeleteMemo) { Text("메모 삭제", color = Color.Black, fontSize = 14.sp) }
+        TextButton(onClick = onDeleteMemo) { Text("메모 삭제", color = EreaderColors.Black, fontSize = 14.sp) }
         PopupDivider()
-        TextButton(onClick = onShare) { Text("공유", color = Color.Black, fontSize = 14.sp) }
+        TextButton(onClick = onShare) { Text("공유", color = EreaderColors.Black, fontSize = 14.sp) }
     }
 }
 
@@ -4099,7 +4100,7 @@ private fun PdfViewer(path: String, onCenterTap: () -> Unit) {
         LazyColumn(modifier = Modifier.fillMaxSize()) {
             items(pageCount) { index ->
                 PdfPageItem(renderer = renderer, pageIndex = index)
-                if (index < pageCount - 1) HorizontalDivider(thickness = 4.dp)
+                if (index < pageCount - 1) HorizontalDivider(thickness = 4.dp, color = EreaderColors.Gray)
             }
         }
         Box(
@@ -4348,13 +4349,13 @@ private fun ReaderSettingsBottomSheet(
                         modifier = Modifier
                             .weight(1f)
                             .height(2.dp)
-                            .background(if (selectedTab == index) Color.Black else Color.Transparent)
+                            .background(if (selectedTab == index) EreaderColors.Black else Color.Transparent)
                     )
                 }
                 Spacer(modifier = Modifier.width(56.dp))
             }
         }
-        HorizontalDivider(color = Color.Black)
+        HorizontalDivider(color = EreaderColors.Black)
 
         Box(modifier = Modifier.fillMaxWidth().height(230.dp)) {
             when (selectedTab) {
@@ -4407,7 +4408,7 @@ private fun ReaderGlyphTab(
                 }
             }
         }
-        HorizontalDivider(color = Color(0xFFE0E0E0))
+        HorizontalDivider(color = EreaderColors.Gray)
         ReaderSettingRow("글자 크기") {
             ReaderStepperField(
                 value = settings.fontSize.toString(),
@@ -4428,7 +4429,7 @@ private fun ReaderMarginTab(settings: ReaderSettings, onSettingsChange: (ReaderS
                 onIncrement = { if (settings.lineHeight < 3.0f) onSettingsChange(settings.copy(lineHeight = (Math.round(settings.lineHeight * 10) + 1) / 10f)) }
             )
         }
-        HorizontalDivider(color = Color(0xFFE0E0E0))
+        HorizontalDivider(color = EreaderColors.Gray)
         ReaderSettingRow("문단 간격") {
             ReaderStepperField(
                 value = settings.paragraphSpacing.toString(),
@@ -4436,7 +4437,7 @@ private fun ReaderMarginTab(settings: ReaderSettings, onSettingsChange: (ReaderS
                 onIncrement = { if (settings.paragraphSpacing < 40) onSettingsChange(settings.copy(paragraphSpacing = settings.paragraphSpacing + 1)) }
             )
         }
-        HorizontalDivider(color = Color(0xFFE0E0E0))
+        HorizontalDivider(color = EreaderColors.Gray)
         ReaderSettingRow("상하 여백") {
             ReaderStepperField(
                 value = settings.paddingVertical.toString(),
@@ -4444,7 +4445,7 @@ private fun ReaderMarginTab(settings: ReaderSettings, onSettingsChange: (ReaderS
                 onIncrement = { if (settings.paddingVertical < 80) onSettingsChange(settings.copy(paddingVertical = settings.paddingVertical + 2)) }
             )
         }
-        HorizontalDivider(color = Color(0xFFE0E0E0))
+        HorizontalDivider(color = EreaderColors.Gray)
         ReaderSettingRow("좌우 여백") {
             ReaderStepperField(
                 value = settings.paddingHorizontal.toString(),
@@ -4467,7 +4468,7 @@ private fun ReaderViewerTab(settings: ReaderSettings, onSettingsChange: (ReaderS
                 forceAbove = true
             )
         }
-        HorizontalDivider(color = Color(0xFFE0E0E0))
+        HorizontalDivider(color = EreaderColors.Gray)
         ReaderSettingRow("왼쪽 하단 정보") {
             ReaderCycleSelectorField(
                 options = ReaderBottomInfo.entries,
@@ -4476,7 +4477,7 @@ private fun ReaderViewerTab(settings: ReaderSettings, onSettingsChange: (ReaderS
                 labelFor = { it.label }
             )
         }
-        HorizontalDivider(color = Color(0xFFE0E0E0))
+        HorizontalDivider(color = EreaderColors.Gray)
         ReaderSettingRow("오른쪽 하단 정보") {
             ReaderCycleSelectorField(
                 options = ReaderBottomInfo.entries,
@@ -4485,7 +4486,7 @@ private fun ReaderViewerTab(settings: ReaderSettings, onSettingsChange: (ReaderS
                 labelFor = { it.label }
             )
         }
-        HorizontalDivider(color = Color(0xFFE0E0E0))
+        HorizontalDivider(color = EreaderColors.Gray)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -4501,11 +4502,11 @@ private fun ReaderViewerTab(settings: ReaderSettings, onSettingsChange: (ReaderS
                 checked = settings.dualPage,
                 onCheckedChange = { onSettingsChange(settings.copy(dualPage = it)) },
                 colors = SwitchDefaults.colors(
-                    checkedThumbColor = Color.White,
-                    checkedTrackColor = Color.Black,
-                    uncheckedThumbColor = Color.Black,
-                    uncheckedTrackColor = Color.White,
-                    uncheckedBorderColor = Color.Black
+                    checkedThumbColor = EreaderColors.White,
+                    checkedTrackColor = EreaderColors.Black,
+                    uncheckedThumbColor = EreaderColors.Black,
+                    uncheckedTrackColor = EreaderColors.White,
+                    uncheckedBorderColor = EreaderColors.Black
                 )
             )
         }
@@ -4654,8 +4655,8 @@ private fun <T> ReaderCycleSelectorField(
                 Column(
                     modifier = Modifier
                         .width(160.dp)
-                        .background(Color.White)
-                        .border(1.dp, Color.Black)
+                        .background(EreaderColors.White)
+                        .border(1.dp, EreaderColors.Black)
                         .onGloballyPositioned { dropdownHeightPx = it.size.height }
                 ) {
                     visibleOptions.forEachIndexed { index, option ->
@@ -4669,7 +4670,7 @@ private fun <T> ReaderCycleSelectorField(
                             Text(
                                 labelFor(option),
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = Color.Black,
+                                color = EreaderColors.Black,
                                 modifier = Modifier.weight(1f)
                             )
                             if (option == selected) {
@@ -4681,7 +4682,7 @@ private fun <T> ReaderCycleSelectorField(
                             }
                         }
                         if (index < visibleOptions.lastIndex || needsPagination) {
-                            HorizontalDivider(color = Color(0xFFE0E0E0))
+                            HorizontalDivider(color = EreaderColors.Gray)
                         }
                     }
                     if (needsPagination) {
@@ -4701,13 +4702,13 @@ private fun <T> ReaderCycleSelectorField(
                                     Icons.AutoMirrored.Filled.ArrowBack,
                                     contentDescription = null,
                                     modifier = Modifier.size(16.dp),
-                                    tint = if (currentPage > 0) Color.Black else Color(0xFFBBBBBB)
+                                    tint = if (currentPage > 0) EreaderColors.Black else EreaderColors.DarkGray
                                 )
                             }
                             Text(
                                 "${currentPage + 1} / $totalPages",
                                 style = MaterialTheme.typography.bodySmall,
-                                color = Color.Black
+                                color = EreaderColors.Black
                             )
                             IconButton(
                                 onClick = { if (currentPage < totalPages - 1) currentPage++ },
@@ -4718,7 +4719,7 @@ private fun <T> ReaderCycleSelectorField(
                                     Icons.AutoMirrored.Filled.ArrowForward,
                                     contentDescription = null,
                                     modifier = Modifier.size(16.dp),
-                                    tint = if (currentPage < totalPages - 1) Color.Black else Color(0xFFBBBBBB)
+                                    tint = if (currentPage < totalPages - 1) EreaderColors.Black else EreaderColors.DarkGray
                                 )
                             }
                         }
@@ -4831,7 +4832,7 @@ private fun FontLayerPopup(
         )
     }
 
-    Surface(modifier = Modifier.fillMaxSize(), color = Color.White) {
+    Surface(modifier = Modifier.fillMaxSize(), color = EreaderColors.White) {
         Column(modifier = Modifier.fillMaxSize()) {
             // Header
             Row(
@@ -4847,7 +4848,7 @@ private fun FontLayerPopup(
                         Text(
                             if (selectedTab == 0) fontSortOrder.label else systemFontSortOrder.label,
                             style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurface
+                            color = EreaderColors.Black
                         )
                     }
                     if (sortDropdownExpanded) {
@@ -4857,7 +4858,7 @@ private fun FontLayerPopup(
                             onDismissRequest = { sortDropdownExpanded = false },
                             properties = PopupProperties(focusable = true)
                         ) {
-                            Column(modifier = Modifier.width(IntrinsicSize.Max).background(Color.White).border(1.dp, Color.Black)) {
+                            Column(modifier = Modifier.width(IntrinsicSize.Max).background(EreaderColors.White).border(1.dp, EreaderColors.Black)) {
                                 if (selectedTab == 0) {
                                     FontSortOrder.entries.forEachIndexed { i, order ->
                                         Row(
@@ -4866,13 +4867,13 @@ private fun FontLayerPopup(
                                                 .clickable { fontSortOrder = order; sortDropdownExpanded = false }
                                                 .padding(start = 16.dp, end = 12.dp, top = 12.dp, bottom = 12.dp)
                                         ) {
-                                            Text(order.label, style = MaterialTheme.typography.bodyMedium, color = Color.Black, modifier = Modifier.weight(1f))
+                                            Text(order.label, style = MaterialTheme.typography.bodyMedium, color = EreaderColors.Black, modifier = Modifier.weight(1f))
                                             if (fontSortOrder == order) {
                                                 Spacer(Modifier.width(16.dp))
-                                                Icon(Icons.Default.Check, contentDescription = null, tint = Color.Black, modifier = Modifier.size(16.dp))
+                                                Icon(Icons.Default.Check, contentDescription = null, tint = EreaderColors.Black, modifier = Modifier.size(16.dp))
                                             }
                                         }
-                                        if (i < FontSortOrder.entries.lastIndex) HorizontalDivider(color = Color(0xFFE0E0E0))
+                                        if (i < FontSortOrder.entries.lastIndex) HorizontalDivider(color = EreaderColors.Gray)
                                     }
                                 } else {
                                     SystemFontSortOrder.entries.forEachIndexed { i, order ->
@@ -4882,13 +4883,13 @@ private fun FontLayerPopup(
                                                 .clickable { systemFontSortOrder = order; sortDropdownExpanded = false }
                                                 .padding(start = 16.dp, end = 12.dp, top = 12.dp, bottom = 12.dp)
                                         ) {
-                                            Text(order.label, style = MaterialTheme.typography.bodyMedium, color = Color.Black, modifier = Modifier.weight(1f))
+                                            Text(order.label, style = MaterialTheme.typography.bodyMedium, color = EreaderColors.Black, modifier = Modifier.weight(1f))
                                             if (systemFontSortOrder == order) {
                                                 Spacer(Modifier.width(16.dp))
-                                                Icon(Icons.Default.Check, contentDescription = null, tint = Color.Black, modifier = Modifier.size(16.dp))
+                                                Icon(Icons.Default.Check, contentDescription = null, tint = EreaderColors.Black, modifier = Modifier.size(16.dp))
                                             }
                                         }
-                                        if (i < SystemFontSortOrder.entries.lastIndex) HorizontalDivider(color = Color(0xFFE0E0E0))
+                                        if (i < SystemFontSortOrder.entries.lastIndex) HorizontalDivider(color = EreaderColors.Gray)
                                     }
                                 }
                             }
@@ -4913,10 +4914,10 @@ private fun FontLayerPopup(
             }
             // Tab underline
             Row(modifier = Modifier.fillMaxWidth().height(2.dp)) {
-                Box(modifier = Modifier.weight(1f).fillMaxHeight().background(if (selectedTab == 0) Color.Black else Color.Transparent))
-                Box(modifier = Modifier.weight(1f).fillMaxHeight().background(if (selectedTab == 1) Color.Black else Color.Transparent))
+                Box(modifier = Modifier.weight(1f).fillMaxHeight().background(if (selectedTab == 0) EreaderColors.Black else Color.Transparent))
+                Box(modifier = Modifier.weight(1f).fillMaxHeight().background(if (selectedTab == 1) EreaderColors.Black else Color.Transparent))
             }
-            HorizontalDivider(color = Color.Black)
+            HorizontalDivider(color = EreaderColors.Black)
 
             // Content
             Box(modifier = Modifier.weight(1f)) {
@@ -4930,7 +4931,7 @@ private fun FontLayerPopup(
                 } else {
                     Column(modifier = Modifier.fillMaxSize()) {
                         pageItems.forEachIndexed { index, fontName ->
-                            if (index > 0) HorizontalDivider(color = Color(0xFFCCCCCC))
+                            if (index > 0) HorizontalDivider(color = EreaderColors.Gray)
                             val isImported = selectedTab == 0 && importedFonts.any { it.name == fontName }
                             Row(
                                 modifier = Modifier
@@ -4981,20 +4982,20 @@ private fun FontLayerPopup(
                             modifier = Modifier.clickable(enabled = currentPage > 0) { currentPage-- }.padding(horizontal = 16.dp, vertical = 12.dp),
                             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "이전", modifier = Modifier.height(16.dp), tint = if (currentPage > 0) Color.Black else Color(0xFFCCCCCC))
-                            Text("이전", style = MaterialTheme.typography.bodyMedium, color = if (currentPage > 0) Color.Black else Color(0xFFCCCCCC))
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "이전", modifier = Modifier.height(16.dp), tint = if (currentPage > 0) EreaderColors.Black else EreaderColors.DarkGray)
+                            Text("이전", style = MaterialTheme.typography.bodyMedium, color = if (currentPage > 0) EreaderColors.Black else EreaderColors.DarkGray)
                         }
                         Text("${currentPage + 1}/$totalPages (${currentItems.size}개)", style = MaterialTheme.typography.bodyMedium)
                         Row(
                             modifier = Modifier.clickable(enabled = currentPage < totalPages - 1) { currentPage++ }.padding(horizontal = 16.dp, vertical = 12.dp),
                             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
-                            Text("다음", style = MaterialTheme.typography.bodyMedium, color = if (currentPage < totalPages - 1) Color.Black else Color(0xFFCCCCCC))
-                            Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = "다음", modifier = Modifier.height(16.dp), tint = if (currentPage < totalPages - 1) Color.Black else Color(0xFFCCCCCC))
+                            Text("다음", style = MaterialTheme.typography.bodyMedium, color = if (currentPage < totalPages - 1) EreaderColors.Black else EreaderColors.DarkGray)
+                            Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = "다음", modifier = Modifier.height(16.dp), tint = if (currentPage < totalPages - 1) EreaderColors.Black else EreaderColors.DarkGray)
                         }
                     }
                 }
-                HorizontalDivider(color = Color.Black)
+                HorizontalDivider(color = EreaderColors.Black)
             }
         }
     }
