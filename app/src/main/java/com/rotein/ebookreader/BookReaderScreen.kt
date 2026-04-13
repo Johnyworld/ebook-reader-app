@@ -80,6 +80,7 @@ import com.rotein.ebookreader.ui.components.EreaderDropdownMenu
 import com.rotein.ebookreader.ui.components.FullScreenPopup
 import com.rotein.ebookreader.ui.components.PopupHeaderBar
 import com.rotein.ebookreader.ui.components.ActionPopup
+import com.rotein.ebookreader.ui.components.EreaderTabBar
 import com.rotein.ebookreader.ui.components.ReaderCycleSelectorField
 import com.rotein.ebookreader.ui.components.ReaderSettingRow
 import com.rotein.ebookreader.ui.components.ReaderStepperField
@@ -3838,40 +3839,16 @@ private fun ReaderSettingsBottomSheet(
 
     Column(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.fillMaxWidth()) {
-            Row(
-                modifier = Modifier.fillMaxWidth().height(56.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                tabLabels.forEachIndexed { index, label ->
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxHeight()
-                            .clickable { selectedTab = index },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            label,
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = if (selectedTab == index) FontWeight.Bold else FontWeight.Normal
-                        )
+            EreaderTabBar(
+                tabs = tabLabels,
+                selectedIndex = selectedTab,
+                onSelect = { selectedTab = it },
+                trailingContent = {
+                    IconButton(onClick = onDismiss, modifier = Modifier.size(56.dp)) {
+                        Icon(Icons.Default.Close, contentDescription = "닫기")
                     }
                 }
-                IconButton(onClick = onDismiss, modifier = Modifier.size(56.dp)) {
-                    Icon(Icons.Default.Close, contentDescription = "닫기")
-                }
-            }
-            Row(modifier = Modifier.fillMaxWidth()) {
-                tabLabels.forEachIndexed { index, _ ->
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(2.dp)
-                            .background(if (selectedTab == index) EreaderColors.Black else Color.Transparent)
-                    )
-                }
-                Spacer(modifier = Modifier.width(56.dp))
-            }
+            )
         }
         HorizontalDivider(color = EreaderColors.Black)
 
@@ -4053,7 +4030,7 @@ private fun FontLayerPopup(
     var importedFonts by remember { mutableStateOf(ImportedFontStore.load(context)) }
 
     val itemHeightDp = 56
-    val headerHeightDp = 56 + 44 + 2 // header(56) + tabs(44) + tab underline(2)
+    val headerHeightDp = 56 + 48 + 2 // header(56) + tabs(48) + tab underline(2)
     val paginationHeightDp = 72
     val itemsPerPage = maxOf(1, (screenHeightDp - statusBarHeightDp - headerHeightDp - paginationHeightDp) / itemHeightDp)
 
@@ -4158,26 +4135,11 @@ private fun FontLayerPopup(
                     )
                 }
             }
-            // Tabs
-            Row(modifier = Modifier.fillMaxWidth().height(44.dp)) {
-                listOf("글꼴", "글꼴 가져오기").forEachIndexed { index, label ->
-                    Box(
-                        modifier = Modifier.weight(1f).fillMaxHeight().clickable { selectedTab = index },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            label,
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = if (selectedTab == index) FontWeight.Bold else FontWeight.Normal
-                        )
-                    }
-                }
-            }
-            // Tab underline
-            Row(modifier = Modifier.fillMaxWidth().height(2.dp)) {
-                Box(modifier = Modifier.weight(1f).fillMaxHeight().background(if (selectedTab == 0) EreaderColors.Black else Color.Transparent))
-                Box(modifier = Modifier.weight(1f).fillMaxHeight().background(if (selectedTab == 1) EreaderColors.Black else Color.Transparent))
-            }
+            EreaderTabBar(
+                tabs = listOf("글꼴", "글꼴 가져오기"),
+                selectedIndex = selectedTab,
+                onSelect = { selectedTab = it },
+            )
             HorizontalDivider(color = EreaderColors.Black)
 
             // Content
