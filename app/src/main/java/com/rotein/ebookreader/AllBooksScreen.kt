@@ -66,7 +66,11 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 @Composable
-fun AllBooksScreen(onBookClick: (BookFile) -> Unit, modifier: Modifier = Modifier) {
+fun AllBooksScreen(
+    onBookClick: (BookFile) -> Unit,
+    onLoadComplete: () -> Unit = {},
+    modifier: Modifier = Modifier
+) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val dao = remember { BookDatabase.getInstance(context).bookReadRecordDao() }
@@ -81,7 +85,7 @@ fun AllBooksScreen(onBookClick: (BookFile) -> Unit, modifier: Modifier = Modifie
             }
         )
     }
-    var books by remember { mutableStateOf<List<BookFile>>(emptyList()) }
+    var books by remember { mutableStateOf(BookCache.books ?: emptyList()) }
     var isLoading by remember { mutableStateOf(false) }
     var isSearchActive by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
@@ -136,9 +140,16 @@ fun AllBooksScreen(onBookClick: (BookFile) -> Unit, modifier: Modifier = Modifie
 
     LaunchedEffect(hasPermission) {
         if (hasPermission) {
-            isLoading = true
-            books = withContext(Dispatchers.IO) { FileScanner.scanBooks(context) }
-            isLoading = false
+            if (BookCache.books != null) {
+                onLoadComplete()
+            } else {
+                isLoading = true
+                val scanned = withContext(Dispatchers.IO) { FileScanner.scanBooks(context) }
+                BookCache.books = scanned
+                books = scanned
+                isLoading = false
+                onLoadComplete()
+            }
         }
     }
 
