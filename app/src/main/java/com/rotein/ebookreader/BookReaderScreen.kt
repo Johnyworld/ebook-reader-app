@@ -844,6 +844,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                 currentChapterTitle = chapterTitle,
                 totalBookPages = totalPages,
                 onNavigate = { href ->
+                    epubWebView.value?.visibility = View.INVISIBLE
                     epubWebView.value?.post {
                         epubWebView.value?.evaluateJavascript(
                             "window._displayHref(\"${href.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n")}\")",
@@ -875,6 +876,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                     }
                 },
                 onNavigate = { cfi, page ->
+                    epubWebView.value?.visibility = View.INVISIBLE
                     epubWebView.value?.post {
                         val escaped = cfi.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n")
                         epubWebView.value?.evaluateJavascript("window._displayCfi(\"$escaped\")", null)
@@ -901,6 +903,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                 spinePageOffsets = spinePageOffsets,
                 cfiPageMap = cfiPageMap,
                 onNavigate = { cfi ->
+                    epubWebView.value?.visibility = View.INVISIBLE
                     epubWebView.value?.post {
                         val escaped = cfi.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n")
                         epubWebView.value?.evaluateJavascript("window._displayCfi(\"$escaped\")", null)
@@ -1069,6 +1072,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                 spinePageOffsets = spinePageOffsets,
                 cfiPageMap = cfiPageMap,
                 onNavigate = { memo ->
+                    epubWebView.value?.visibility = View.INVISIBLE
                     epubWebView.value?.post {
                         val escaped = memo.cfi.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n")
                         epubWebView.value?.evaluateJavascript("window._displayCfi(\"$escaped\")", null)
@@ -1143,6 +1147,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                 }) else null,
                 onNavigate = if (editingMemo != null) ({
                     val cfi = editingMemo!!.cfi
+                    epubWebView.value?.visibility = View.INVISIBLE
                     showMemoEditor = false
                     showMenu = false
                     editingMemo = null
@@ -1202,6 +1207,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                 spinePageOffsets = spinePageOffsets,
                 cfiPageMap = cfiPageMap,
                 onNavigate = { cfi ->
+                    epubWebView.value?.visibility = View.INVISIBLE
                     epubWebView.value?.post {
                         val escaped = cfi.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n")
                         epubWebView.value?.evaluateJavascript("window._displayCfi(\"$escaped\")", null)
@@ -2475,26 +2481,31 @@ private fun EpubViewer(
                         isHorizontalScrollBarEnabled = false
                         isVerticalScrollBarEnabled = false
                         webViewClient = WebViewClient()
-                        addJavascriptInterface(EpubBridge(onLocationUpdate, onTocLoaded, onContentRendered, onChapterChanged, onTocReady, onPageInfoChanged, onDebugInfo, onScanStart, onScanComplete, onSearchResultsPartial, onSearchComplete, selectionOnTextSelected, selectionOnSelectionTapped) { cssX, cssY ->
-                            val wv = webViewRef.get() ?: return@EpubBridge
-                            val ov = overlayRef.get()
-                            ov?.visibility = View.GONE
-                            val density = wv.context.resources.displayMetrics.density
-                            val px = cssX * density
-                            val py = cssY * density
-                            wv.postDelayed({
-                                val downTime = SystemClock.uptimeMillis()
-                                val down = MotionEvent.obtain(downTime, downTime, MotionEvent.ACTION_DOWN, px, py, 0)
-                                wv.dispatchTouchEvent(down)
-                                down.recycle()
+                        addJavascriptInterface(EpubBridge(onLocationUpdate, onTocLoaded, onContentRendered, onChapterChanged, onTocReady, onPageInfoChanged, onDebugInfo, onScanStart, onScanComplete, onSearchResultsPartial, onSearchComplete, selectionOnTextSelected, selectionOnSelectionTapped,
+                            onAutoSelectReadyCallback = autoSelect@{ cssX, cssY ->
+                                val wv = webViewRef.get() ?: return@autoSelect
+                                val ov = overlayRef.get()
+                                ov?.visibility = View.GONE
+                                val density = wv.context.resources.displayMetrics.density
+                                val px = cssX * density
+                                val py = cssY * density
                                 wv.postDelayed({
-                                    val up = MotionEvent.obtain(downTime, SystemClock.uptimeMillis(), MotionEvent.ACTION_UP, px, py, 0)
-                                    wv.dispatchTouchEvent(up)
-                                    up.recycle()
-                                    ov?.visibility = View.VISIBLE
-                                }, 600)
-                            }, 100)
-                        }, "Android")
+                                    val downTime = SystemClock.uptimeMillis()
+                                    val down = MotionEvent.obtain(downTime, downTime, MotionEvent.ACTION_DOWN, px, py, 0)
+                                    wv.dispatchTouchEvent(down)
+                                    down.recycle()
+                                    wv.postDelayed({
+                                        val up = MotionEvent.obtain(downTime, SystemClock.uptimeMillis(), MotionEvent.ACTION_UP, px, py, 0)
+                                        wv.dispatchTouchEvent(up)
+                                        up.recycle()
+                                        ov?.visibility = View.VISIBLE
+                                    }, 600)
+                                }, 100)
+                            },
+                            onNavigationCompleteCallback = {
+                                webViewRef.get()?.visibility = View.VISIBLE
+                            }
+                        ), "Android")
                     }
                     webViewRef.set(webView)
                     onWebViewCreated(webView)
@@ -3707,22 +3718,18 @@ window._nextThenAutoSelect = function() {
     window._next();
 };
 
-window._displayHref = function(href) { rendition.display(href); };
+window._displayHref = function(href) {
+    rendition.display(href).then(function() {
+        Android.onNavigationComplete();
+    });
+};
 window._displayCfi = function(cfi) {
-    var prevIndex = -1;
-    try {
-        var loc = rendition.currentLocation();
-        if (loc && loc.start) prevIndex = loc.start.index;
-    } catch(e) {}
     rendition.display(cfi).then(function() {
-        var newIndex = -1;
-        try {
-            var loc2 = rendition.currentLocation();
-            if (loc2 && loc2.start) newIndex = loc2.start.index;
-        } catch(e) {}
-        if (prevIndex !== newIndex) {
-            setTimeout(function() { rendition.display(cfi); }, 0);
-        }
+        setTimeout(function() {
+            rendition.display(cfi).then(function() {
+                Android.onNavigationComplete();
+            });
+        }, 0);
     });
 };
 window._displayPageNum = function(pageNum) {
@@ -3949,7 +3956,8 @@ private class EpubBridge(
     private val onSearchCompleteCallback: () -> Unit = {},
     private val onTextSelectedCallback: (text: String, x: Float, y: Float, bottom: Float) -> Unit = { _, _, _, _ -> },
     private val onSelectionTappedCallback: (text: String, x: Float, y: Float, bottom: Float, cfi: String, isAtPageEnd: Boolean) -> Unit = { _, _, _, _, _, _ -> },
-    private val onAutoSelectReadyCallback: (cssX: Float, cssY: Float) -> Unit = { _, _ -> }
+    private val onAutoSelectReadyCallback: (cssX: Float, cssY: Float) -> Unit = { _, _ -> },
+    private val onNavigationCompleteCallback: () -> Unit = {}
 ) {
     private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
 
@@ -4024,6 +4032,11 @@ private class EpubBridge(
     @android.webkit.JavascriptInterface
     fun onAutoSelectReady(cssX: Float, cssY: Float) {
         mainHandler.post { onAutoSelectReadyCallback(cssX, cssY) }
+    }
+
+    @android.webkit.JavascriptInterface
+    fun onNavigationComplete() {
+        mainHandler.post { onNavigationCompleteCallback() }
     }
 
 }
