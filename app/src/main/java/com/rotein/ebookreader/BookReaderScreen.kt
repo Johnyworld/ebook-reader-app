@@ -48,6 +48,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import com.rotein.ebookreader.ui.components.PaginationBar
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
@@ -1299,57 +1300,14 @@ private fun TocPopup(
                     }
                 }
             }
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = EreaderSpacing.L)
-                    .onSizeChanged { bottomBarHeightPx = it.height },
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(
-                    modifier = Modifier
-                        .clickable(enabled = currentPage > 0) { currentPage-- }
-                        .padding(horizontal = EreaderSpacing.L, vertical = EreaderSpacing.M),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(EreaderSpacing.XS)
-                ) {
-                    Icon(
-                        Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "이전",
-                        modifier = Modifier.height(16.dp),
-                        tint = if (currentPage > 0) EreaderColors.Black else EreaderColors.DarkGray
-                    )
-                    Text(
-                        "이전",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = if (currentPage > 0) EreaderColors.Black else EreaderColors.DarkGray
-                    )
-                }
-                Text(
-                    "${currentPage + 1}/$totalPages (${flatItems.size}건)",
-                    style = MaterialTheme.typography.bodyMedium
-                )
-                Row(
-                    modifier = Modifier
-                        .clickable(enabled = currentPage < totalPages - 1) { currentPage++ }
-                        .padding(horizontal = EreaderSpacing.L, vertical = EreaderSpacing.M),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(EreaderSpacing.XS)
-                ) {
-                    Text(
-                        "다음",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = if (currentPage < totalPages - 1) EreaderColors.Black else EreaderColors.DarkGray
-                    )
-                    Icon(
-                        Icons.AutoMirrored.Filled.ArrowForward,
-                        contentDescription = "다음",
-                        modifier = Modifier.height(16.dp),
-                        tint = if (currentPage < totalPages - 1) EreaderColors.Black else EreaderColors.DarkGray
-                    )
-                }
-            }
+            PaginationBar(
+                currentPage = currentPage,
+                totalPages = totalPages,
+                centerText = "${currentPage + 1}/$totalPages (${flatItems.size}건)",
+                onPrevious = { currentPage-- },
+                onNext = { currentPage++ },
+                modifier = Modifier.padding(bottom = EreaderSpacing.L).onSizeChanged { bottomBarHeightPx = it.height },
+            )
     }
 }
 
@@ -1480,54 +1438,13 @@ private fun SearchPopup(
 
             Column {
                 if (!searchResults.isNullOrEmpty()) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().height(56.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .clickable(enabled = currentPage > 0) { currentPage-- }
-                                .padding(horizontal = EreaderSpacing.L, vertical = EreaderSpacing.M),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(EreaderSpacing.XS)
-                        ) {
-                            Icon(
-                                Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = "이전",
-                                modifier = Modifier.height(16.dp),
-                                tint = if (currentPage > 0) EreaderColors.Black else EreaderColors.DarkGray
-                            )
-                            Text(
-                                "이전",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = if (currentPage > 0) EreaderColors.Black else EreaderColors.DarkGray
-                            )
-                        }
-                        Text(
-                            "${currentPage + 1}/$totalPages (${resultList.size}건)",
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                        Row(
-                            modifier = Modifier
-                                .clickable(enabled = currentPage < totalPages - 1) { currentPage++ }
-                                .padding(horizontal = EreaderSpacing.L, vertical = EreaderSpacing.M),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(EreaderSpacing.XS)
-                        ) {
-                            Text(
-                                "다음",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = if (currentPage < totalPages - 1) EreaderColors.Black else EreaderColors.DarkGray
-                            )
-                            Icon(
-                                Icons.AutoMirrored.Filled.ArrowForward,
-                                contentDescription = "다음",
-                                modifier = Modifier.height(16.dp),
-                                tint = if (currentPage < totalPages - 1) EreaderColors.Black else EreaderColors.DarkGray
-                            )
-                        }
-                    }
+                    PaginationBar(
+                        currentPage = currentPage,
+                        totalPages = totalPages,
+                        centerText = "${currentPage + 1}/$totalPages (${resultList.size}건)",
+                        onPrevious = { currentPage-- },
+                        onNext = { currentPage++ },
+                    )
                 }
                 HorizontalDivider(color = EreaderColors.Black)
                 Row(
@@ -1608,7 +1525,7 @@ private fun BookmarkPopup(
     val statusBarHeightDp = with(density) { WindowInsets.statusBars.getTop(this).toDp().value.toInt() }
     val itemHeightDp = 88
     val headerHeightDp = 56
-    val paginationHeightDp = 56
+    val paginationHeightDp = 72
     val itemsPerPage = maxOf(1, (screenHeightDp - statusBarHeightDp - headerHeightDp - paginationHeightDp) / itemHeightDp)
     var currentPage by remember { mutableStateOf(0) }
     var sortOrder by remember { mutableStateOf(BookmarkSortStore.load(context)) }
@@ -1762,56 +1679,15 @@ private fun BookmarkPopup(
 
             Column {
                 if (sortedBookmarks.isNotEmpty()) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().height(56.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .clickable(enabled = currentPage > 0) { currentPage-- }
-                                .padding(horizontal = EreaderSpacing.L, vertical = EreaderSpacing.M),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(EreaderSpacing.XS)
-                        ) {
-                            Icon(
-                                Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = "이전",
-                                modifier = Modifier.height(16.dp),
-                                tint = if (currentPage > 0) EreaderColors.Black else EreaderColors.DarkGray
-                            )
-                            Text(
-                                "이전",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = if (currentPage > 0) EreaderColors.Black else EreaderColors.DarkGray
-                            )
-                        }
-                        Text(
-                            "${currentPage + 1}/$totalPages (${sortedBookmarks.size}건)",
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                        Row(
-                            modifier = Modifier
-                                .clickable(enabled = currentPage < totalPages - 1) { currentPage++ }
-                                .padding(horizontal = EreaderSpacing.L, vertical = EreaderSpacing.M),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(EreaderSpacing.XS)
-                        ) {
-                            Text(
-                                "다음",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = if (currentPage < totalPages - 1) EreaderColors.Black else EreaderColors.DarkGray
-                            )
-                            Icon(
-                                Icons.AutoMirrored.Filled.ArrowForward,
-                                contentDescription = "다음",
-                                modifier = Modifier.height(16.dp),
-                                tint = if (currentPage < totalPages - 1) EreaderColors.Black else EreaderColors.DarkGray
-                            )
-                        }
-                    }
+                    PaginationBar(
+                        currentPage = currentPage,
+                        totalPages = totalPages,
+                        centerText = "${currentPage + 1}/$totalPages (${sortedBookmarks.size}건)",
+                        onPrevious = { currentPage-- },
+                        onNext = { currentPage++ },
+                        modifier = Modifier.padding(bottom = EreaderSpacing.L),
+                    )
                 }
-                HorizontalDivider(color = EreaderColors.Black)
             }
     }
 }
@@ -1831,7 +1707,7 @@ private fun HighlightPopup(
     val statusBarHeightDp = with(density) { WindowInsets.statusBars.getTop(this).toDp().value.toInt() }
     val itemHeightDp = 88
     val headerHeightDp = 56
-    val paginationHeightDp = 56
+    val paginationHeightDp = 72
     val itemsPerPage = maxOf(1, (screenHeightDp - statusBarHeightDp - headerHeightDp - paginationHeightDp) / itemHeightDp)
     var currentPage by remember { mutableStateOf(0) }
     var sortOrder by remember { mutableStateOf(HighlightSortStore.load(context)) }
@@ -1943,29 +1819,15 @@ private fun HighlightPopup(
 
             Column {
                 if (sortedHighlights.isNotEmpty()) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().height(56.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(
-                            modifier = Modifier.clickable(enabled = currentPage > 0) { currentPage-- }.padding(horizontal = EreaderSpacing.L, vertical = EreaderSpacing.M),
-                            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(EreaderSpacing.XS)
-                        ) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "이전", modifier = Modifier.height(16.dp), tint = if (currentPage > 0) EreaderColors.Black else EreaderColors.DarkGray)
-                            Text("이전", style = MaterialTheme.typography.bodyMedium, color = if (currentPage > 0) EreaderColors.Black else EreaderColors.DarkGray)
-                        }
-                        Text("${currentPage + 1}/$totalPages (${sortedHighlights.size}건)", style = MaterialTheme.typography.bodyMedium)
-                        Row(
-                            modifier = Modifier.clickable(enabled = currentPage < totalPages - 1) { currentPage++ }.padding(horizontal = EreaderSpacing.L, vertical = EreaderSpacing.M),
-                            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(EreaderSpacing.XS)
-                        ) {
-                            Text("다음", style = MaterialTheme.typography.bodyMedium, color = if (currentPage < totalPages - 1) EreaderColors.Black else EreaderColors.DarkGray)
-                            Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = "다음", modifier = Modifier.height(16.dp), tint = if (currentPage < totalPages - 1) EreaderColors.Black else EreaderColors.DarkGray)
-                        }
-                    }
+                    PaginationBar(
+                        currentPage = currentPage,
+                        totalPages = totalPages,
+                        centerText = "${currentPage + 1}/$totalPages (${sortedHighlights.size}건)",
+                        onPrevious = { currentPage-- },
+                        onNext = { currentPage++ },
+                        modifier = Modifier.padding(bottom = EreaderSpacing.L),
+                    )
                 }
-                HorizontalDivider(color = EreaderColors.Black)
             }
     }
 }
@@ -2065,7 +1927,7 @@ private fun MemoListPopup(
     val statusBarHeightDp = with(density) { WindowInsets.statusBars.getTop(this).toDp().value.toInt() }
     val itemHeightDp = 112
     val headerHeightDp = 56
-    val paginationHeightDp = 56
+    val paginationHeightDp = 72
     val itemsPerPage = maxOf(1, (screenHeightDp - statusBarHeightDp - headerHeightDp - paginationHeightDp) / itemHeightDp)
     var currentPage by remember { mutableStateOf(0) }
     var sortOrder by remember { mutableStateOf(MemoSortStore.load(context)) }
@@ -2187,29 +2049,15 @@ private fun MemoListPopup(
 
             Column {
                 if (sortedMemos.isNotEmpty()) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().height(56.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(
-                            modifier = Modifier.clickable(enabled = currentPage > 0) { currentPage-- }.padding(horizontal = EreaderSpacing.L, vertical = EreaderSpacing.M),
-                            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(EreaderSpacing.XS)
-                        ) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "이전", modifier = Modifier.height(16.dp), tint = if (currentPage > 0) EreaderColors.Black else EreaderColors.DarkGray)
-                            Text("이전", style = MaterialTheme.typography.bodyMedium, color = if (currentPage > 0) EreaderColors.Black else EreaderColors.DarkGray)
-                        }
-                        Text("${currentPage + 1}/$totalPages (${sortedMemos.size}건)", style = MaterialTheme.typography.bodyMedium)
-                        Row(
-                            modifier = Modifier.clickable(enabled = currentPage < totalPages - 1) { currentPage++ }.padding(horizontal = EreaderSpacing.L, vertical = EreaderSpacing.M),
-                            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(EreaderSpacing.XS)
-                        ) {
-                            Text("다음", style = MaterialTheme.typography.bodyMedium, color = if (currentPage < totalPages - 1) EreaderColors.Black else EreaderColors.DarkGray)
-                            Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = "다음", modifier = Modifier.height(16.dp), tint = if (currentPage < totalPages - 1) EreaderColors.Black else EreaderColors.DarkGray)
-                        }
-                    }
+                    PaginationBar(
+                        currentPage = currentPage,
+                        totalPages = totalPages,
+                        centerText = "${currentPage + 1}/$totalPages (${sortedMemos.size}건)",
+                        onPrevious = { currentPage-- },
+                        onNext = { currentPage++ },
+                        modifier = Modifier.padding(bottom = EreaderSpacing.L),
+                    )
                 }
-                HorizontalDivider(color = EreaderColors.Black)
             }
     }
 }
@@ -4658,7 +4506,7 @@ private fun FontLayerPopup(
 
     val itemHeightDp = 56
     val headerHeightDp = 56 + 44 + 2 // header(56) + tabs(44) + tab underline(2)
-    val paginationHeightDp = 56
+    val paginationHeightDp = 72
     val itemsPerPage = maxOf(1, (screenHeightDp - statusBarHeightDp - headerHeightDp - paginationHeightDp) / itemHeightDp)
 
     val pinnedFonts = listOf(FONT_EPUB_ORIGINAL, FONT_SYSTEM)
@@ -4876,29 +4724,15 @@ private fun FontLayerPopup(
             // Footer
             Column {
                 if (currentItems.isNotEmpty()) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().height(56.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(
-                            modifier = Modifier.clickable(enabled = currentPage > 0) { currentPage-- }.padding(horizontal = EreaderSpacing.L, vertical = EreaderSpacing.M),
-                            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(EreaderSpacing.XS)
-                        ) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "이전", modifier = Modifier.height(16.dp), tint = if (currentPage > 0) EreaderColors.Black else EreaderColors.DarkGray)
-                            Text("이전", style = MaterialTheme.typography.bodyMedium, color = if (currentPage > 0) EreaderColors.Black else EreaderColors.DarkGray)
-                        }
-                        Text("${currentPage + 1}/$totalPages (${currentItems.size}개)", style = MaterialTheme.typography.bodyMedium)
-                        Row(
-                            modifier = Modifier.clickable(enabled = currentPage < totalPages - 1) { currentPage++ }.padding(horizontal = EreaderSpacing.L, vertical = EreaderSpacing.M),
-                            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(EreaderSpacing.XS)
-                        ) {
-                            Text("다음", style = MaterialTheme.typography.bodyMedium, color = if (currentPage < totalPages - 1) EreaderColors.Black else EreaderColors.DarkGray)
-                            Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = "다음", modifier = Modifier.height(16.dp), tint = if (currentPage < totalPages - 1) EreaderColors.Black else EreaderColors.DarkGray)
-                        }
-                    }
+                    PaginationBar(
+                        currentPage = currentPage,
+                        totalPages = totalPages,
+                        centerText = "${currentPage + 1}/$totalPages (${currentItems.size}개)",
+                        onPrevious = { currentPage-- },
+                        onNext = { currentPage++ },
+                        modifier = Modifier.padding(bottom = EreaderSpacing.L),
+                    )
                 }
-                HorizontalDivider(color = EreaderColors.Black)
             }
     }
 }
