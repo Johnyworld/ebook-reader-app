@@ -7,6 +7,7 @@
     <style name="Theme.EbookReaderApp.Splash" parent="Theme.SplashScreen">
         <item name="windowSplashScreenBackground">@android:color/white</item>
         <item name="windowSplashScreenAnimationDuration">0</item>
+        <item name="android:windowSplashScreenAnimationDuration">0</item>
         <item name="postSplashScreenTheme">@style/Theme.EbookReaderApp</item>
     </style>
 </resources>
