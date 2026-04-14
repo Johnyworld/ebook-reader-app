@@ -75,10 +75,11 @@ internal fun ReaderSettingsBottomSheet(
     settings: ReaderSettings,
     onSettingsChange: (ReaderSettings) -> Unit,
     onDismiss: () -> Unit,
-    onOpenFontPopup: () -> Unit = {}
+    onOpenFontPopup: () -> Unit = {},
+    isPdf: Boolean = false
 ) {
     var selectedTab by remember { mutableStateOf(0) }
-    val tabLabels = listOf("글자", "여백", "뷰어")
+    val tabLabels = if (isPdf) listOf("뷰어") else listOf("글자", "여백", "뷰어")
 
     Column(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.fillMaxWidth()) {
@@ -96,10 +97,14 @@ internal fun ReaderSettingsBottomSheet(
         HorizontalDivider(color = EreaderColors.Black)
 
         Box(modifier = Modifier.fillMaxWidth().height(230.dp)) {
-            when (selectedTab) {
-                0 -> ReaderGlyphTab(settings, onSettingsChange, onOpenFontPopup)
-                1 -> ReaderMarginTab(settings, onSettingsChange)
-                2 -> ReaderViewerTab(settings, onSettingsChange)
+            if (isPdf) {
+                ReaderViewerTab(settings, onSettingsChange)
+            } else {
+                when (selectedTab) {
+                    0 -> ReaderGlyphTab(settings, onSettingsChange, onOpenFontPopup)
+                    1 -> ReaderMarginTab(settings, onSettingsChange)
+                    2 -> ReaderViewerTab(settings, onSettingsChange)
+                }
             }
         }
     }

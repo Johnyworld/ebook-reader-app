@@ -806,7 +806,8 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                         settings = readerSettings,
                         onSettingsChange = { vm.updateSettings(it) },
                         onDismiss = { vm.setShowSettingsPopup(false) },
-                        onOpenFontPopup = { vm.setShowFontPopup(true) }
+                        onOpenFontPopup = { vm.setShowFontPopup(true) },
+                        isPdf = isPdf
                     )
                 }
             }
