@@ -100,7 +100,10 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
         onDispose { activity?.currentEpubWebView = null }
     }
 
-    BackHandler { onClose() }
+    BackHandler {
+        vm.setShowMenu(false)
+        onClose()
+    }
     BackHandler(enabled = popupState.showMenu) { vm.setShowMenu(false) }
     BackHandler(enabled = popupState.showTocPopup) { vm.setShowTocPopup(false) }
     BackHandler(enabled = popupState.showSearchPopup) { vm.setShowSearchPopup(false) }
@@ -384,7 +387,10 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                 ) {
                     PopupHeaderBar(
                         title = book.metadata?.title ?: book.name,
-                        onBack = onClose
+                        onBack = {
+                            vm.setShowMenu(false)
+                            onClose()
+                        }
                     ) {
                         IconButton(onClick = {
                             if (readingState.currentCfi.isEmpty()) return@IconButton
