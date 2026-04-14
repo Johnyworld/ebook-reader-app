@@ -71,9 +71,7 @@ import com.rotein.ebookreader.ui.components.ActionPopup
 import com.rotein.ebookreader.ui.components.PopupHeaderBar
 import com.rotein.ebookreader.ui.theme.EreaderColors
 import com.rotein.ebookreader.ui.theme.EreaderSpacing
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import org.json.JSONArray
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -91,14 +89,11 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
     val pageCalcState by vm.pageCalcState.collectAsState()
 
     val context = LocalContext.current
-    val bookmarkDao = remember { BookDatabase.getInstance(context).bookmarkDao() }
-    val highlightDao = remember { BookDatabase.getInstance(context).highlightDao() }
     val scope = rememberCoroutineScope()
+    val annotationState by vm.annotationState.collectAsState()
 
     data class HighlightActionState(val id: Long, val x: Float, val y: Float, val bottom: Float)
     var highlightActionState by remember { mutableStateOf<HighlightActionState?>(null) }
-    val memoDao = remember { BookDatabase.getInstance(context).memoDao() }
-    var memos by remember(book.path) { mutableStateOf<List<Memo>>(emptyList()) }
     var editingMemo by remember { mutableStateOf<Memo?>(null) }
     var pendingMemoText by remember { mutableStateOf("") }
     var pendingMemoCfi by remember { mutableStateOf("") }
@@ -111,9 +106,6 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
     var searchQuery by remember { mutableStateOf("") }
     val epubWebView = remember { mutableStateOf<WebView?>(null) }
     val onNavigationCompleteRef = remember { mutableStateOf<(() -> Unit)?>(null) }
-    var isCurrentPageBookmarked by remember(book.path) { mutableStateOf(false) }
-    var bookmarks by remember(book.path) { mutableStateOf<List<Bookmark>>(emptyList()) }
-    var highlights by remember(book.path) { mutableStateOf<List<Highlight>>(emptyList()) }
     var debugSpineIndex by remember(book.path) { mutableStateOf(-1) }
     var debugDisplayedPage by remember(book.path) { mutableStateOf(-1) }
     var debugDisplayedTotal by remember(book.path) { mutableStateOf(0) }
@@ -152,41 +144,37 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
 
     LaunchedEffect(book.path) {
         vm.loadBook(book.path, book.extension.lowercase() == "epub")
-        // Annotation loading stays here until Task 5
-        bookmarks = withContext(Dispatchers.IO) { BookDatabase.getInstance(context).bookmarkDao().getByBook(book.path) }
-        highlights = withContext(Dispatchers.IO) { BookDatabase.getInstance(context).highlightDao().getByBook(book.path) }
-        memos = withContext(Dispatchers.IO) { BookDatabase.getInstance(context).memoDao().getByBook(book.path) }
     }
 
     LaunchedEffect(contentState.isContentRendered) {
         if (!contentState.isContentRendered) return@LaunchedEffect
-        if (highlights.isNotEmpty()) {
-            val json = highlights.joinToString(",", "[", "]") {
+        if (annotationState.highlights.isNotEmpty()) {
+            val json = annotationState.highlights.joinToString(",", "[", "]") {
                 """{"id":${it.id},"cfi":"${it.cfi.escapeCfiForJs()}"}"""
             }
             epubWebView.value?.evaluateJavascript("window._applyHighlights('$json')", null)
         }
-        if (memos.isNotEmpty()) {
-            val json = memos.joinToString(",", "[", "]") {
+        if (annotationState.memos.isNotEmpty()) {
+            val json = annotationState.memos.joinToString(",", "[", "]") {
                 """{"id":${it.id},"cfi":"${it.cfi.escapeCfiForJs()}"}"""
             }
             epubWebView.value?.evaluateJavascript("window._applyMemos('$json')", null)
         }
     }
 
-    LaunchedEffect(readingState.currentCfi, bookmarks, contentState.isContentRendered) {
+    LaunchedEffect(readingState.currentCfi, annotationState.bookmarks, contentState.isContentRendered) {
         if (!contentState.isContentRendered) return@LaunchedEffect
         val wv = epubWebView.value ?: return@LaunchedEffect
-        if (readingState.currentCfi.isEmpty() || bookmarks.isEmpty()) {
-            isCurrentPageBookmarked = false
+        if (readingState.currentCfi.isEmpty() || annotationState.bookmarks.isEmpty()) {
+            vm.setCurrentPageBookmarked(false)
             wv.evaluateJavascript("window._showBookmarkRibbon(false)", null)
             return@LaunchedEffect
         }
-        val cfiListJson = bookmarks.map { it.cfi }.filter { it.isNotEmpty() }
+        val cfiListJson = annotationState.bookmarks.map { it.cfi }.filter { it.isNotEmpty() }
             .joinToString(",", "[", "]") { "\"${it.replace("\"", "\\\"")}\"" }
         wv.evaluateJavascript("window._isBookmarkedInRange('${cfiListJson.replace("'", "\\'")}')") { result ->
             val matched = result?.removeSurrounding("\"")?.trim() == "true"
-            isCurrentPageBookmarked = matched
+            vm.setCurrentPageBookmarked(matched)
             wv.evaluateJavascript("window._showBookmarkRibbon($matched)", null)
         }
     }
@@ -218,7 +206,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                     } else {
                         vm.setScanning(true)
                     }
-                    val allCfis = (bookmarks.map { it.cfi } + highlights.map { it.cfi } + memos.map { it.cfi })
+                    val allCfis = (annotationState.bookmarks.map { it.cfi } + annotationState.highlights.map { it.cfi } + annotationState.memos.map { it.cfi })
                         .filter { it.isNotEmpty() }.distinct()
                     if (allCfis.isNotEmpty()) {
                         val cfiArray = org.json.JSONArray(allCfis)
@@ -227,22 +215,10 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                 },
                 onHighlight = { text, cfi ->
                     if (cfi.isNotEmpty()) {
-                        val chapterSnapshot = readingState.chapterTitle
-                        if (readingState.currentPage > 0) vm.addToCfiPageMap(cfi, readingState.currentPage)
                         scope.launch {
-                            val highlight = Highlight(
-                                bookPath = book.path,
-                                cfi = cfi,
-                                text = text,
-                                chapterTitle = chapterSnapshot,
-                                page = readingState.currentPage,
-                                createdAt = System.currentTimeMillis()
-                            )
-                            val id = withContext(Dispatchers.IO) { highlightDao.insert(highlight) }
-                            val saved = highlight.copy(id = id)
-                            highlights = highlights + saved
+                            val saved = vm.addHighlight(cfi, text)
                             val escapedCfi = cfi.escapeCfiForJs()
-                            epubWebView.value?.evaluateJavascript("window._addHighlight(\"$escapedCfi\", $id)", null)
+                            epubWebView.value?.evaluateJavascript("window._addHighlight(\"$escapedCfi\", ${saved.id})", null)
                         }
                     }
                 },
@@ -250,12 +226,12 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                 onMemo = { text, cfi ->
                     pendingMemoText = text
                     pendingMemoCfi = cfi
-                    editingMemo = memos.find { it.cfi == cfi }
+                    editingMemo = annotationState.memos.find { it.cfi == cfi }
                     vm.setShowMemoEditor(true)
                 },
                 onHighlightLongPress = { id, x, y, bottom ->
-                    val cfi = highlights.find { it.id == id }?.cfi
-                    val overlappingMemo = if (cfi != null) memos.find { it.cfi == cfi } else null
+                    val cfi = annotationState.highlights.find { it.id == id }?.cfi
+                    val overlappingMemo = if (cfi != null) annotationState.memos.find { it.cfi == cfi } else null
                     if (overlappingMemo != null) {
                         combinedAnnotationState = CombinedAnnotationState(id, overlappingMemo.id, x, y, bottom)
                     } else {
@@ -263,8 +239,8 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                     }
                 },
                 onMemoLongPress = { id, x, y, bottom ->
-                    val cfi = memos.find { it.id == id }?.cfi
-                    val overlappingHighlight = if (cfi != null) highlights.find { it.cfi == cfi } else null
+                    val cfi = annotationState.memos.find { it.id == id }?.cfi
+                    val overlappingHighlight = if (cfi != null) annotationState.highlights.find { it.cfi == cfi } else null
                     if (overlappingHighlight != null) {
                         combinedAnnotationState = CombinedAnnotationState(overlappingHighlight.id, id, x, y, bottom)
                     } else {
@@ -286,36 +262,6 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                 onScanStart = { if (!contentState.scanCacheValid) vm.setScanning(true) },
                 onScanComplete = { scannedTotal, spinePageOffsetsJson, cfiPageMapJson, charPageBreaksJson ->
                     vm.onScanComplete(scannedTotal, spinePageOffsetsJson, cfiPageMapJson, charPageBreaksJson)
-                    // Annotation remapping stays here until Task 5
-                    try {
-                        val obj = org.json.JSONObject(cfiPageMapJson)
-                        val cfiMap = mutableMapOf<String, Int>()
-                        obj.keys().forEach { key -> cfiMap[key] = obj.getInt(key) }
-                        val newSpineOffsets = pageCalcState.spinePageOffsets
-                        scope.launch(Dispatchers.IO) {
-                            bookmarks = bookmarks.map { bm ->
-                                val newPage = cfiToPage(bm.cfi, newSpineOffsets, cfiMap)
-                                if (newPage > 0 && newPage != bm.page) {
-                                    bookmarkDao.updatePage(bm.id, newPage)
-                                    bm.copy(page = newPage)
-                                } else bm
-                            }
-                            highlights = highlights.map { hl ->
-                                val newPage = cfiToPage(hl.cfi, newSpineOffsets, cfiMap)
-                                if (newPage > 0 && newPage != hl.page) {
-                                    highlightDao.updatePage(hl.id, newPage)
-                                    hl.copy(page = newPage)
-                                } else hl
-                            }
-                            memos = memos.map { m ->
-                                val newPage = cfiToPage(m.cfi, newSpineOffsets, cfiMap)
-                                if (newPage > 0 && newPage != m.page) {
-                                    memoDao.updatePage(m.id, newPage)
-                                    m.copy(page = newPage)
-                                } else m
-                            }
-                        }
-                    } catch (_: Exception) {}
                     if (!searchResults.isNullOrEmpty()) {
                         searchResults = recalcSearchPages(searchResults!!, pageCalcState.spinePageOffsets, charPageBreaksJson)
                     }
@@ -514,11 +460,11 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                     ) {
                         IconButton(onClick = {
                             if (readingState.currentCfi.isEmpty()) return@IconButton
-                            if (isCurrentPageBookmarked) {
+                            if (annotationState.isCurrentPageBookmarked) {
                                 scope.launch {
                                     val wv = epubWebView.value
                                     if (wv != null) {
-                                        val cfiListJson = bookmarks.map { it.cfi }.filter { it.isNotEmpty() }
+                                        val cfiListJson = annotationState.bookmarks.map { it.cfi }.filter { it.isNotEmpty() }
                                             .joinToString(",", "[", "]") { "\"${it.replace("\"", "\\\"")}\"" }
                                         wv.evaluateJavascript(
                                             "(function(){try{var cfis=${cfiListJson};var startCfi=window._currentCfi;var endCfi=window._currentEndCfi;var epubcfi=new ePub.CFI();var matched=[];for(var i=0;i<cfis.length;i++){var c=cfis[i];if(c===startCfi||(endCfi&&epubcfi.compare(c,startCfi)>=0&&epubcfi.compare(c,endCfi)<=0)){matched.push(c);}}return JSON.stringify(matched);}catch(e){return '[]';}})()"
@@ -527,31 +473,22 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                                                 val arr = org.json.JSONArray(result?.removeSurrounding("\"")?.replace("\\\"", "\"")?.replace("\\\\", "\\") ?: "[]")
                                                 (0 until arr.length()).map { arr.getString(it) }.toSet()
                                             } catch (_: Exception) { emptySet() }
-                                            scope.launch {
-                                                for (cfi in matchedCfis) {
-                                                    withContext(Dispatchers.IO) { bookmarkDao.deleteByCfi(book.path, cfi) }
-                                                }
-                                                bookmarks = bookmarks.filter { it.cfi !in matchedCfis }
-                                            }
+                                            vm.removeBookmarksByCfis(matchedCfis)
                                         }
                                     }
                                 }
                             } else {
                                 val wv = epubWebView.value
                                 val saveBookmark = { cfi: String, excerpt: String ->
-                                    if (cfi.isNotEmpty() && readingState.currentPage > 0) vm.addToCfiPageMap(cfi, readingState.currentPage)
-                                    scope.launch {
-                                        val bookmark = Bookmark(
-                                            bookPath = book.path,
-                                            cfi = cfi,
-                                            chapterTitle = readingState.chapterTitle,
-                                            excerpt = excerpt,
-                                            page = readingState.currentPage,
-                                            createdAt = System.currentTimeMillis()
-                                        )
-                                        withContext(Dispatchers.IO) { bookmarkDao.insert(bookmark) }
-                                        bookmarks = bookmarks + bookmark
-                                    }
+                                    val bookmark = Bookmark(
+                                        bookPath = book.path,
+                                        cfi = cfi,
+                                        chapterTitle = readingState.chapterTitle,
+                                        excerpt = excerpt,
+                                        page = readingState.currentPage,
+                                        createdAt = System.currentTimeMillis()
+                                    )
+                                    vm.addBookmark(bookmark)
                                 }
                                 if (wv != null) {
                                     wv.evaluateJavascript(
@@ -578,7 +515,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                             }
                         }) {
                             Icon(
-                                if (isCurrentPageBookmarked) Icons.Filled.Bookmark else Icons.Filled.BookmarkBorder,
+                                if (annotationState.isCurrentPageBookmarked) Icons.Filled.Bookmark else Icons.Filled.BookmarkBorder,
                                 contentDescription = "북마크",
                                 tint = EreaderColors.Black
                             )
@@ -649,7 +586,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
         // 하이라이트 팝업
         if (popupState.showHighlightPopup) {
             HighlightPopup(
-                highlights = highlights,
+                highlights = annotationState.highlights,
                 spinePageOffsets = pageCalcState.spinePageOffsets,
                 cfiPageMap = pageCalcState.cfiPageMap,
                 onNavigate = { cfi ->
@@ -661,11 +598,8 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                     }
                 },
                 onDelete = { highlight ->
-                    scope.launch {
-                        withContext(Dispatchers.IO) { highlightDao.deleteById(highlight.id) }
-                        highlights = highlights.filter { it.id != highlight.id }
-                        epubWebView.value?.evaluateJavascript("window._removeHighlight(${highlight.id})", null)
-                    }
+                    vm.removeHighlight(highlight.id)
+                    epubWebView.value?.evaluateJavascript("window._removeHighlight(${highlight.id})", null)
                 },
                 onDismiss = { vm.setShowHighlightPopup(false) }
             )
@@ -680,22 +614,19 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                     ActionItem("하이라이트 삭제") {
                         val id = state.id
                         highlightActionState = null
-                        scope.launch {
-                            withContext(Dispatchers.IO) { highlightDao.deleteById(id) }
-                            epubWebView.value?.evaluateJavascript("window._removeHighlight($id)", null)
-                            highlights = highlights.filter { it.id != id }
-                        }
+                        vm.removeHighlight(id)
+                        epubWebView.value?.evaluateJavascript("window._removeHighlight($id)", null)
                     },
                     ActionItem("메모") {
-                        val hl = highlights.find { it.id == state.id }
+                        val hl = annotationState.highlights.find { it.id == state.id }
                         pendingMemoText = hl?.text ?: ""
                         pendingMemoCfi = hl?.cfi ?: ""
-                        editingMemo = memos.find { it.cfi == pendingMemoCfi }
+                        editingMemo = annotationState.memos.find { it.cfi == pendingMemoCfi }
                         vm.setShowMemoEditor(true)
                         highlightActionState = null
                     },
                     ActionItem("공유") {
-                        val text = highlights.find { it.id == state.id }?.text ?: ""
+                        val text = annotationState.highlights.find { it.id == state.id }?.text ?: ""
                         val intent = Intent(Intent.ACTION_SEND).apply {
                             type = "text/plain"
                             putExtra(Intent.EXTRA_TEXT, text)
@@ -717,14 +648,11 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                     ActionItem("하이라이트 삭제") {
                         val hid = state.highlightId
                         combinedAnnotationState = null
-                        scope.launch {
-                            withContext(Dispatchers.IO) { highlightDao.deleteById(hid) }
-                            epubWebView.value?.evaluateJavascript("window._removeHighlight($hid)", null)
-                            highlights = highlights.filter { it.id != hid }
-                        }
+                        vm.removeHighlight(hid)
+                        epubWebView.value?.evaluateJavascript("window._removeHighlight($hid)", null)
                     },
                     ActionItem("메모 편집") {
-                        val memo = memos.find { it.id == state.memoId }
+                        val memo = annotationState.memos.find { it.id == state.memoId }
                         combinedAnnotationState = null
                         if (memo != null) {
                             editingMemo = memo
@@ -736,15 +664,12 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                     ActionItem("메모 삭제") {
                         val mid = state.memoId
                         combinedAnnotationState = null
-                        scope.launch {
-                            withContext(Dispatchers.IO) { memoDao.deleteById(mid) }
-                            epubWebView.value?.evaluateJavascript("window._removeMemo($mid)", null)
-                            memos = memos.filter { it.id != mid }
-                        }
+                        vm.removeMemo(mid)
+                        epubWebView.value?.evaluateJavascript("window._removeMemo($mid)", null)
                     },
                     ActionItem("공유") {
-                        val hl = highlights.find { it.id == state.highlightId }
-                        val memo = memos.find { it.id == state.memoId }
+                        val hl = annotationState.highlights.find { it.id == state.highlightId }
+                        val memo = annotationState.memos.find { it.id == state.memoId }
                         val text = buildString {
                             hl?.text?.let { append(it) }
                             memo?.note?.takeIf { it.isNotEmpty() }?.let { append("\n\n$it") }
@@ -762,7 +687,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
         }
 
         memoActionState?.let { state ->
-            val memo = memos.find { it.id == state.id }
+            val memo = annotationState.memos.find { it.id == state.id }
             ActionPopup(
                 selectionY = state.y,
                 selectionBottom = state.bottom,
@@ -771,21 +696,10 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                     ActionItem("하이라이트") {
                         memoActionState = null
                         if (memo != null) {
-                            val chapterSnapshot = readingState.chapterTitle
                             scope.launch {
-                                val highlight = Highlight(
-                                    bookPath = book.path,
-                                    cfi = memo.cfi,
-                                    text = memo.text,
-                                    chapterTitle = chapterSnapshot,
-                                    page = memo.page.takeIf { it > 0 } ?: cfiToPage(memo.cfi, pageCalcState.spinePageOffsets, pageCalcState.cfiPageMap),
-                                    createdAt = System.currentTimeMillis()
-                                )
-                                val id = withContext(Dispatchers.IO) { highlightDao.insert(highlight) }
-                                val saved = highlight.copy(id = id)
-                                highlights = highlights + saved
+                                val saved = vm.addHighlightFromMemo(memo)
                                 val escapedCfi = memo.cfi.escapeCfiForJs()
-                                epubWebView.value?.evaluateJavascript("window._addHighlight(\"$escapedCfi\", $id)", null)
+                                epubWebView.value?.evaluateJavascript("window._addHighlight(\"$escapedCfi\", ${saved.id})", null)
                             }
                         }
                     },
@@ -801,11 +715,8 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                     ActionItem("메모 삭제") {
                         val id = state.id
                         memoActionState = null
-                        scope.launch {
-                            withContext(Dispatchers.IO) { memoDao.deleteById(id) }
-                            epubWebView.value?.evaluateJavascript("window._removeMemo($id)", null)
-                            memos = memos.filter { it.id != id }
-                        }
+                        vm.removeMemo(id)
+                        epubWebView.value?.evaluateJavascript("window._removeMemo($id)", null)
                     },
                     ActionItem("공유") {
                         val text = memo?.let { "${it.text}\n\n${it.note}" } ?: ""
@@ -823,7 +734,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
 
         if (popupState.showMemoListPopup) {
             MemoListPopup(
-                memos = memos,
+                memos = annotationState.memos,
                 spinePageOffsets = pageCalcState.spinePageOffsets,
                 cfiPageMap = pageCalcState.cfiPageMap,
                 onNavigate = { memo ->
@@ -841,11 +752,8 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                     vm.setShowMemoEditor(true)
                 },
                 onDelete = { memo ->
-                    scope.launch {
-                        withContext(Dispatchers.IO) { memoDao.deleteById(memo.id) }
-                        epubWebView.value?.evaluateJavascript("window._removeMemo(${memo.id})", null)
-                        memos = memos.filter { it.id != memo.id }
-                    }
+                    vm.removeMemo(memo.id)
+                    epubWebView.value?.evaluateJavascript("window._removeMemo(${memo.id})", null)
                 },
                 onDismiss = { vm.setShowMemoListPopup(false) }
             )
@@ -856,36 +764,14 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                 selectedText = editingMemo?.text ?: pendingMemoText,
                 initialNote = editingMemo?.note ?: "",
                 onSave = { note ->
-                    val existing = editingMemo
-                    if (existing != null) {
-                        scope.launch {
-                            withContext(Dispatchers.IO) { memoDao.updateNote(existing.id, note) }
-                            memos = memos.map { if (it.id == existing.id) it.copy(note = note) else it }
-                            vm.setShowMemoEditor(false)
-                            editingMemo = null
-                        }
-                    } else if (pendingMemoCfi.isNotEmpty()) {
-                        val chapterSnapshot = readingState.chapterTitle
-                        if (readingState.currentPage > 0) vm.addToCfiPageMap(pendingMemoCfi, readingState.currentPage)
-                        scope.launch {
-                            val newMemo = Memo(
-                                bookPath = book.path,
-                                cfi = pendingMemoCfi,
-                                text = pendingMemoText,
-                                note = note,
-                                chapterTitle = chapterSnapshot,
-                                page = readingState.currentPage,
-                                createdAt = System.currentTimeMillis()
-                            )
-                            val id = withContext(Dispatchers.IO) { memoDao.insert(newMemo) }
-                            val saved = newMemo.copy(id = id)
-                            memos = memos + saved
+                    scope.launch {
+                        val saved = vm.saveMemo(note, editingMemo, pendingMemoText, pendingMemoCfi)
+                        if (saved != null && editingMemo == null && pendingMemoCfi.isNotEmpty()) {
                             val escapedCfi = pendingMemoCfi.escapeCfiForJs()
-                            epubWebView.value?.evaluateJavascript("window._addMemo(\"$escapedCfi\", $id)", null)
-                            vm.setShowMemoEditor(false)
+                            epubWebView.value?.evaluateJavascript("window._addMemo(\"$escapedCfi\", ${saved.id})", null)
                         }
-                    } else {
                         vm.setShowMemoEditor(false)
+                        editingMemo = null
                     }
                 },
                 onCancel = { vm.setShowMemoEditor(false); editingMemo = null },
@@ -893,11 +779,8 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                     val id = editingMemo!!.id
                     vm.setShowMemoEditor(false)
                     editingMemo = null
-                    scope.launch {
-                        withContext(Dispatchers.IO) { memoDao.deleteById(id) }
-                        epubWebView.value?.evaluateJavascript("window._removeMemo($id)", null)
-                        memos = memos.filter { it.id != id }
-                    }
+                    vm.removeMemo(id)
+                    epubWebView.value?.evaluateJavascript("window._removeMemo($id)", null)
                 }) else null,
                 onNavigate = if (editingMemo != null) ({
                     if (onNavigationCompleteRef.value != null) return@MemoEditorScreen
@@ -955,7 +838,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
         // 북마크 팝업
         if (popupState.showBookmarkPopup) {
             BookmarkPopup(
-                bookmarks = bookmarks,
+                bookmarks = annotationState.bookmarks,
                 spinePageOffsets = pageCalcState.spinePageOffsets,
                 cfiPageMap = pageCalcState.cfiPageMap,
                 onNavigate = { cfi ->
@@ -966,12 +849,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                         epubWebView.value?.evaluateJavascript("window._displayCfi(\"$escaped\")", null)
                     }
                 },
-                onDelete = { bookmark ->
-                    scope.launch {
-                        withContext(Dispatchers.IO) { bookmarkDao.deleteByCfi(bookmark.bookPath, bookmark.cfi) }
-                        bookmarks = bookmarks.filter { it.id != bookmark.id }
-                    }
-                },
+                onDelete = { bookmark -> vm.removeBookmark(bookmark) },
                 onDismiss = { vm.setShowBookmarkPopup(false) }
             )
         }

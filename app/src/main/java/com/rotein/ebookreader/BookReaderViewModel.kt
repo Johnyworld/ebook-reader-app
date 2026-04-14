@@ -36,6 +36,13 @@ data class ContentState(
     val scanCacheValid: Boolean = false
 )
 
+data class AnnotationState(
+    val bookmarks: List<Bookmark> = emptyList(),
+    val highlights: List<Highlight> = emptyList(),
+    val memos: List<Memo> = emptyList(),
+    val isCurrentPageBookmarked: Boolean = false
+)
+
 data class PopupState(
     val showMenu: Boolean = false,
     val showTocPopup: Boolean = false,
@@ -79,6 +86,9 @@ class BookReaderViewModel(application: Application) : AndroidViewModel(applicati
 
     private val _pageCalcState = MutableStateFlow(PageCalcState())
     val pageCalcState: StateFlow<PageCalcState> = _pageCalcState.asStateFlow()
+
+    private val _annotationState = MutableStateFlow(AnnotationState())
+    val annotationState: StateFlow<AnnotationState> = _annotationState.asStateFlow()
 
     init {
         // 설정 변경 시 자동 저장
@@ -136,7 +146,10 @@ class BookReaderViewModel(application: Application) : AndroidViewModel(applicati
                 _contentState.update { it.copy(scanCacheValid = true) }
             }
 
-            // Annotation loading will be added in Task 5
+            val bookmarks = withContext(Dispatchers.IO) { bookmarkDao.getByBook(path) }
+            val highlights = withContext(Dispatchers.IO) { highlightDao.getByBook(path) }
+            val memos = withContext(Dispatchers.IO) { memoDao.getByBook(path) }
+            _annotationState.value = AnnotationState(bookmarks = bookmarks, highlights = highlights, memos = memos)
         }
     }
 
@@ -188,10 +201,136 @@ class BookReaderViewModel(application: Application) : AndroidViewModel(applicati
             obj.keys().forEach { key -> cfiMap[key] = obj.getInt(key) }
             _pageCalcState.update { it.copy(cfiPageMap = cfiMap) }
         } catch (_: Exception) {}
+
+        remapAnnotationPages()
     }
 
     fun addToCfiPageMap(cfi: String, page: Int) {
         _pageCalcState.update { it.copy(cfiPageMap = it.cfiPageMap + (cfi to page)) }
+    }
+
+    fun setCurrentPageBookmarked(bookmarked: Boolean) {
+        _annotationState.update { it.copy(isCurrentPageBookmarked = bookmarked) }
+    }
+
+    fun addBookmark(bookmark: Bookmark) {
+        viewModelScope.launch {
+            val id = withContext(Dispatchers.IO) { bookmarkDao.insert(bookmark) }
+            _annotationState.update { it.copy(bookmarks = it.bookmarks + bookmark.copy(id = id)) }
+        }
+    }
+
+    fun removeBookmarksByCfis(cfis: Set<String>) {
+        viewModelScope.launch {
+            for (cfi in cfis) {
+                withContext(Dispatchers.IO) { bookmarkDao.deleteByCfi(bookPath, cfi) }
+            }
+            _annotationState.update { it.copy(bookmarks = it.bookmarks.filter { bm -> bm.cfi !in cfis }) }
+        }
+    }
+
+    fun removeBookmark(bookmark: Bookmark) {
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) { bookmarkDao.deleteByCfi(bookmark.bookPath, bookmark.cfi) }
+            _annotationState.update { it.copy(bookmarks = it.bookmarks.filter { it.id != bookmark.id }) }
+        }
+    }
+
+    /** Returns the saved Highlight with its ID set. Caller can use it for JS injection. */
+    suspend fun addHighlight(cfi: String, text: String): Highlight {
+        val rs = _readingState.value
+        if (rs.currentPage > 0) addToCfiPageMap(cfi, rs.currentPage)
+        val highlight = Highlight(
+            bookPath = bookPath,
+            cfi = cfi,
+            text = text,
+            chapterTitle = rs.chapterTitle,
+            page = rs.currentPage,
+            createdAt = System.currentTimeMillis()
+        )
+        val id = withContext(Dispatchers.IO) { highlightDao.insert(highlight) }
+        val saved = highlight.copy(id = id)
+        _annotationState.update { it.copy(highlights = it.highlights + saved) }
+        return saved
+    }
+
+    fun removeHighlight(id: Long) {
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) { highlightDao.deleteById(id) }
+            _annotationState.update { it.copy(highlights = it.highlights.filter { it.id != id }) }
+        }
+    }
+
+    suspend fun addHighlightFromMemo(memo: Memo): Highlight {
+        val rs = _readingState.value
+        val pcs = _pageCalcState.value
+        val highlight = Highlight(
+            bookPath = bookPath,
+            cfi = memo.cfi,
+            text = memo.text,
+            chapterTitle = rs.chapterTitle,
+            page = memo.page.takeIf { it > 0 } ?: cfiToPage(memo.cfi, pcs.spinePageOffsets, pcs.cfiPageMap),
+            createdAt = System.currentTimeMillis()
+        )
+        val id = withContext(Dispatchers.IO) { highlightDao.insert(highlight) }
+        val saved = highlight.copy(id = id)
+        _annotationState.update { it.copy(highlights = it.highlights + saved) }
+        return saved
+    }
+
+    /** Returns saved Memo (new or updated). Null if pendingCfi is empty for new memo. */
+    suspend fun saveMemo(note: String, existingMemo: Memo?, pendingText: String, pendingCfi: String): Memo? {
+        if (existingMemo != null) {
+            withContext(Dispatchers.IO) { memoDao.updateNote(existingMemo.id, note) }
+            _annotationState.update {
+                it.copy(memos = it.memos.map { m -> if (m.id == existingMemo.id) m.copy(note = note) else m })
+            }
+            return existingMemo.copy(note = note)
+        } else if (pendingCfi.isNotEmpty()) {
+            val rs = _readingState.value
+            if (rs.currentPage > 0) addToCfiPageMap(pendingCfi, rs.currentPage)
+            val newMemo = Memo(
+                bookPath = bookPath,
+                cfi = pendingCfi,
+                text = pendingText,
+                note = note,
+                chapterTitle = rs.chapterTitle,
+                page = rs.currentPage,
+                createdAt = System.currentTimeMillis()
+            )
+            val id = withContext(Dispatchers.IO) { memoDao.insert(newMemo) }
+            val saved = newMemo.copy(id = id)
+            _annotationState.update { it.copy(memos = it.memos + saved) }
+            return saved
+        }
+        return null
+    }
+
+    fun removeMemo(id: Long) {
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) { memoDao.deleteById(id) }
+            _annotationState.update { it.copy(memos = it.memos.filter { it.id != id }) }
+        }
+    }
+
+    fun remapAnnotationPages() {
+        val pcs = _pageCalcState.value
+        viewModelScope.launch(Dispatchers.IO) {
+            val `as` = _annotationState.value
+            val newBookmarks = `as`.bookmarks.map { bm ->
+                val newPage = cfiToPage(bm.cfi, pcs.spinePageOffsets, pcs.cfiPageMap)
+                if (newPage > 0 && newPage != bm.page) { bookmarkDao.updatePage(bm.id, newPage); bm.copy(page = newPage) } else bm
+            }
+            val newHighlights = `as`.highlights.map { hl ->
+                val newPage = cfiToPage(hl.cfi, pcs.spinePageOffsets, pcs.cfiPageMap)
+                if (newPage > 0 && newPage != hl.page) { highlightDao.updatePage(hl.id, newPage); hl.copy(page = newPage) } else hl
+            }
+            val newMemos = `as`.memos.map { m ->
+                val newPage = cfiToPage(m.cfi, pcs.spinePageOffsets, pcs.cfiPageMap)
+                if (newPage > 0 && newPage != m.page) { memoDao.updatePage(m.id, newPage); m.copy(page = newPage) } else m
+            }
+            _annotationState.update { it.copy(bookmarks = newBookmarks, highlights = newHighlights, memos = newMemos) }
+        }
     }
 
     fun updateLocation(progress: Float, cfi: String, chapter: String) {
