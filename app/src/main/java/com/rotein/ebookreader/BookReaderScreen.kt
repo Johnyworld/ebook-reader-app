@@ -71,7 +71,6 @@ import com.rotein.ebookreader.ui.components.PopupHeaderBar
 import com.rotein.ebookreader.ui.theme.EreaderColors
 import com.rotein.ebookreader.ui.theme.EreaderSpacing
 import kotlinx.coroutines.launch
-import org.json.JSONArray
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -230,19 +229,6 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
             "mobi" -> MobiViewer(book.path, onCenterTap)
             else   -> CenteredMessage("지원하지 않는 형식입니다.")
         }
-
-        // 디버그 정보 오버레이 (필요 시 주석 해제)
-        // if (isContentRendered && debugSpineIndex >= 0) {
-        //     Text(
-        //         text = "si=$debugSpineIndex p=$debugDisplayedPage/$debugDisplayedTotal s=${"%.3f".format(debugScrollX)}/${"%.3f".format(debugScrollWidth)} d=${"%.3f".format(debugDeltaX)}",
-        //         modifier = Modifier
-        //             .align(Alignment.TopCenter)
-        //             .padding(top = 4.dp)
-        //             .background(EreaderColors.White),
-        //         style = MaterialTheme.typography.bodySmall,
-        //         color = EreaderColors.Black
-        //     )
-        // }
 
         // 북마크 리본은 WebView 내부 HTML로 렌더링 (글자 하위 레이어)
 
