@@ -100,7 +100,10 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
         onDispose { activity?.currentEpubWebView = null }
     }
 
-    BackHandler { onClose() }
+    BackHandler {
+        vm.setShowMenu(false)
+        onClose()
+    }
     BackHandler(enabled = popupState.showMenu) { vm.setShowMenu(false) }
     BackHandler(enabled = popupState.showTocPopup) { vm.setShowTocPopup(false) }
     BackHandler(enabled = popupState.showSearchPopup) { vm.setShowSearchPopup(false) }
@@ -299,17 +302,14 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    if (contentState.isLoading) "도서 불러오는 중..." else "${(readingState.readingProgress * 100).toInt()}% 읽음",
+                                    "${(readingState.readingProgress * 100).toInt()}% 읽음",
                                     style = MaterialTheme.typography.bodyMedium
                                 )
-                                if (readingState.totalPages > 0) {
-                                    Text(
-                                        "${readingState.currentPage} / ${readingState.totalPages}",
-                                        style = MaterialTheme.typography.bodyMedium
-                                    )
-                                }
+                                Text(
+                                    "${readingState.currentPage} / ${readingState.totalPages}",
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
                             }
-                            if (!contentState.isLoading) {
                             Spacer(Modifier.height(EreaderSpacing.S))
                             LinearProgressIndicator(
                                 progress = { readingState.readingProgress },
@@ -320,7 +320,6 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                                 gapSize = 0.dp,
                                 drawStopIndicator = {}
                             )
-                            }
                             Spacer(Modifier.height(EreaderSpacing.M))
                             Row(
                                 modifier = Modifier
@@ -388,7 +387,10 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                 ) {
                     PopupHeaderBar(
                         title = book.metadata?.title ?: book.name,
-                        onBack = onClose
+                        onBack = {
+                            vm.setShowMenu(false)
+                            onClose()
+                        }
                     ) {
                         IconButton(onClick = {
                             if (readingState.currentCfi.isEmpty()) return@IconButton
