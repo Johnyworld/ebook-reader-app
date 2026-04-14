@@ -101,9 +101,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
     var memoActionState by remember { mutableStateOf<MemoActionState?>(null) }
     data class CombinedAnnotationState(val highlightId: Long, val memoId: Long, val x: Float, val y: Float, val bottom: Float)
     var combinedAnnotationState by remember { mutableStateOf<CombinedAnnotationState?>(null) }
-    var searchResults by remember { mutableStateOf<List<SearchResultItem>?>(null) }
-    var isSearching by remember { mutableStateOf(false) }
-    var searchQuery by remember { mutableStateOf("") }
+    val searchState by vm.searchState.collectAsState()
     val epubWebView = remember { mutableStateOf<WebView?>(null) }
     val onNavigationCompleteRef = remember { mutableStateOf<(() -> Unit)?>(null) }
     var debugSpineIndex by remember(book.path) { mutableStateOf(-1) }
@@ -262,17 +260,9 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                 onScanStart = { if (!contentState.scanCacheValid) vm.setScanning(true) },
                 onScanComplete = { scannedTotal, spinePageOffsetsJson, cfiPageMapJson, charPageBreaksJson ->
                     vm.onScanComplete(scannedTotal, spinePageOffsetsJson, cfiPageMapJson, charPageBreaksJson)
-                    if (!searchResults.isNullOrEmpty()) {
-                        searchResults = recalcSearchPages(searchResults!!, pageCalcState.spinePageOffsets, charPageBreaksJson)
-                    }
                 },
-                onSearchResultsPartial = { json ->
-                    try {
-                        val partial = parseSearchResults(JSONArray(json))
-                        searchResults = (searchResults ?: emptyList()) + partial
-                    } catch (_: Exception) {}
-                },
-                onSearchComplete = { isSearching = false },
+                onSearchResultsPartial = { json -> vm.onSearchResultsPartial(json) },
+                onSearchComplete = { vm.onSearchComplete() },
                 onNavigationComplete = {
                     vm.setLoading(false)
                     onNavigationCompleteRef.value?.invoke()
@@ -549,14 +539,12 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
         // 검색 팝업
         if (popupState.showSearchPopup) {
             SearchPopup(
-                searchResults = searchResults,
-                isSearching = isSearching,
+                searchResults = searchState.results,
+                isSearching = searchState.isSearching,
                 tocItems = tocItems,
-                initialQuery = searchQuery,
+                initialQuery = searchState.query,
                 onSearch = { query ->
-                    searchQuery = query
-                    isSearching = true
-                    searchResults = emptyList()
+                    vm.startSearch(query)
                     val escaped = query.escapeCfiForJs()
                     epubWebView.value?.post {
                         epubWebView.value?.evaluateJavascript("window._setSearchHighlight(\"$escaped\")", null)
@@ -572,9 +560,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                     }
                 },
                 onClear = {
-                    searchQuery = ""
-                    searchResults = null
-                    isSearching = false
+                    vm.clearSearch()
                     epubWebView.value?.post {
                         epubWebView.value?.evaluateJavascript("window._clearSearchHighlight()", null)
                     }

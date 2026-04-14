@@ -55,6 +55,12 @@ data class PopupState(
     val showFontPopup: Boolean = false
 )
 
+data class SearchState(
+    val query: String = "",
+    val results: List<SearchResultItem>? = null,
+    val isSearching: Boolean = false
+)
+
 class BookReaderViewModel(application: Application) : AndroidViewModel(application) {
 
     private val db = BookDatabase.getInstance(application)
@@ -89,6 +95,9 @@ class BookReaderViewModel(application: Application) : AndroidViewModel(applicati
 
     private val _annotationState = MutableStateFlow(AnnotationState())
     val annotationState: StateFlow<AnnotationState> = _annotationState.asStateFlow()
+
+    private val _searchState = MutableStateFlow(SearchState())
+    val searchState: StateFlow<SearchState> = _searchState.asStateFlow()
 
     init {
         // 설정 변경 시 자동 저장
@@ -202,6 +211,13 @@ class BookReaderViewModel(application: Application) : AndroidViewModel(applicati
             _pageCalcState.update { it.copy(cfiPageMap = cfiMap) }
         } catch (_: Exception) {}
 
+        val sr = _searchState.value.results
+        if (!sr.isNullOrEmpty()) {
+            _searchState.update {
+                it.copy(results = recalcSearchPages(sr, _pageCalcState.value.spinePageOffsets, charPageBreaksJson))
+            }
+        }
+
         remapAnnotationPages()
     }
 
@@ -311,6 +327,25 @@ class BookReaderViewModel(application: Application) : AndroidViewModel(applicati
             withContext(Dispatchers.IO) { memoDao.deleteById(id) }
             _annotationState.update { it.copy(memos = it.memos.filter { it.id != id }) }
         }
+    }
+
+    fun startSearch(query: String) {
+        _searchState.update { it.copy(query = query, isSearching = true, results = emptyList()) }
+    }
+
+    fun onSearchResultsPartial(json: String) {
+        try {
+            val partial = parseSearchResults(org.json.JSONArray(json))
+            _searchState.update { it.copy(results = (it.results ?: emptyList()) + partial) }
+        } catch (_: Exception) {}
+    }
+
+    fun onSearchComplete() {
+        _searchState.update { it.copy(isSearching = false) }
+    }
+
+    fun clearSearch() {
+        _searchState.update { SearchState() }
     }
 
     fun remapAnnotationPages() {
