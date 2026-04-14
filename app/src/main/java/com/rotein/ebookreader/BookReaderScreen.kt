@@ -72,7 +72,6 @@ import com.rotein.ebookreader.ui.components.PopupHeaderBar
 import com.rotein.ebookreader.ui.theme.EreaderColors
 import com.rotein.ebookreader.ui.theme.EreaderSpacing
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -131,15 +130,8 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
     var debugScrollX by remember(book.path) { mutableStateOf(0f) }
     var debugScrollWidth by remember(book.path) { mutableStateOf(0f) }
     var debugDeltaX by remember(book.path) { mutableStateOf(0f) }
-    var readerSettings by remember { mutableStateOf(ReaderSettingsStore.load(context)) }
-    var currentTime by remember { mutableStateOf("") }
-    LaunchedEffect(Unit) {
-        val sdf = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault())
-        while (true) {
-            currentTime = sdf.format(java.util.Date())
-            delay(60_000L - System.currentTimeMillis() % 60_000L)
-        }
-    }
+    val readerSettings by vm.readerSettings.collectAsState()
+    val currentTime by vm.currentTime.collectAsState()
 
     val activity = LocalContext.current as? MainActivity
     DisposableEffect(epubWebView.value) {
@@ -160,10 +152,6 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
     BackHandler(enabled = combinedAnnotationState != null) { combinedAnnotationState = null }
     BackHandler(enabled = popupState.showSettingsPopup) { vm.setShowSettingsPopup(false) }
     BackHandler(enabled = popupState.showFontPopup) { vm.setShowFontPopup(false) }
-
-    LaunchedEffect(readerSettings) {
-        withContext(Dispatchers.IO) { ReaderSettingsStore.save(context, readerSettings) }
-    }
 
     LaunchedEffect(popupState.showMenu) {
         if (popupState.showMenu) {
@@ -1018,7 +1006,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                 ) {
                     ReaderSettingsBottomSheet(
                         settings = readerSettings,
-                        onSettingsChange = { readerSettings = it },
+                        onSettingsChange = { vm.updateSettings(it) },
                         onDismiss = { vm.setShowSettingsPopup(false) },
                         onOpenFontPopup = { vm.setShowFontPopup(true) }
                     )
@@ -1030,8 +1018,8 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
         if (popupState.showFontPopup) {
             FontLayerPopup(
                 currentFontName = readerSettings.fontName,
-                onSelect = { readerSettings = readerSettings.copy(fontName = it); vm.setShowFontPopup(false) },
-                onFontChanged = { readerSettings = readerSettings.copy(fontName = it) },
+                onSelect = { vm.updateSettings(readerSettings.copy(fontName = it)); vm.setShowFontPopup(false) },
+                onFontChanged = { vm.updateSettings(readerSettings.copy(fontName = it)) },
                 onFontImported = {},
                 onDismiss = { vm.setShowFontPopup(false) }
             )
