@@ -106,16 +106,23 @@ internal val MIGRATION_4_5 = object : Migration(4, 5) {
     }
 }
 
+interface AnnotationItem {
+    val cfi: String
+    val page: Int
+    val createdAt: Long
+    val chapterTitle: String
+}
+
 @Entity(tableName = "bookmarks", indices = [Index("bookPath")])
 data class Bookmark(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val bookPath: String,
-    val cfi: String,
-    val chapterTitle: String = "",
+    override val cfi: String,
+    override val chapterTitle: String = "",
     val excerpt: String = "",
-    val page: Int = 0,
-    val createdAt: Long = System.currentTimeMillis()
-)
+    override val page: Int = 0,
+    override val createdAt: Long = System.currentTimeMillis()
+) : AnnotationItem
 
 @Dao
 interface BookmarkDao {
@@ -158,12 +165,12 @@ internal val MIGRATION_7_8 = object : Migration(7, 8) {
 data class Highlight(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val bookPath: String,
-    val cfi: String,
+    override val cfi: String,
     val text: String = "",
-    val chapterTitle: String = "",
-    val page: Int = 0,
-    val createdAt: Long = System.currentTimeMillis()
-)
+    override val chapterTitle: String = "",
+    override val page: Int = 0,
+    override val createdAt: Long = System.currentTimeMillis()
+) : AnnotationItem
 
 @Dao
 interface HighlightDao {
@@ -200,13 +207,13 @@ internal val MIGRATION_9_10 = object : Migration(9, 10) {
 data class Memo(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val bookPath: String,
-    val cfi: String,
+    override val cfi: String,
     val text: String = "",
     val note: String = "",
-    val chapterTitle: String = "",
-    val page: Int = 0,
-    val createdAt: Long = System.currentTimeMillis()
-)
+    override val chapterTitle: String = "",
+    override val page: Int = 0,
+    override val createdAt: Long = System.currentTimeMillis()
+) : AnnotationItem
 
 @Dao
 interface MemoDao {

@@ -421,7 +421,7 @@ private fun extractEpub(context: Context, epubPath: String): Pair<String, String
     val outDir = File(context.cacheDir, "epub/$hash")
     val opfMarker = File(outDir, ".opf_path")
 
-    if (outDir.exists() && opfMarker.exists() && File(outDir, "epub.min.js").exists()) {
+    if (outDir.exists() && opfMarker.exists() && File(outDir, "epub.min.js").exists() && File(outDir, "js/init.js").exists()) {
         return Pair(outDir.absolutePath, opfMarker.readText())
     }
 
@@ -439,6 +439,14 @@ private fun extractEpub(context: Context, epubPath: String): Pair<String, String
 
     // assets 에서 epub.min.js 복사
     context.assets.open("epub.min.js").use { it.copyTo(File(outDir, "epub.min.js").outputStream()) }
+
+    // assets 에서 JS 모듈 파일 복사
+    val jsDir = File(outDir, "js")
+    jsDir.mkdirs()
+    val jsFiles = listOf("init.js", "settings.js", "location.js", "page-scan.js", "selection.js", "search.js", "annotation.js", "navigation.js")
+    for (jsFile in jsFiles) {
+        context.assets.open("epub/js/$jsFile").use { it.copyTo(File(jsDir, jsFile).outputStream()) }
+    }
 
     val opfPath = findOpfPath(outDir) ?: return null
     opfMarker.writeText(opfPath)
