@@ -220,7 +220,7 @@ rendition.on("relocated", function(location) {
     } else {
         _pendingLocation = location;
     }
-    if (_searchHighlightQuery) { setTimeout(_applySearchHighlights, 50); }
+    if (_searchHighlightQuery && !_navigating) { setTimeout(_applySearchHighlights, 50); }
     if (_pendingAutoSelect) {
         _pendingAutoSelect = false;
         requestAnimationFrame(function() {
@@ -389,12 +389,26 @@ function computeVisualPages() {
                                             var rect = range.getBoundingClientRect();
                                             if (rect.width > 0) {
                                                 var nodePage = Math.floor(rect.left / sDelta);
+                                                var nodeEndPage = Math.floor(Math.max(rect.right - 1, 0) / sDelta);
                                                 if (nodePage > lastPage) {
                                                     for (var np = lastPage + 1; np <= nodePage; np++) {
                                                         pageBreaks.push(charOffset);
                                                     }
-                                                    lastPage = nodePage;
                                                 }
+                                                if (nodeEndPage > nodePage) {
+                                                    for (var tp = nodePage + 1; tp <= nodeEndPage; tp++) {
+                                                        var lo = 0, hi = len;
+                                                        while (lo < hi) {
+                                                            var mid = (lo + hi) >> 1;
+                                                            range.setStart(sNd, mid);
+                                                            range.setEnd(sNd, Math.min(mid + 1, len));
+                                                            var mr = range.getBoundingClientRect();
+                                                            if (Math.floor(mr.left / sDelta) < tp) lo = mid + 1; else hi = mid;
+                                                        }
+                                                        pageBreaks.push(charOffset + lo);
+                                                    }
+                                                }
+                                                lastPage = Math.max(lastPage, nodeEndPage);
                                             }
                                         } catch(re) {}
                                         charOffset += len;
@@ -784,6 +798,7 @@ function _finishNavigation() {
         }
     } catch(e) {}
     Android.onNavigationComplete();
+    if (_searchHighlightQuery) { setTimeout(_applySearchHighlights, 50); }
 }
 if (_savedCfi.length > 0) {
     _navigating = true;
@@ -825,6 +840,7 @@ window._nextThenAutoSelect = function() {
 
 window._displayHref = function(href) {
     _navigating = true;
+    _removeSearchHighlights();
     rendition.display(href).then(function() {
         setTimeout(function() {
             rendition.display(href).then(_finishNavigation).catch(_finishNavigation);
@@ -832,10 +848,17 @@ window._displayHref = function(href) {
     }).catch(_finishNavigation);
 };
 window._displayCfi = function(cfi) {
+    // range CFI를 point CFI로 변환 (rendition.display()는 range CFI 미지원)
+    var navCfi = cfi;
+    var m = cfi.match(/^(epubcfi\(.+),(\/.+),(\/.+)\)$/);
+    if (m) {
+        navCfi = m[1] + m[2] + ')';
+    }
     _navigating = true;
-    rendition.display(cfi).then(function() {
+    _removeSearchHighlights();
+    rendition.display(navCfi).then(function() {
         setTimeout(function() {
-            rendition.display(cfi).then(_finishNavigation).catch(_finishNavigation);
+            rendition.display(navCfi).then(_finishNavigation).catch(_finishNavigation);
         }, 0);
     }).catch(_finishNavigation);
 };
