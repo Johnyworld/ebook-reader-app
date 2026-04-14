@@ -81,6 +81,10 @@ import org.json.JSONArray
 fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = Modifier) {
     val vm: BookReaderViewModel = viewModel()
     val popupState by vm.popupState.collectAsState()
+    val readingState by vm.readingState.collectAsState()
+    val contentState by vm.contentState.collectAsState()
+    val readerSettings by vm.readerSettings.collectAsState()
+    val currentTime by vm.currentTime.collectAsState()
     val onCenterTap = { vm.toggleMenu() }
 
     val context = LocalContext.current
@@ -89,11 +93,6 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
     val highlightDao = remember { BookDatabase.getInstance(context).highlightDao() }
     val scope = rememberCoroutineScope()
 
-    var readingProgress by remember(book.path) { mutableStateOf(0f) }
-    var chapterTitle by remember(book.path) { mutableStateOf("") }
-    var savedCfi by remember(book.path) { mutableStateOf<String?>(null) }
-    var isLoading by remember(book.path) { mutableStateOf(book.extension.lowercase() == "epub") }
-    var locationsReady by remember(book.path) { mutableStateOf(false) }
     var tocItems by remember(book.path) { mutableStateOf<List<TocItem>>(emptyList()) }
     data class HighlightActionState(val id: Long, val x: Float, val y: Float, val bottom: Float)
     var highlightActionState by remember { mutableStateOf<HighlightActionState?>(null) }
@@ -111,27 +110,18 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
     var searchQuery by remember { mutableStateOf("") }
     val epubWebView = remember { mutableStateOf<WebView?>(null) }
     val onNavigationCompleteRef = remember { mutableStateOf<(() -> Unit)?>(null) }
-    var currentPage by remember(book.path) { mutableStateOf(0) }
-    var totalPages by remember(book.path) { mutableStateOf(0) }
-    var currentCfi by remember(book.path) { mutableStateOf("") }
     var isCurrentPageBookmarked by remember(book.path) { mutableStateOf(false) }
     var bookmarks by remember(book.path) { mutableStateOf<List<Bookmark>>(emptyList()) }
     var highlights by remember(book.path) { mutableStateOf<List<Highlight>>(emptyList()) }
-    var isContentRendered by remember(book.path) { mutableStateOf(false) }
-    var isScanning by remember(book.path) { mutableStateOf(false) }
     var spinePageOffsets by remember(book.path) { mutableStateOf<Map<Int, Int>>(emptyMap()) }
     var cfiPageMap by remember(book.path) { mutableStateOf<Map<String, Int>>(emptyMap()) }
-    var scanCacheValid by remember(book.path) { mutableStateOf(false) }
     var spineCharPageBreaksJson by remember(book.path) { mutableStateOf("") }
-    var prevProgress by remember(book.path) { mutableStateOf(-1f) }
     var debugSpineIndex by remember(book.path) { mutableStateOf(-1) }
     var debugDisplayedPage by remember(book.path) { mutableStateOf(-1) }
     var debugDisplayedTotal by remember(book.path) { mutableStateOf(0) }
     var debugScrollX by remember(book.path) { mutableStateOf(0f) }
     var debugScrollWidth by remember(book.path) { mutableStateOf(0f) }
     var debugDeltaX by remember(book.path) { mutableStateOf(0f) }
-    val readerSettings by vm.readerSettings.collectAsState()
-    val currentTime by vm.currentTime.collectAsState()
 
     val activity = LocalContext.current as? MainActivity
     DisposableEffect(epubWebView.value) {
@@ -157,31 +147,32 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
         if (popupState.showMenu) {
             epubWebView.value?.evaluateJavascript("window._currentCfi || ''") { result ->
                 val cfi = result?.removeSurrounding("\"")?.trim().orEmpty()
-                if (cfi.isNotEmpty()) currentCfi = cfi
+                if (cfi.isNotEmpty()) vm.updateCurrentCfi(cfi)
             }
         }
     }
 
     LaunchedEffect(book.path) {
+        vm.initReadingState(isEpub = book.extension.lowercase() == "epub")
         val record = withContext(Dispatchers.IO) { dao.getByPath(book.path) }
-        savedCfi = record?.lastCfi ?: ""
+        vm.setSavedCfi(record?.lastCfi ?: "")
         val cachedToc = record?.tocJson.orEmpty()
         if (cachedToc.isNotEmpty()) {
             try {
                 tocItems = parseTocJson(JSONArray(cachedToc))
-                locationsReady = true
+                vm.setLocationsReady(true)
             } catch (_: Exception) {}
         }
         val currentFingerprint = readerSettings.layoutFingerprint()
         if (record != null && record.cachedSettingsFingerprint == currentFingerprint && record.cachedTotalPages > 0) {
-            totalPages = record.cachedTotalPages
+            vm.setTotalPages(record.cachedTotalPages)
             try {
                 val obj = org.json.JSONObject(record.cachedSpinePageOffsetsJson)
                 val map = mutableMapOf<Int, Int>()
                 obj.keys().forEach { key -> map[key.toInt()] = obj.getInt(key) }
                 spinePageOffsets = map
             } catch (_: Exception) {}
-            scanCacheValid = true
+            vm.setScanCacheValid(true)
             spineCharPageBreaksJson = record.cachedSpineCharPageBreaksJson
         }
         bookmarks = withContext(Dispatchers.IO) { bookmarkDao.getByBook(book.path) }
@@ -189,8 +180,8 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
         memos = withContext(Dispatchers.IO) { memoDao.getByBook(book.path) }
     }
 
-    LaunchedEffect(isContentRendered) {
-        if (!isContentRendered) return@LaunchedEffect
+    LaunchedEffect(contentState.isContentRendered) {
+        if (!contentState.isContentRendered) return@LaunchedEffect
         if (highlights.isNotEmpty()) {
             val json = highlights.joinToString(",", "[", "]") {
                 """{"id":${it.id},"cfi":"${it.cfi.escapeCfiForJs()}"}"""
@@ -205,10 +196,10 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
         }
     }
 
-    LaunchedEffect(currentCfi, bookmarks, isContentRendered) {
-        if (!isContentRendered) return@LaunchedEffect
+    LaunchedEffect(readingState.currentCfi, bookmarks, contentState.isContentRendered) {
+        if (!contentState.isContentRendered) return@LaunchedEffect
         val wv = epubWebView.value ?: return@LaunchedEffect
-        if (currentCfi.isEmpty() || bookmarks.isEmpty()) {
+        if (readingState.currentCfi.isEmpty() || bookmarks.isEmpty()) {
             isCurrentPageBookmarked = false
             wv.evaluateJavascript("window._showBookmarkRibbon(false)", null)
             return@LaunchedEffect
@@ -227,25 +218,14 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
             "txt"  -> TxtViewer(book.path, onCenterTap)
             "epub" -> EpubViewer(
                 path = book.path,
-                savedCfi = savedCfi,
+                savedCfi = readingState.savedCfi,
                 onCenterTap = onCenterTap,
                 onLocationUpdate = { progress, cfi, chapter ->
-                    locationsReady = true
-                    currentCfi = cfi
-                    chapterTitle = chapter
-                    if (prevProgress >= 0f && currentPage > 0 && totalPages > 0) {
-                        if (progress > prevProgress) {
-                            currentPage = (currentPage + 1).coerceAtMost(totalPages)
-                        } else if (progress < prevProgress) {
-                            currentPage = (currentPage - 1).coerceAtLeast(1)
-                        }
-                        readingProgress = currentPage.toFloat() / totalPages.toFloat()
-                    }
-                    prevProgress = progress
+                    vm.updateLocation(progress, cfi, chapter)
                     scope.launch(Dispatchers.IO) { dao.upsertCfi(book.path, cfi) }
                 },
                 onTocLoaded = { tocJson ->
-                    if (!locationsReady) {
+                    if (!contentState.locationsReady) {
                         try { tocItems = parseTocJson(JSONArray(tocJson)) } catch (_: Exception) {}
                     }
                 },
@@ -255,7 +235,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                         val hasPageData = flattenToc(newItems).any { it.page > 0 }
                         if (hasPageData || flattenToc(tocItems).none { it.page > 0 }) {
                             tocItems = newItems
-                            locationsReady = true
+                            vm.setLocationsReady(true)
                         }
                         if (hasPageData) {
                             scope.launch(Dispatchers.IO) { dao.upsertTocJson(book.path, tocJson) }
@@ -263,18 +243,18 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                     } catch (_: Exception) {}
                 },
                 onContentRendered = {
-                    if (savedCfi.isNullOrEmpty()) isLoading = false
-                    isContentRendered = true
-                    if (scanCacheValid && spinePageOffsets.isNotEmpty()) {
+                    if (readingState.savedCfi.isNullOrEmpty()) vm.setLoading(false)
+                    vm.setContentRendered(true)
+                    if (contentState.scanCacheValid && spinePageOffsets.isNotEmpty()) {
                         val jsonObj = org.json.JSONObject()
                         spinePageOffsets.forEach { (k, v) -> jsonObj.put(k.toString(), v) }
                         val charBreaksJs = if (spineCharPageBreaksJson.isNotEmpty()) "_spineCharPageBreaks=$spineCharPageBreaksJson;" else ""
-                        val js = "_spinePageOffsets=$jsonObj;_totalVisualPages=$totalPages;$charBreaksJs" +
+                        val js = "_spinePageOffsets=$jsonObj;_totalVisualPages=${readingState.totalPages};$charBreaksJs" +
                             "if(_pendingLocation){reportLocation(_pendingLocation);_pendingLocation=null;}" +
                             "else{var l=rendition.currentLocation();if(l&&l.start)reportLocation(l);}"
                         epubWebView.value?.evaluateJavascript(js, null)
                     } else {
-                        isScanning = true
+                        vm.setScanning(true)
                     }
                     val allCfis = (bookmarks.map { it.cfi } + highlights.map { it.cfi } + memos.map { it.cfi })
                         .filter { it.isNotEmpty() }.distinct()
@@ -285,15 +265,15 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                 },
                 onHighlight = { text, cfi ->
                     if (cfi.isNotEmpty()) {
-                        val chapterSnapshot = chapterTitle
-                        if (currentPage > 0) cfiPageMap = cfiPageMap + (cfi to currentPage)
+                        val chapterSnapshot = readingState.chapterTitle
+                        if (readingState.currentPage > 0) cfiPageMap = cfiPageMap + (cfi to readingState.currentPage)
                         scope.launch {
                             val highlight = Highlight(
                                 bookPath = book.path,
                                 cfi = cfi,
                                 text = text,
                                 chapterTitle = chapterSnapshot,
-                                page = currentPage,
+                                page = readingState.currentPage,
                                 createdAt = System.currentTimeMillis()
                             )
                             val id = withContext(Dispatchers.IO) { highlightDao.insert(highlight) }
@@ -304,7 +284,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                         }
                     }
                 },
-                onChapterChanged = { chapter -> chapterTitle = chapter },
+                onChapterChanged = { chapter -> vm.updateChapterTitle(chapter) },
                 onMemo = { text, cfi ->
                     pendingMemoText = text
                     pendingMemoCfi = cfi
@@ -331,8 +311,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                 },
                 onWebViewCreated = { webView -> epubWebView.value = webView },
                 onPageInfoChanged = { page, total ->
-                    currentPage = page
-                    if (total > 0) readingProgress = page.toFloat() / total.toFloat()
+                    vm.updatePageInfo(page, total)
                 },
                 onDebugInfo = { spineIdx, dispPage, dispTotal, scrollX, scrollW, deltaX ->
                     debugSpineIndex = spineIdx
@@ -342,12 +321,10 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                     debugScrollWidth = scrollW
                     debugDeltaX = deltaX
                 },
-                onScanStart = { if (!scanCacheValid) isScanning = true },
+                onScanStart = { if (!contentState.scanCacheValid) vm.setScanning(true) },
                 onScanComplete = { scannedTotal, spinePageOffsetsJson, cfiPageMapJson, charPageBreaksJson ->
-                    if (scannedTotal != totalPages) {
-                        totalPages = scannedTotal
-                    }
-                    isScanning = false
+                    vm.setTotalPages(scannedTotal)
+                    vm.setScanning(false)
                     try {
                         val obj = org.json.JSONObject(spinePageOffsetsJson)
                         val map = mutableMapOf<Int, Int>()
@@ -401,7 +378,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                 },
                 onSearchComplete = { isSearching = false },
                 onNavigationComplete = {
-                    isLoading = false
+                    vm.setLoading(false)
                     onNavigationCompleteRef.value?.invoke()
                     onNavigationCompleteRef.value = null
                 },
@@ -428,9 +405,9 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
         // 북마크 리본은 WebView 내부 HTML로 렌더링 (글자 하위 레이어)
 
         // 하단 정보 오버레이
-        if (!popupState.showMenu && isContentRendered) {
-            val leftText = readerBottomInfoText(readerSettings.leftInfo, book, chapterTitle, currentPage, totalPages, readingProgress, currentTime)
-            val rightText = readerBottomInfoText(readerSettings.rightInfo, book, chapterTitle, currentPage, totalPages, readingProgress, currentTime)
+        if (!popupState.showMenu && contentState.isContentRendered) {
+            val leftText = readerBottomInfoText(readerSettings.leftInfo, book, readingState.chapterTitle, readingState.currentPage, readingState.totalPages, readingState.readingProgress, currentTime)
+            val rightText = readerBottomInfoText(readerSettings.rightInfo, book, readingState.chapterTitle, readingState.currentPage, readingState.totalPages, readingState.readingProgress, currentTime)
             if (leftText != null || rightText != null) {
                 Row(
                     modifier = Modifier
@@ -446,7 +423,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
         }
 
         // 로딩 오버레이
-        if (isLoading) {
+        if (contentState.isLoading) {
             Box(
                 modifier = Modifier.fillMaxSize().background(EreaderColors.White).clickable(enabled = false) {},
                 contentAlignment = Alignment.Center
@@ -475,7 +452,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                         .pointerInput(Unit) { detectTapGestures {} },
                     color = EreaderColors.White
                 ) {
-                    if (isScanning) {
+                    if (contentState.isScanning) {
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -494,20 +471,20 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    if (isLoading) "도서 불러오는 중..." else "${(readingProgress * 100).toInt()}% 읽음",
+                                    if (contentState.isLoading) "도서 불러오는 중..." else "${(readingState.readingProgress * 100).toInt()}% 읽음",
                                     style = MaterialTheme.typography.bodyMedium
                                 )
-                                if (totalPages > 0) {
+                                if (readingState.totalPages > 0) {
                                     Text(
-                                        "$currentPage / $totalPages",
+                                        "${readingState.currentPage} / ${readingState.totalPages}",
                                         style = MaterialTheme.typography.bodyMedium
                                     )
                                 }
                             }
-                            if (!isLoading) {
+                            if (!contentState.isLoading) {
                             Spacer(Modifier.height(EreaderSpacing.S))
                             LinearProgressIndicator(
-                                progress = { readingProgress },
+                                progress = { readingState.readingProgress },
                                 modifier = Modifier.fillMaxWidth(),
                                 color = EreaderColors.Black,
                                 trackColor = EreaderColors.Gray,
@@ -533,7 +510,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                                     tint = EreaderColors.Black
                                 )
                                 Text(
-                                    chapterTitle.ifEmpty { "목차" },
+                                    readingState.chapterTitle.ifEmpty { "목차" },
                                     style = MaterialTheme.typography.bodySmall.copy(fontSize = 14.sp),
                                     color = EreaderColors.Black
                                 )
@@ -586,7 +563,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                         onBack = onClose
                     ) {
                         IconButton(onClick = {
-                            if (currentCfi.isEmpty()) return@IconButton
+                            if (readingState.currentCfi.isEmpty()) return@IconButton
                             if (isCurrentPageBookmarked) {
                                 scope.launch {
                                     val wv = epubWebView.value
@@ -612,14 +589,14 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                             } else {
                                 val wv = epubWebView.value
                                 val saveBookmark = { cfi: String, excerpt: String ->
-                                    if (cfi.isNotEmpty() && currentPage > 0) cfiPageMap = cfiPageMap + (cfi to currentPage)
+                                    if (cfi.isNotEmpty() && readingState.currentPage > 0) cfiPageMap = cfiPageMap + (cfi to readingState.currentPage)
                                     scope.launch {
                                         val bookmark = Bookmark(
                                             bookPath = book.path,
                                             cfi = cfi,
-                                            chapterTitle = chapterTitle,
+                                            chapterTitle = readingState.chapterTitle,
                                             excerpt = excerpt,
-                                            page = currentPage,
+                                            page = readingState.currentPage,
                                             createdAt = System.currentTimeMillis()
                                         )
                                         withContext(Dispatchers.IO) { bookmarkDao.insert(bookmark) }
@@ -666,8 +643,8 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
             TocPopup(
                 tocItems = tocItems,
                 bookTitle = book.metadata?.title ?: book.name,
-                currentChapterTitle = chapterTitle,
-                totalBookPages = totalPages,
+                currentChapterTitle = readingState.chapterTitle,
+                totalBookPages = readingState.totalPages,
                 onNavigate = { href ->
                     if (onNavigationCompleteRef.value != null) return@TocPopup
                     onNavigationCompleteRef.value = { vm.setShowTocPopup(false); vm.setShowMenu(false) }
@@ -844,7 +821,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                     ActionItem("하이라이트") {
                         memoActionState = null
                         if (memo != null) {
-                            val chapterSnapshot = chapterTitle
+                            val chapterSnapshot = readingState.chapterTitle
                             scope.launch {
                                 val highlight = Highlight(
                                     bookPath = book.path,
@@ -938,8 +915,8 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                             editingMemo = null
                         }
                     } else if (pendingMemoCfi.isNotEmpty()) {
-                        val chapterSnapshot = chapterTitle
-                        if (currentPage > 0) cfiPageMap = cfiPageMap + (pendingMemoCfi to currentPage)
+                        val chapterSnapshot = readingState.chapterTitle
+                        if (readingState.currentPage > 0) cfiPageMap = cfiPageMap + (pendingMemoCfi to readingState.currentPage)
                         scope.launch {
                             val newMemo = Memo(
                                 bookPath = book.path,
@@ -947,7 +924,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                                 text = pendingMemoText,
                                 note = note,
                                 chapterTitle = chapterSnapshot,
-                                page = currentPage,
+                                page = readingState.currentPage,
                                 createdAt = System.currentTimeMillis()
                             )
                             val id = withContext(Dispatchers.IO) { memoDao.insert(newMemo) }

@@ -12,6 +12,24 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+data class ReadingState(
+    val currentPage: Int = 0,
+    val totalPages: Int = 0,
+    val readingProgress: Float = 0f,
+    val currentCfi: String = "",
+    val chapterTitle: String = "",
+    val savedCfi: String? = null,
+    val prevProgress: Float = -1f
+)
+
+data class ContentState(
+    val isLoading: Boolean = true,
+    val isContentRendered: Boolean = false,
+    val locationsReady: Boolean = false,
+    val isScanning: Boolean = false,
+    val scanCacheValid: Boolean = false
+)
+
 data class PopupState(
     val showMenu: Boolean = false,
     val showTocPopup: Boolean = false,
@@ -25,6 +43,12 @@ data class PopupState(
 )
 
 class BookReaderViewModel(application: Application) : AndroidViewModel(application) {
+
+    private val _readingState = MutableStateFlow(ReadingState())
+    val readingState: StateFlow<ReadingState> = _readingState.asStateFlow()
+
+    private val _contentState = MutableStateFlow(ContentState())
+    val contentState: StateFlow<ContentState> = _contentState.asStateFlow()
 
     private val _popupState = MutableStateFlow(PopupState())
     val popupState: StateFlow<PopupState> = _popupState.asStateFlow()
@@ -53,6 +77,79 @@ class BookReaderViewModel(application: Application) : AndroidViewModel(applicati
                 delay(60_000L - System.currentTimeMillis() % 60_000L)
             }
         }
+    }
+
+    fun initReadingState(isEpub: Boolean) {
+        _readingState.value = ReadingState()
+        _contentState.value = ContentState(isLoading = isEpub)
+    }
+
+    fun updateLocation(progress: Float, cfi: String, chapter: String) {
+        _contentState.update { it.copy(locationsReady = true) }
+        val rs = _readingState.value
+        var newPage = rs.currentPage
+        var newProgress = rs.readingProgress
+        if (rs.prevProgress >= 0f && rs.currentPage > 0 && rs.totalPages > 0) {
+            if (progress > rs.prevProgress) {
+                newPage = (rs.currentPage + 1).coerceAtMost(rs.totalPages)
+            } else if (progress < rs.prevProgress) {
+                newPage = (rs.currentPage - 1).coerceAtLeast(1)
+            }
+            newProgress = newPage.toFloat() / rs.totalPages.toFloat()
+        }
+        _readingState.update {
+            it.copy(
+                currentCfi = cfi,
+                chapterTitle = chapter,
+                currentPage = newPage,
+                readingProgress = newProgress,
+                prevProgress = progress
+            )
+        }
+    }
+
+    fun updateCurrentCfi(cfi: String) {
+        _readingState.update { it.copy(currentCfi = cfi) }
+    }
+
+    fun updateChapterTitle(chapter: String) {
+        _readingState.update { it.copy(chapterTitle = chapter) }
+    }
+
+    fun updatePageInfo(page: Int, total: Int) {
+        _readingState.update {
+            val newTotal = if (total > 0) total else it.totalPages
+            val progress = if (newTotal > 0) page.toFloat() / newTotal.toFloat() else it.readingProgress
+            it.copy(currentPage = page, totalPages = newTotal, readingProgress = progress)
+        }
+    }
+
+    fun setLoading(loading: Boolean) {
+        _contentState.update { it.copy(isLoading = loading) }
+    }
+
+    fun setContentRendered(rendered: Boolean) {
+        _contentState.update { it.copy(isContentRendered = rendered) }
+    }
+
+    fun setScanning(scanning: Boolean) {
+        _contentState.update { it.copy(isScanning = scanning) }
+    }
+
+    fun setScanCacheValid(valid: Boolean) {
+        _contentState.update { it.copy(scanCacheValid = valid) }
+    }
+
+    fun setLocationsReady(ready: Boolean) {
+        _contentState.update { it.copy(locationsReady = ready) }
+    }
+
+    fun setSavedCfi(cfi: String?) {
+        _readingState.update { it.copy(savedCfi = cfi) }
+    }
+
+    fun setTotalPages(total: Int) {
+        _readingState.update { it.copy(totalPages = total) }
     }
 
     fun updateSettings(settings: ReaderSettings) {
