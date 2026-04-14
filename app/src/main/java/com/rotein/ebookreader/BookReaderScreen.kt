@@ -474,7 +474,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                         )
                     }
                 },
-                onDismiss = { vm.setShowTocPopup(false) }
+                onDismiss = { vm.setShowTocPopup(false); onNavigationCompleteRef.value = null }
             )
         }
 
@@ -507,7 +507,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                         epubWebView.value?.evaluateJavascript("window._clearSearchHighlight()", null)
                     }
                 },
-                onDismiss = { vm.setShowSearchPopup(false) }
+                onDismiss = { vm.setShowSearchPopup(false); onNavigationCompleteRef.value = null }
             )
         }
 
@@ -529,7 +529,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                     vm.removeHighlight(highlight.id)
                     epubWebView.value?.evaluateJavascript("window._removeHighlight(${highlight.id})", null)
                 },
-                onDismiss = { vm.setShowHighlightPopup(false) }
+                onDismiss = { vm.setShowHighlightPopup(false); onNavigationCompleteRef.value = null }
             )
         }
 
@@ -671,7 +671,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                     vm.removeMemo(memo.id)
                     epubWebView.value?.evaluateJavascript("window._removeMemo(${memo.id})", null)
                 },
-                onDismiss = { vm.setShowMemoListPopup(false) }
+                onDismiss = { vm.setShowMemoListPopup(false); onNavigationCompleteRef.value = null }
             )
         }
 
@@ -689,7 +689,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                         vm.closeMemoEditor()
                     }
                 },
-                onCancel = { vm.closeMemoEditor() },
+                onCancel = { vm.closeMemoEditor(); onNavigationCompleteRef.value = null },
                 onDelete = if (annotationUiState.editingMemo != null) ({
                     val id = annotationUiState.editingMemo!!.id
                     vm.removeMemo(id)
@@ -764,7 +764,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                     }
                 },
                 onDelete = { bookmark -> vm.removeBookmark(bookmark) },
-                onDismiss = { vm.setShowBookmarkPopup(false) }
+                onDismiss = { vm.setShowBookmarkPopup(false); onNavigationCompleteRef.value = null }
             )
         }
     }

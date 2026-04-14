@@ -220,7 +220,7 @@ rendition.on("relocated", function(location) {
     } else {
         _pendingLocation = location;
     }
-    if (_searchHighlightQuery) { setTimeout(_applySearchHighlights, 50); }
+    if (_searchHighlightQuery && !_navigating) { setTimeout(_applySearchHighlights, 50); }
     if (_pendingAutoSelect) {
         _pendingAutoSelect = false;
         requestAnimationFrame(function() {
@@ -784,6 +784,7 @@ function _finishNavigation() {
         }
     } catch(e) {}
     Android.onNavigationComplete();
+    if (_searchHighlightQuery) { setTimeout(_applySearchHighlights, 50); }
 }
 if (_savedCfi.length > 0) {
     _navigating = true;
@@ -825,6 +826,7 @@ window._nextThenAutoSelect = function() {
 
 window._displayHref = function(href) {
     _navigating = true;
+    _removeSearchHighlights();
     rendition.display(href).then(function() {
         setTimeout(function() {
             rendition.display(href).then(_finishNavigation).catch(_finishNavigation);
@@ -833,6 +835,7 @@ window._displayHref = function(href) {
 };
 window._displayCfi = function(cfi) {
     _navigating = true;
+    _removeSearchHighlights();
     rendition.display(cfi).then(function() {
         setTimeout(function() {
             rendition.display(cfi).then(_finishNavigation).catch(_finishNavigation);
