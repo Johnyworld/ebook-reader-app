@@ -38,11 +38,13 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
@@ -78,8 +80,9 @@ import org.json.JSONArray
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = Modifier) {
-    var showMenu by remember { mutableStateOf(false) }
-    val onCenterTap = { showMenu = !showMenu }
+    val vm: BookReaderViewModel = viewModel()
+    val popupState by vm.popupState.collectAsState()
+    val onCenterTap = { vm.toggleMenu() }
 
     val context = LocalContext.current
     val dao = remember { BookDatabase.getInstance(context).bookReadRecordDao() }
@@ -93,16 +96,10 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
     var isLoading by remember(book.path) { mutableStateOf(book.extension.lowercase() == "epub") }
     var locationsReady by remember(book.path) { mutableStateOf(false) }
     var tocItems by remember(book.path) { mutableStateOf<List<TocItem>>(emptyList()) }
-    var showTocPopup by remember { mutableStateOf(false) }
-    var showSearchPopup by remember { mutableStateOf(false) }
-    var showBookmarkPopup by remember { mutableStateOf(false) }
-    var showHighlightPopup by remember { mutableStateOf(false) }
     data class HighlightActionState(val id: Long, val x: Float, val y: Float, val bottom: Float)
     var highlightActionState by remember { mutableStateOf<HighlightActionState?>(null) }
     val memoDao = remember { BookDatabase.getInstance(context).memoDao() }
     var memos by remember(book.path) { mutableStateOf<List<Memo>>(emptyList()) }
-    var showMemoListPopup by remember { mutableStateOf(false) }
-    var showMemoEditor by remember { mutableStateOf(false) }
     var editingMemo by remember { mutableStateOf<Memo?>(null) }
     var pendingMemoText by remember { mutableStateOf("") }
     var pendingMemoCfi by remember { mutableStateOf("") }
@@ -134,8 +131,6 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
     var debugScrollX by remember(book.path) { mutableStateOf(0f) }
     var debugScrollWidth by remember(book.path) { mutableStateOf(0f) }
     var debugDeltaX by remember(book.path) { mutableStateOf(0f) }
-    var showSettingsPopup by remember { mutableStateOf(false) }
-    var showFontPopup by remember { mutableStateOf(false) }
     var readerSettings by remember { mutableStateOf(ReaderSettingsStore.load(context)) }
     var currentTime by remember { mutableStateOf("") }
     LaunchedEffect(Unit) {
@@ -153,25 +148,25 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
     }
 
     BackHandler { onClose() }
-    BackHandler(enabled = showMenu) { showMenu = false }
-    BackHandler(enabled = showTocPopup) { showTocPopup = false }
-    BackHandler(enabled = showSearchPopup) { showSearchPopup = false }
-    BackHandler(enabled = showBookmarkPopup) { showBookmarkPopup = false }
-    BackHandler(enabled = showHighlightPopup) { showHighlightPopup = false }
+    BackHandler(enabled = popupState.showMenu) { vm.setShowMenu(false) }
+    BackHandler(enabled = popupState.showTocPopup) { vm.setShowTocPopup(false) }
+    BackHandler(enabled = popupState.showSearchPopup) { vm.setShowSearchPopup(false) }
+    BackHandler(enabled = popupState.showBookmarkPopup) { vm.setShowBookmarkPopup(false) }
+    BackHandler(enabled = popupState.showHighlightPopup) { vm.setShowHighlightPopup(false) }
     BackHandler(enabled = highlightActionState != null) { highlightActionState = null }
-    BackHandler(enabled = showMemoListPopup) { showMemoListPopup = false }
-    BackHandler(enabled = showMemoEditor) { showMemoEditor = false }
+    BackHandler(enabled = popupState.showMemoListPopup) { vm.setShowMemoListPopup(false) }
+    BackHandler(enabled = popupState.showMemoEditor) { vm.setShowMemoEditor(false) }
     BackHandler(enabled = memoActionState != null) { memoActionState = null }
     BackHandler(enabled = combinedAnnotationState != null) { combinedAnnotationState = null }
-    BackHandler(enabled = showSettingsPopup) { showSettingsPopup = false }
-    BackHandler(enabled = showFontPopup) { showFontPopup = false }
+    BackHandler(enabled = popupState.showSettingsPopup) { vm.setShowSettingsPopup(false) }
+    BackHandler(enabled = popupState.showFontPopup) { vm.setShowFontPopup(false) }
 
     LaunchedEffect(readerSettings) {
         withContext(Dispatchers.IO) { ReaderSettingsStore.save(context, readerSettings) }
     }
 
-    LaunchedEffect(showMenu) {
-        if (showMenu) {
+    LaunchedEffect(popupState.showMenu) {
+        if (popupState.showMenu) {
             epubWebView.value?.evaluateJavascript("window._currentCfi || ''") { result ->
                 val cfi = result?.removeSurrounding("\"")?.trim().orEmpty()
                 if (cfi.isNotEmpty()) currentCfi = cfi
@@ -326,7 +321,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                     pendingMemoText = text
                     pendingMemoCfi = cfi
                     editingMemo = memos.find { it.cfi == cfi }
-                    showMemoEditor = true
+                    vm.setShowMemoEditor(true)
                 },
                 onHighlightLongPress = { id, x, y, bottom ->
                     val cfi = highlights.find { it.id == id }?.cfi
@@ -445,7 +440,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
         // 북마크 리본은 WebView 내부 HTML로 렌더링 (글자 하위 레이어)
 
         // 하단 정보 오버레이
-        if (!showMenu && isContentRendered) {
+        if (!popupState.showMenu && isContentRendered) {
             val leftText = readerBottomInfoText(readerSettings.leftInfo, book, chapterTitle, currentPage, totalPages, readingProgress, currentTime)
             val rightText = readerBottomInfoText(readerSettings.rightInfo, book, chapterTitle, currentPage, totalPages, readingProgress, currentTime)
             if (leftText != null || rightText != null) {
@@ -473,12 +468,12 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
         }
 
         // 투명 스크림 - 클릭 이벤트는 아래 레이어로 통과 (가운데 탭으로 닫기)
-        if (showMenu) {
+        if (popupState.showMenu) {
             Box(modifier = Modifier.fillMaxSize())
         }
 
         // 바텀 시트 (스크림보다 위, 헤더보다 아래)
-        if (showMenu) {
+        if (popupState.showMenu) {
             Column(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
@@ -537,7 +532,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                             Row(
                                 modifier = Modifier
                                     .align(Alignment.CenterHorizontally)
-                                    .clickable { showTocPopup = true }
+                                    .clickable { vm.setShowTocPopup(true) }
                                     .border(1.dp, EreaderColors.Black, RoundedCornerShape(4.dp))
                                     .padding(horizontal = EreaderSpacing.S, vertical = EreaderSpacing.XS),
                                 verticalAlignment = Alignment.CenterVertically,
@@ -560,24 +555,24 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                         HorizontalDivider(color = EreaderColors.Black)
 
                         ReaderMenuItem(Icons.Default.Search, "본문 검색", onClick = {
-                            showSearchPopup = true
+                            vm.setShowSearchPopup(true)
                         })
                         HorizontalDivider(color = EreaderColors.Gray)
                         ReaderMenuItem(Icons.Default.Star, "하이라이트", onClick = {
-                            showHighlightPopup = true
+                            vm.setShowHighlightPopup(true)
                         })
                         HorizontalDivider(color = EreaderColors.Gray)
                         ReaderMenuItem(Icons.Default.Edit, "메모", onClick = {
-                            showMemoListPopup = true
+                            vm.setShowMemoListPopup(true)
                         })
                         HorizontalDivider(color = EreaderColors.Gray)
                         ReaderMenuItem(Icons.Default.Bookmark, "북마크", onClick = {
-                            showBookmarkPopup = true
+                            vm.setShowBookmarkPopup(true)
                         })
                         HorizontalDivider(color = EreaderColors.Gray)
                         ReaderMenuItem(Icons.Default.Settings, "설정", onClick = {
-                            showSettingsPopup = true
-                            showMenu = false
+                            vm.setShowSettingsPopup(true)
+                            vm.setShowMenu(false)
                         })
 
                         Spacer(Modifier.height(EreaderSpacing.XXS))
@@ -588,7 +583,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
         }
 
         // 헤더 (최상위 레이어)
-        if (showMenu) {
+        if (popupState.showMenu) {
             Column(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
@@ -679,7 +674,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
         }
 
         // 목차 팝업 (헤더보다 위, 최상위 레이어)
-        if (showTocPopup) {
+        if (popupState.showTocPopup) {
             TocPopup(
                 tocItems = tocItems,
                 bookTitle = book.metadata?.title ?: book.name,
@@ -687,7 +682,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                 totalBookPages = totalPages,
                 onNavigate = { href ->
                     if (onNavigationCompleteRef.value != null) return@TocPopup
-                    onNavigationCompleteRef.value = { showTocPopup = false; showMenu = false }
+                    onNavigationCompleteRef.value = { vm.setShowTocPopup(false); vm.setShowMenu(false) }
                     epubWebView.value?.post {
                         epubWebView.value?.evaluateJavascript(
                             "window._displayHref(\"${href.escapeCfiForJs()}\")",
@@ -695,12 +690,12 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                         )
                     }
                 },
-                onDismiss = { showTocPopup = false }
+                onDismiss = { vm.setShowTocPopup(false) }
             )
         }
 
         // 검색 팝업
-        if (showSearchPopup) {
+        if (popupState.showSearchPopup) {
             SearchPopup(
                 searchResults = searchResults,
                 isSearching = isSearching,
@@ -718,7 +713,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                 },
                 onNavigate = { cfi, page ->
                     if (onNavigationCompleteRef.value != null) return@SearchPopup
-                    onNavigationCompleteRef.value = { showSearchPopup = false; showMenu = false }
+                    onNavigationCompleteRef.value = { vm.setShowSearchPopup(false); vm.setShowMenu(false) }
                     epubWebView.value?.post {
                         val escaped = cfi.escapeCfiForJs()
                         epubWebView.value?.evaluateJavascript("window._displayCfi(\"$escaped\")", null)
@@ -732,19 +727,19 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                         epubWebView.value?.evaluateJavascript("window._clearSearchHighlight()", null)
                     }
                 },
-                onDismiss = { showSearchPopup = false }
+                onDismiss = { vm.setShowSearchPopup(false) }
             )
         }
 
         // 하이라이트 팝업
-        if (showHighlightPopup) {
+        if (popupState.showHighlightPopup) {
             HighlightPopup(
                 highlights = highlights,
                 spinePageOffsets = spinePageOffsets,
                 cfiPageMap = cfiPageMap,
                 onNavigate = { cfi ->
                     if (onNavigationCompleteRef.value != null) return@HighlightPopup
-                    onNavigationCompleteRef.value = { showHighlightPopup = false; showMenu = false }
+                    onNavigationCompleteRef.value = { vm.setShowHighlightPopup(false); vm.setShowMenu(false) }
                     epubWebView.value?.post {
                         val escaped = cfi.escapeCfiForJs()
                         epubWebView.value?.evaluateJavascript("window._displayCfi(\"$escaped\")", null)
@@ -757,7 +752,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                         epubWebView.value?.evaluateJavascript("window._removeHighlight(${highlight.id})", null)
                     }
                 },
-                onDismiss = { showHighlightPopup = false }
+                onDismiss = { vm.setShowHighlightPopup(false) }
             )
         }
 
@@ -781,7 +776,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                         pendingMemoText = hl?.text ?: ""
                         pendingMemoCfi = hl?.cfi ?: ""
                         editingMemo = memos.find { it.cfi == pendingMemoCfi }
-                        showMemoEditor = true
+                        vm.setShowMemoEditor(true)
                         highlightActionState = null
                     },
                     ActionItem("공유") {
@@ -820,7 +815,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                             editingMemo = memo
                             pendingMemoText = memo.text
                             pendingMemoCfi = memo.cfi
-                            showMemoEditor = true
+                            vm.setShowMemoEditor(true)
                         }
                     },
                     ActionItem("메모 삭제") {
@@ -885,7 +880,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                             editingMemo = memo
                             pendingMemoText = memo.text
                             pendingMemoCfi = memo.cfi
-                            showMemoEditor = true
+                            vm.setShowMemoEditor(true)
                         }
                     },
                     ActionItem("메모 삭제") {
@@ -911,14 +906,14 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
             )
         }
 
-        if (showMemoListPopup) {
+        if (popupState.showMemoListPopup) {
             MemoListPopup(
                 memos = memos,
                 spinePageOffsets = spinePageOffsets,
                 cfiPageMap = cfiPageMap,
                 onNavigate = { memo ->
                     if (onNavigationCompleteRef.value != null) return@MemoListPopup
-                    onNavigationCompleteRef.value = { showMemoListPopup = false; showMenu = false }
+                    onNavigationCompleteRef.value = { vm.setShowMemoListPopup(false); vm.setShowMenu(false) }
                     epubWebView.value?.post {
                         val escaped = memo.cfi.escapeCfiForJs()
                         epubWebView.value?.evaluateJavascript("window._displayCfi(\"$escaped\")", null)
@@ -928,7 +923,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                     editingMemo = memo
                     pendingMemoText = memo.text
                     pendingMemoCfi = memo.cfi
-                    showMemoEditor = true
+                    vm.setShowMemoEditor(true)
                 },
                 onDelete = { memo ->
                     scope.launch {
@@ -937,11 +932,11 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                         memos = memos.filter { it.id != memo.id }
                     }
                 },
-                onDismiss = { showMemoListPopup = false }
+                onDismiss = { vm.setShowMemoListPopup(false) }
             )
         }
 
-        if (showMemoEditor) {
+        if (popupState.showMemoEditor) {
             MemoEditorScreen(
                 selectedText = editingMemo?.text ?: pendingMemoText,
                 initialNote = editingMemo?.note ?: "",
@@ -951,7 +946,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                         scope.launch {
                             withContext(Dispatchers.IO) { memoDao.updateNote(existing.id, note) }
                             memos = memos.map { if (it.id == existing.id) it.copy(note = note) else it }
-                            showMemoEditor = false
+                            vm.setShowMemoEditor(false)
                             editingMemo = null
                         }
                     } else if (pendingMemoCfi.isNotEmpty()) {
@@ -972,16 +967,16 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                             memos = memos + saved
                             val escapedCfi = pendingMemoCfi.escapeCfiForJs()
                             epubWebView.value?.evaluateJavascript("window._addMemo(\"$escapedCfi\", $id)", null)
-                            showMemoEditor = false
+                            vm.setShowMemoEditor(false)
                         }
                     } else {
-                        showMemoEditor = false
+                        vm.setShowMemoEditor(false)
                     }
                 },
-                onCancel = { showMemoEditor = false; editingMemo = null },
+                onCancel = { vm.setShowMemoEditor(false); editingMemo = null },
                 onDelete = if (editingMemo != null) ({
                     val id = editingMemo!!.id
-                    showMemoEditor = false
+                    vm.setShowMemoEditor(false)
                     editingMemo = null
                     scope.launch {
                         withContext(Dispatchers.IO) { memoDao.deleteById(id) }
@@ -992,7 +987,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                 onNavigate = if (editingMemo != null) ({
                     if (onNavigationCompleteRef.value != null) return@MemoEditorScreen
                     val cfi = editingMemo!!.cfi
-                    onNavigationCompleteRef.value = { showMemoEditor = false; showMenu = false; editingMemo = null }
+                    onNavigationCompleteRef.value = { vm.setShowMemoEditor(false); vm.setShowMenu(false); editingMemo = null }
                     epubWebView.value?.post {
                         val escaped = cfi.escapeCfiForJs()
                         epubWebView.value?.evaluateJavascript("window._displayCfi(\"$escaped\")", null)
@@ -1002,11 +997,11 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
         }
 
         // 설정 바텀시트
-        if (showSettingsPopup) {
+        if (popupState.showSettingsPopup) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .pointerInput(Unit) { detectTapGestures { showSettingsPopup = false } }
+                    .pointerInput(Unit) { detectTapGestures { vm.setShowSettingsPopup(false) } }
             )
             Column(
                 modifier = Modifier
@@ -1024,33 +1019,33 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                     ReaderSettingsBottomSheet(
                         settings = readerSettings,
                         onSettingsChange = { readerSettings = it },
-                        onDismiss = { showSettingsPopup = false },
-                        onOpenFontPopup = { showFontPopup = true }
+                        onDismiss = { vm.setShowSettingsPopup(false) },
+                        onOpenFontPopup = { vm.setShowFontPopup(true) }
                     )
                 }
             }
         }
 
         // 글꼴 팝업
-        if (showFontPopup) {
+        if (popupState.showFontPopup) {
             FontLayerPopup(
                 currentFontName = readerSettings.fontName,
-                onSelect = { readerSettings = readerSettings.copy(fontName = it); showFontPopup = false },
+                onSelect = { readerSettings = readerSettings.copy(fontName = it); vm.setShowFontPopup(false) },
                 onFontChanged = { readerSettings = readerSettings.copy(fontName = it) },
                 onFontImported = {},
-                onDismiss = { showFontPopup = false }
+                onDismiss = { vm.setShowFontPopup(false) }
             )
         }
 
         // 북마크 팝업
-        if (showBookmarkPopup) {
+        if (popupState.showBookmarkPopup) {
             BookmarkPopup(
                 bookmarks = bookmarks,
                 spinePageOffsets = spinePageOffsets,
                 cfiPageMap = cfiPageMap,
                 onNavigate = { cfi ->
                     if (onNavigationCompleteRef.value != null) return@BookmarkPopup
-                    onNavigationCompleteRef.value = { showBookmarkPopup = false; showMenu = false }
+                    onNavigationCompleteRef.value = { vm.setShowBookmarkPopup(false); vm.setShowMenu(false) }
                     epubWebView.value?.post {
                         val escaped = cfi.escapeCfiForJs()
                         epubWebView.value?.evaluateJavascript("window._displayCfi(\"$escaped\")", null)
@@ -1062,7 +1057,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                         bookmarks = bookmarks.filter { it.id != bookmark.id }
                     }
                 },
-                onDismiss = { showBookmarkPopup = false }
+                onDismiss = { vm.setShowBookmarkPopup(false) }
             )
         }
     }
