@@ -61,6 +61,19 @@ data class SearchState(
     val isSearching: Boolean = false
 )
 
+data class HighlightActionState(val id: Long, val x: Float, val y: Float, val bottom: Float)
+data class MemoActionState(val id: Long, val x: Float, val y: Float, val bottom: Float)
+data class CombinedAnnotationState(val highlightId: Long, val memoId: Long, val x: Float, val y: Float, val bottom: Float)
+
+data class AnnotationUiState(
+    val highlightActionState: HighlightActionState? = null,
+    val memoActionState: MemoActionState? = null,
+    val combinedAnnotationState: CombinedAnnotationState? = null,
+    val editingMemo: Memo? = null,
+    val pendingMemoText: String = "",
+    val pendingMemoCfi: String = ""
+)
+
 class BookReaderViewModel(application: Application) : AndroidViewModel(application) {
 
     private val db = BookDatabase.getInstance(application)
@@ -98,6 +111,9 @@ class BookReaderViewModel(application: Application) : AndroidViewModel(applicati
 
     private val _searchState = MutableStateFlow(SearchState())
     val searchState: StateFlow<SearchState> = _searchState.asStateFlow()
+
+    private val _annotationUiState = MutableStateFlow(AnnotationUiState())
+    val annotationUiState: StateFlow<AnnotationUiState> = _annotationUiState.asStateFlow()
 
     init {
         // 설정 변경 시 자동 저장
@@ -478,5 +494,58 @@ class BookReaderViewModel(application: Application) : AndroidViewModel(applicati
 
     fun setShowFontPopup(show: Boolean) {
         _popupState.update { it.copy(showFontPopup = show) }
+    }
+
+    fun setHighlightAction(state: HighlightActionState?) {
+        _annotationUiState.update { it.copy(highlightActionState = state, memoActionState = null, combinedAnnotationState = null) }
+    }
+
+    fun setMemoAction(state: MemoActionState?) {
+        _annotationUiState.update { it.copy(memoActionState = state, highlightActionState = null, combinedAnnotationState = null) }
+    }
+
+    fun setCombinedAnnotation(state: CombinedAnnotationState?) {
+        _annotationUiState.update { it.copy(combinedAnnotationState = state, highlightActionState = null, memoActionState = null) }
+    }
+
+    fun clearAnnotationActions() {
+        _annotationUiState.update { it.copy(highlightActionState = null, memoActionState = null, combinedAnnotationState = null) }
+    }
+
+    fun openMemoEditor(text: String, cfi: String, existingMemo: Memo?) {
+        _annotationUiState.update {
+            it.copy(pendingMemoText = text, pendingMemoCfi = cfi, editingMemo = existingMemo)
+        }
+        _popupState.update { it.copy(showMemoEditor = true) }
+    }
+
+    fun closeMemoEditor() {
+        _popupState.update { it.copy(showMemoEditor = false) }
+        _annotationUiState.update { it.copy(editingMemo = null, pendingMemoText = "", pendingMemoCfi = "") }
+    }
+
+    fun onHighlightLongPress(id: Long, x: Float, y: Float, bottom: Float) {
+        val cfi = _annotationState.value.highlights.find { it.id == id }?.cfi
+        val overlappingMemo = if (cfi != null) _annotationState.value.memos.find { it.cfi == cfi } else null
+        if (overlappingMemo != null) {
+            setCombinedAnnotation(CombinedAnnotationState(id, overlappingMemo.id, x, y, bottom))
+        } else {
+            setHighlightAction(HighlightActionState(id, x, y, bottom))
+        }
+    }
+
+    fun onMemoLongPress(id: Long, x: Float, y: Float, bottom: Float) {
+        val cfi = _annotationState.value.memos.find { it.id == id }?.cfi
+        val overlappingHighlight = if (cfi != null) _annotationState.value.highlights.find { it.cfi == cfi } else null
+        if (overlappingHighlight != null) {
+            setCombinedAnnotation(CombinedAnnotationState(overlappingHighlight.id, id, x, y, bottom))
+        } else {
+            setMemoAction(MemoActionState(id, x, y, bottom))
+        }
+    }
+
+    fun onMemoRequest(text: String, cfi: String) {
+        val existingMemo = _annotationState.value.memos.find { it.cfi == cfi }
+        openMemoEditor(text, cfi, existingMemo)
     }
 }
