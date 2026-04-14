@@ -138,7 +138,7 @@ class BookReaderViewModel(application: Application) : AndroidViewModel(applicati
     fun loadBook(path: String, isEpub: Boolean) {
         bookPath = path
         _readingState.value = ReadingState()
-        _contentState.value = ContentState(isLoading = isEpub)
+        _contentState.value = ContentState(isLoading = true)
         _tocItems.value = emptyList()
         _pageCalcState.value = PageCalcState()
 
@@ -146,29 +146,31 @@ class BookReaderViewModel(application: Application) : AndroidViewModel(applicati
             val record = withContext(Dispatchers.IO) { dao.getByPath(path) }
             _readingState.update { it.copy(savedCfi = record?.lastCfi ?: "") }
 
-            val cachedToc = record?.tocJson.orEmpty()
-            if (cachedToc.isNotEmpty()) {
-                try {
-                    _tocItems.value = parseTocJson(org.json.JSONArray(cachedToc))
-                    _contentState.update { it.copy(locationsReady = true) }
-                } catch (_: Exception) {}
-            }
+            if (isEpub) {
+                val cachedToc = record?.tocJson.orEmpty()
+                if (cachedToc.isNotEmpty()) {
+                    try {
+                        _tocItems.value = parseTocJson(org.json.JSONArray(cachedToc))
+                        _contentState.update { it.copy(locationsReady = true) }
+                    } catch (_: Exception) {}
+                }
 
-            val currentFingerprint = _readerSettings.value.layoutFingerprint()
-            if (record != null && record.cachedSettingsFingerprint == currentFingerprint && record.cachedTotalPages > 0) {
-                _readingState.update { it.copy(totalPages = record.cachedTotalPages) }
-                try {
-                    val obj = org.json.JSONObject(record.cachedSpinePageOffsetsJson)
-                    val map = mutableMapOf<Int, Int>()
-                    obj.keys().forEach { key -> map[key.toInt()] = obj.getInt(key) }
-                    _pageCalcState.update {
-                        it.copy(
-                            spinePageOffsets = map,
-                            spineCharPageBreaksJson = record.cachedSpineCharPageBreaksJson
-                        )
-                    }
-                } catch (_: Exception) {}
-                _contentState.update { it.copy(scanCacheValid = true) }
+                val currentFingerprint = _readerSettings.value.layoutFingerprint()
+                if (record != null && record.cachedSettingsFingerprint == currentFingerprint && record.cachedTotalPages > 0) {
+                    _readingState.update { it.copy(totalPages = record.cachedTotalPages) }
+                    try {
+                        val obj = org.json.JSONObject(record.cachedSpinePageOffsetsJson)
+                        val map = mutableMapOf<Int, Int>()
+                        obj.keys().forEach { key -> map[key.toInt()] = obj.getInt(key) }
+                        _pageCalcState.update {
+                            it.copy(
+                                spinePageOffsets = map,
+                                spineCharPageBreaksJson = record.cachedSpineCharPageBreaksJson
+                            )
+                        }
+                    } catch (_: Exception) {}
+                    _contentState.update { it.copy(scanCacheValid = true) }
+                }
             }
 
             val bookmarks = withContext(Dispatchers.IO) { bookmarkDao.getByBook(path) }
