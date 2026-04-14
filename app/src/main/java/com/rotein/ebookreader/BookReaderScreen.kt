@@ -87,13 +87,14 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
     val currentTime by vm.currentTime.collectAsState()
     val onCenterTap = { vm.toggleMenu() }
 
+    val tocItems by vm.tocItems.collectAsState()
+    val pageCalcState by vm.pageCalcState.collectAsState()
+
     val context = LocalContext.current
-    val dao = remember { BookDatabase.getInstance(context).bookReadRecordDao() }
     val bookmarkDao = remember { BookDatabase.getInstance(context).bookmarkDao() }
     val highlightDao = remember { BookDatabase.getInstance(context).highlightDao() }
     val scope = rememberCoroutineScope()
 
-    var tocItems by remember(book.path) { mutableStateOf<List<TocItem>>(emptyList()) }
     data class HighlightActionState(val id: Long, val x: Float, val y: Float, val bottom: Float)
     var highlightActionState by remember { mutableStateOf<HighlightActionState?>(null) }
     val memoDao = remember { BookDatabase.getInstance(context).memoDao() }
@@ -113,9 +114,6 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
     var isCurrentPageBookmarked by remember(book.path) { mutableStateOf(false) }
     var bookmarks by remember(book.path) { mutableStateOf<List<Bookmark>>(emptyList()) }
     var highlights by remember(book.path) { mutableStateOf<List<Highlight>>(emptyList()) }
-    var spinePageOffsets by remember(book.path) { mutableStateOf<Map<Int, Int>>(emptyMap()) }
-    var cfiPageMap by remember(book.path) { mutableStateOf<Map<String, Int>>(emptyMap()) }
-    var spineCharPageBreaksJson by remember(book.path) { mutableStateOf("") }
     var debugSpineIndex by remember(book.path) { mutableStateOf(-1) }
     var debugDisplayedPage by remember(book.path) { mutableStateOf(-1) }
     var debugDisplayedTotal by remember(book.path) { mutableStateOf(0) }
@@ -153,31 +151,11 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
     }
 
     LaunchedEffect(book.path) {
-        vm.initReadingState(isEpub = book.extension.lowercase() == "epub")
-        val record = withContext(Dispatchers.IO) { dao.getByPath(book.path) }
-        vm.setSavedCfi(record?.lastCfi ?: "")
-        val cachedToc = record?.tocJson.orEmpty()
-        if (cachedToc.isNotEmpty()) {
-            try {
-                tocItems = parseTocJson(JSONArray(cachedToc))
-                vm.setLocationsReady(true)
-            } catch (_: Exception) {}
-        }
-        val currentFingerprint = readerSettings.layoutFingerprint()
-        if (record != null && record.cachedSettingsFingerprint == currentFingerprint && record.cachedTotalPages > 0) {
-            vm.setTotalPages(record.cachedTotalPages)
-            try {
-                val obj = org.json.JSONObject(record.cachedSpinePageOffsetsJson)
-                val map = mutableMapOf<Int, Int>()
-                obj.keys().forEach { key -> map[key.toInt()] = obj.getInt(key) }
-                spinePageOffsets = map
-            } catch (_: Exception) {}
-            vm.setScanCacheValid(true)
-            spineCharPageBreaksJson = record.cachedSpineCharPageBreaksJson
-        }
-        bookmarks = withContext(Dispatchers.IO) { bookmarkDao.getByBook(book.path) }
-        highlights = withContext(Dispatchers.IO) { highlightDao.getByBook(book.path) }
-        memos = withContext(Dispatchers.IO) { memoDao.getByBook(book.path) }
+        vm.loadBook(book.path, book.extension.lowercase() == "epub")
+        // Annotation loading stays here until Task 5
+        bookmarks = withContext(Dispatchers.IO) { BookDatabase.getInstance(context).bookmarkDao().getByBook(book.path) }
+        highlights = withContext(Dispatchers.IO) { BookDatabase.getInstance(context).highlightDao().getByBook(book.path) }
+        memos = withContext(Dispatchers.IO) { BookDatabase.getInstance(context).memoDao().getByBook(book.path) }
     }
 
     LaunchedEffect(contentState.isContentRendered) {
@@ -222,33 +200,17 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                 onCenterTap = onCenterTap,
                 onLocationUpdate = { progress, cfi, chapter ->
                     vm.updateLocation(progress, cfi, chapter)
-                    scope.launch(Dispatchers.IO) { dao.upsertCfi(book.path, cfi) }
+                    vm.saveCfi(cfi)
                 },
-                onTocLoaded = { tocJson ->
-                    if (!contentState.locationsReady) {
-                        try { tocItems = parseTocJson(JSONArray(tocJson)) } catch (_: Exception) {}
-                    }
-                },
-                onTocReady = { tocJson ->
-                    try {
-                        val newItems = parseTocJson(JSONArray(tocJson))
-                        val hasPageData = flattenToc(newItems).any { it.page > 0 }
-                        if (hasPageData || flattenToc(tocItems).none { it.page > 0 }) {
-                            tocItems = newItems
-                            vm.setLocationsReady(true)
-                        }
-                        if (hasPageData) {
-                            scope.launch(Dispatchers.IO) { dao.upsertTocJson(book.path, tocJson) }
-                        }
-                    } catch (_: Exception) {}
-                },
+                onTocLoaded = { tocJson -> vm.onTocLoaded(tocJson) },
+                onTocReady = { tocJson -> vm.onTocReady(tocJson) },
                 onContentRendered = {
                     if (readingState.savedCfi.isNullOrEmpty()) vm.setLoading(false)
                     vm.setContentRendered(true)
-                    if (contentState.scanCacheValid && spinePageOffsets.isNotEmpty()) {
+                    if (contentState.scanCacheValid && pageCalcState.spinePageOffsets.isNotEmpty()) {
                         val jsonObj = org.json.JSONObject()
-                        spinePageOffsets.forEach { (k, v) -> jsonObj.put(k.toString(), v) }
-                        val charBreaksJs = if (spineCharPageBreaksJson.isNotEmpty()) "_spineCharPageBreaks=$spineCharPageBreaksJson;" else ""
+                        pageCalcState.spinePageOffsets.forEach { (k, v) -> jsonObj.put(k.toString(), v) }
+                        val charBreaksJs = if (pageCalcState.spineCharPageBreaksJson.isNotEmpty()) "_spineCharPageBreaks=${pageCalcState.spineCharPageBreaksJson};" else ""
                         val js = "_spinePageOffsets=$jsonObj;_totalVisualPages=${readingState.totalPages};$charBreaksJs" +
                             "if(_pendingLocation){reportLocation(_pendingLocation);_pendingLocation=null;}" +
                             "else{var l=rendition.currentLocation();if(l&&l.start)reportLocation(l);}"
@@ -266,7 +228,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                 onHighlight = { text, cfi ->
                     if (cfi.isNotEmpty()) {
                         val chapterSnapshot = readingState.chapterTitle
-                        if (readingState.currentPage > 0) cfiPageMap = cfiPageMap + (cfi to readingState.currentPage)
+                        if (readingState.currentPage > 0) vm.addToCfiPageMap(cfi, readingState.currentPage)
                         scope.launch {
                             val highlight = Highlight(
                                 bookPath = book.path,
@@ -323,42 +285,30 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                 },
                 onScanStart = { if (!contentState.scanCacheValid) vm.setScanning(true) },
                 onScanComplete = { scannedTotal, spinePageOffsetsJson, cfiPageMapJson, charPageBreaksJson ->
-                    vm.setTotalPages(scannedTotal)
-                    vm.setScanning(false)
-                    try {
-                        val obj = org.json.JSONObject(spinePageOffsetsJson)
-                        val map = mutableMapOf<Int, Int>()
-                        obj.keys().forEach { key -> map[key.toInt()] = obj.getInt(key) }
-                        spinePageOffsets = map
-                        val fingerprint = readerSettings.layoutFingerprint()
-                        scope.launch(Dispatchers.IO) {
-                            dao.upsertPageScanCache(book.path, scannedTotal, spinePageOffsetsJson, charPageBreaksJson, fingerprint)
-                        }
-                    } catch (_: Exception) {}
-                    spineCharPageBreaksJson = charPageBreaksJson
+                    vm.onScanComplete(scannedTotal, spinePageOffsetsJson, cfiPageMapJson, charPageBreaksJson)
+                    // Annotation remapping stays here until Task 5
                     try {
                         val obj = org.json.JSONObject(cfiPageMapJson)
-                        val map = mutableMapOf<String, Int>()
-                        obj.keys().forEach { key -> map[key] = obj.getInt(key) }
-                        cfiPageMap = map
-                        val newSpineOffsets = spinePageOffsets
+                        val cfiMap = mutableMapOf<String, Int>()
+                        obj.keys().forEach { key -> cfiMap[key] = obj.getInt(key) }
+                        val newSpineOffsets = pageCalcState.spinePageOffsets
                         scope.launch(Dispatchers.IO) {
                             bookmarks = bookmarks.map { bm ->
-                                val newPage = cfiToPage(bm.cfi, newSpineOffsets, map)
+                                val newPage = cfiToPage(bm.cfi, newSpineOffsets, cfiMap)
                                 if (newPage > 0 && newPage != bm.page) {
                                     bookmarkDao.updatePage(bm.id, newPage)
                                     bm.copy(page = newPage)
                                 } else bm
                             }
                             highlights = highlights.map { hl ->
-                                val newPage = cfiToPage(hl.cfi, newSpineOffsets, map)
+                                val newPage = cfiToPage(hl.cfi, newSpineOffsets, cfiMap)
                                 if (newPage > 0 && newPage != hl.page) {
                                     highlightDao.updatePage(hl.id, newPage)
                                     hl.copy(page = newPage)
                                 } else hl
                             }
                             memos = memos.map { m ->
-                                val newPage = cfiToPage(m.cfi, newSpineOffsets, map)
+                                val newPage = cfiToPage(m.cfi, newSpineOffsets, cfiMap)
                                 if (newPage > 0 && newPage != m.page) {
                                     memoDao.updatePage(m.id, newPage)
                                     m.copy(page = newPage)
@@ -367,7 +317,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                         }
                     } catch (_: Exception) {}
                     if (!searchResults.isNullOrEmpty()) {
-                        searchResults = recalcSearchPages(searchResults!!, spinePageOffsets, charPageBreaksJson)
+                        searchResults = recalcSearchPages(searchResults!!, pageCalcState.spinePageOffsets, charPageBreaksJson)
                     }
                 },
                 onSearchResultsPartial = { json ->
@@ -589,7 +539,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                             } else {
                                 val wv = epubWebView.value
                                 val saveBookmark = { cfi: String, excerpt: String ->
-                                    if (cfi.isNotEmpty() && readingState.currentPage > 0) cfiPageMap = cfiPageMap + (cfi to readingState.currentPage)
+                                    if (cfi.isNotEmpty() && readingState.currentPage > 0) vm.addToCfiPageMap(cfi, readingState.currentPage)
                                     scope.launch {
                                         val bookmark = Bookmark(
                                             bookPath = book.path,
@@ -700,8 +650,8 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
         if (popupState.showHighlightPopup) {
             HighlightPopup(
                 highlights = highlights,
-                spinePageOffsets = spinePageOffsets,
-                cfiPageMap = cfiPageMap,
+                spinePageOffsets = pageCalcState.spinePageOffsets,
+                cfiPageMap = pageCalcState.cfiPageMap,
                 onNavigate = { cfi ->
                     if (onNavigationCompleteRef.value != null) return@HighlightPopup
                     onNavigationCompleteRef.value = { vm.setShowHighlightPopup(false); vm.setShowMenu(false) }
@@ -828,7 +778,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                                     cfi = memo.cfi,
                                     text = memo.text,
                                     chapterTitle = chapterSnapshot,
-                                    page = memo.page.takeIf { it > 0 } ?: cfiToPage(memo.cfi, spinePageOffsets, cfiPageMap),
+                                    page = memo.page.takeIf { it > 0 } ?: cfiToPage(memo.cfi, pageCalcState.spinePageOffsets, pageCalcState.cfiPageMap),
                                     createdAt = System.currentTimeMillis()
                                 )
                                 val id = withContext(Dispatchers.IO) { highlightDao.insert(highlight) }
@@ -874,8 +824,8 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
         if (popupState.showMemoListPopup) {
             MemoListPopup(
                 memos = memos,
-                spinePageOffsets = spinePageOffsets,
-                cfiPageMap = cfiPageMap,
+                spinePageOffsets = pageCalcState.spinePageOffsets,
+                cfiPageMap = pageCalcState.cfiPageMap,
                 onNavigate = { memo ->
                     if (onNavigationCompleteRef.value != null) return@MemoListPopup
                     onNavigationCompleteRef.value = { vm.setShowMemoListPopup(false); vm.setShowMenu(false) }
@@ -916,7 +866,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                         }
                     } else if (pendingMemoCfi.isNotEmpty()) {
                         val chapterSnapshot = readingState.chapterTitle
-                        if (readingState.currentPage > 0) cfiPageMap = cfiPageMap + (pendingMemoCfi to readingState.currentPage)
+                        if (readingState.currentPage > 0) vm.addToCfiPageMap(pendingMemoCfi, readingState.currentPage)
                         scope.launch {
                             val newMemo = Memo(
                                 bookPath = book.path,
@@ -1006,8 +956,8 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
         if (popupState.showBookmarkPopup) {
             BookmarkPopup(
                 bookmarks = bookmarks,
-                spinePageOffsets = spinePageOffsets,
-                cfiPageMap = cfiPageMap,
+                spinePageOffsets = pageCalcState.spinePageOffsets,
+                cfiPageMap = pageCalcState.cfiPageMap,
                 onNavigate = { cfi ->
                     if (onNavigationCompleteRef.value != null) return@BookmarkPopup
                     onNavigationCompleteRef.value = { vm.setShowBookmarkPopup(false); vm.setShowMenu(false) }
