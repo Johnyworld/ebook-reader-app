@@ -62,6 +62,7 @@ _epub.totalVisualPages = 0;
 _epub.spineCharPageBreaks = {};
 _epub.locationsReady = false;
 _epub.rendered = false;
+_epub.navigating = false;
 _epub.pendingLocation = null;
 _epub.pendingCfiList = [];
 _epub.cfiPageMap = {};
