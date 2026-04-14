@@ -246,6 +246,7 @@ class BookReaderViewModel(application: Application) : AndroidViewModel(applicati
     }
 
     fun addBookmark(bookmark: Bookmark) {
+        _annotationState.update { it.copy(isCurrentPageBookmarked = true) }
         viewModelScope.launch {
             val id = withContext(Dispatchers.IO) { bookmarkDao.insert(bookmark) }
             _annotationState.update { it.copy(bookmarks = it.bookmarks + bookmark.copy(id = id)) }
@@ -253,6 +254,7 @@ class BookReaderViewModel(application: Application) : AndroidViewModel(applicati
     }
 
     fun removeBookmarksByCfis(cfis: Set<String>) {
+        _annotationState.update { it.copy(isCurrentPageBookmarked = false) }
         viewModelScope.launch {
             for (cfi in cfis) {
                 withContext(Dispatchers.IO) { bookmarkDao.deleteByCfi(bookPath, cfi) }
@@ -262,6 +264,7 @@ class BookReaderViewModel(application: Application) : AndroidViewModel(applicati
     }
 
     fun removeBookmark(bookmark: Bookmark) {
+        _annotationState.update { it.copy(isCurrentPageBookmarked = false) }
         viewModelScope.launch {
             withContext(Dispatchers.IO) { bookmarkDao.deleteByCfi(bookmark.bookPath, bookmark.cfi) }
             _annotationState.update { it.copy(bookmarks = it.bookmarks.filter { it.id != bookmark.id }) }

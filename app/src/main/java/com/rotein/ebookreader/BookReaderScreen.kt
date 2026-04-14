@@ -179,10 +179,10 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                     if (contentState.scanCacheValid && pageCalcState.spinePageOffsets.isNotEmpty()) {
                         val jsonObj = org.json.JSONObject()
                         pageCalcState.spinePageOffsets.forEach { (k, v) -> jsonObj.put(k.toString(), v) }
-                        val charBreaksJs = if (pageCalcState.spineCharPageBreaksJson.isNotEmpty()) "_spineCharPageBreaks=${pageCalcState.spineCharPageBreaksJson};" else ""
-                        val js = "_spinePageOffsets=$jsonObj;_totalVisualPages=${readingState.totalPages};$charBreaksJs" +
-                            "if(_pendingLocation){reportLocation(_pendingLocation);_pendingLocation=null;}" +
-                            "else{var l=rendition.currentLocation();if(l&&l.start)reportLocation(l);}"
+                        val charBreaksJs = if (pageCalcState.spineCharPageBreaksJson.isNotEmpty()) "_epub.spineCharPageBreaks=${pageCalcState.spineCharPageBreaksJson};" else ""
+                        val js = "_epub.spinePageOffsets=$jsonObj;_epub.totalVisualPages=${readingState.totalPages};$charBreaksJs" +
+                            "if(_epub.pendingLocation){reportLocation(_epub.pendingLocation);_epub.pendingLocation=null;}" +
+                            "else{var l=_epub.rendition.currentLocation();if(l&&l.start)reportLocation(l);}"
                         epubWebView.value?.evaluateJavascript(js, null)
                     } else {
                         vm.setScanning(true)
@@ -424,7 +424,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                                 }
                                 if (wv != null) {
                                     wv.evaluateJavascript(
-                                        "(function(){try{var loc=rendition.currentLocation();var cfi=(loc&&loc.start&&loc.start.cfi)?loc.start.cfi:'';var excerpt='';if(cfi){var r=rendition.getRange(cfi);if(r){var doc=r.startContainer.ownerDocument;var er=doc.createRange();er.setStart(r.startContainer,r.startOffset);er.setEnd(doc.body,doc.body.childNodes.length);excerpt=er.toString().trim().replace(/\\s+/g,' ').substring(0,150);}}if(!excerpt){var c=rendition.getContents();if(c&&c[0]){excerpt=(c[0].document.body.innerText||'').trim().replace(/\\s+/g,' ').substring(0,150);}}return JSON.stringify({cfi:cfi,excerpt:excerpt});}catch(e){return JSON.stringify({cfi:'',excerpt:''});}})()"
+                                        "(function(){try{var loc=_epub.rendition.currentLocation();var cfi=(loc&&loc.start&&loc.start.cfi)?loc.start.cfi:'';var excerpt='';if(cfi){var r=_epub.rendition.getRange(cfi);if(r){var doc=r.startContainer.ownerDocument;var er=doc.createRange();er.setStart(r.startContainer,r.startOffset);er.setEnd(doc.body,doc.body.childNodes.length);excerpt=er.toString().trim().replace(/\\s+/g,' ').substring(0,150);}}if(!excerpt){var c=_epub.rendition.getContents();if(c&&c[0]){excerpt=(c[0].document.body.innerText||'').trim().replace(/\\s+/g,' ').substring(0,150);}}return JSON.stringify({cfi:cfi,excerpt:excerpt});}catch(e){return JSON.stringify({cfi:'',excerpt:''});}})()"
                                     ) { result ->
                                         try {
                                             val json = org.json.JSONObject(
