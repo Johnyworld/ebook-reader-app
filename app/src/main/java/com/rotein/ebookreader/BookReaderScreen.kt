@@ -299,17 +299,14 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    if (contentState.isLoading) "도서 불러오는 중..." else "${(readingState.readingProgress * 100).toInt()}% 읽음",
+                                    "${(readingState.readingProgress * 100).toInt()}% 읽음",
                                     style = MaterialTheme.typography.bodyMedium
                                 )
-                                if (readingState.totalPages > 0) {
-                                    Text(
-                                        "${readingState.currentPage} / ${readingState.totalPages}",
-                                        style = MaterialTheme.typography.bodyMedium
-                                    )
-                                }
+                                Text(
+                                    "${readingState.currentPage} / ${readingState.totalPages}",
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
                             }
-                            if (!contentState.isLoading) {
                             Spacer(Modifier.height(EreaderSpacing.S))
                             LinearProgressIndicator(
                                 progress = { readingState.readingProgress },
@@ -320,7 +317,6 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                                 gapSize = 0.dp,
                                 drawStopIndicator = {}
                             )
-                            }
                             Spacer(Modifier.height(EreaderSpacing.M))
                             Row(
                                 modifier = Modifier
