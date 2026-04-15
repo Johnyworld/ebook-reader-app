@@ -247,11 +247,10 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                 onPageChanged = { page, total ->
                     vm.updatePageInfo(page, total)
                 },
-                onLocationUpdate = { progress, pageNum ->
+                onLocationUpdate = { _, pageNum ->
                     val cfi = "pdf-page:$pageNum"
                     vm.updateCurrentCfi(cfi)
                     vm.saveCfi(cfi)
-                    vm.updateLocation(progress, cfi, "")
                 },
                 onContentLoaded = {
                     vm.setLoading(false)
