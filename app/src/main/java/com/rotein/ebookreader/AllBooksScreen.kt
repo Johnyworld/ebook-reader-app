@@ -47,6 +47,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Fill
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.foundation.Canvas
 import com.rotein.ebookreader.ui.theme.EreaderColors
 import com.rotein.ebookreader.ui.theme.EreaderSpacing
 import androidx.compose.ui.graphics.SolidColor
@@ -427,6 +431,36 @@ private fun BookItem(
                     style = MaterialTheme.typography.labelSmall,
                     color = EreaderColors.DarkGray
                 )
+            }
+            if (isFavorite) {
+                Canvas(
+                    modifier = Modifier
+                        .size(14.dp)
+                        .align(Alignment.TopStart)
+                        .offset(x = (-7).dp, y = (-7).dp)
+                ) {
+                    val w = size.width
+                    val h = size.height
+                    val cx = w / 2f
+                    val cy = h / 2f
+                    val outerR = w / 2f
+                    val innerR = outerR * 0.38f
+                    val starPath = Path().apply {
+                        for (i in 0 until 5) {
+                            val outerAngle = Math.toRadians(-90.0 + i * 72.0)
+                            val innerAngle = Math.toRadians(-90.0 + i * 72.0 + 36.0)
+                            val ox = cx + outerR * kotlin.math.cos(outerAngle).toFloat()
+                            val oy = cy + outerR * kotlin.math.sin(outerAngle).toFloat()
+                            val ix = cx + innerR * kotlin.math.cos(innerAngle).toFloat()
+                            val iy = cy + innerR * kotlin.math.sin(innerAngle).toFloat()
+                            if (i == 0) moveTo(ox, oy) else lineTo(ox, oy)
+                            lineTo(ix, iy)
+                        }
+                        close()
+                    }
+                    drawPath(starPath, Color.White, style = Stroke(width = 1.dp.toPx()))
+                    drawPath(starPath, Color.Black, style = Fill)
+                }
             }
         }
 
