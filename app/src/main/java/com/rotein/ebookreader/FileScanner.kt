@@ -54,6 +54,7 @@ object FileScanner {
     private fun extractMetadata(path: String, extension: String): BookMetadata? = when (extension) {
         "epub" -> EpubMetadataParser.parse(path)
         "mobi" -> MobiMetadataParser.parse(path)
+        "pdf" -> PdfMetadataParser.parse(path)
         else -> null
     }
 }

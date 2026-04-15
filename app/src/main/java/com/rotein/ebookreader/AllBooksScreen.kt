@@ -322,7 +322,7 @@ private fun TopBar(
 
 @Composable
 private fun BookItem(book: BookFile, onClick: () -> Unit) {
-    val displayTitle = book.metadata?.title ?: book.name
+    val displayTitle = book.metadata?.title ?: book.name.substringBeforeLast('.')
     val author = book.metadata?.author
 
     var cover by remember(book.path) { mutableStateOf<Bitmap?>(null) }
@@ -367,13 +367,15 @@ private fun BookItem(book: BookFile, onClick: () -> Unit) {
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
-            Text(
-                text = author ?: book.path,
-                style = MaterialTheme.typography.bodySmall,
-                color = EreaderColors.DarkGray,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+            if (author != null) {
+                Text(
+                    text = author,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = EreaderColors.DarkGray,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
         }
 
         if (cover == null) {
