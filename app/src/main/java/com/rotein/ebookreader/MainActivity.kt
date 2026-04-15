@@ -9,33 +9,20 @@ import androidx.activity.enableEdgeToEdge
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.wrapContentSize
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import com.rotein.ebookreader.ui.theme.EreaderColors
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
-import com.rotein.ebookreader.ui.theme.EreaderSpacing
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 import com.rotein.ebookreader.ui.theme.EbookReaderAppTheme
@@ -76,8 +63,6 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun HomeScreen(modifier: Modifier = Modifier) {
-    val tabs = listOf("기기 내 모든 책", "내 책장")
-    var selectedTabIndex by remember { mutableIntStateOf(0) }
     var currentBook by remember { mutableStateOf<BookFile?>(null) }
     var showSplash by remember { mutableStateOf(true) }
     var splashMinTimeElapsed by remember { mutableStateOf(false) }
@@ -96,46 +81,10 @@ fun HomeScreen(modifier: Modifier = Modifier) {
 
     Box(modifier = modifier.fillMaxSize()) {
         // 실제 콘텐츠 (스플래시 뒤에서 로딩 진행)
-        Column(modifier = Modifier.fillMaxSize()) {
-            TabRow(
-                selectedTabIndex = selectedTabIndex,
-                containerColor = EreaderColors.White,
-                contentColor = EreaderColors.Black,
-                divider = { HorizontalDivider(color = EreaderColors.Gray) },
-                indicator = { tabPositions ->
-                    val tab = tabPositions[selectedTabIndex]
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .wrapContentSize(Alignment.BottomStart)
-                            .offset(x = tab.left)
-                            .width(tab.width)
-                            .height(2.dp)
-                            .background(EreaderColors.Black)
-                    )
-                }
-            ) {
-                tabs.forEachIndexed { index, title ->
-                    Tab(
-                        selected = selectedTabIndex == index,
-                        onClick = { selectedTabIndex = index },
-                        text = { Text(title) },
-                        selectedContentColor = EreaderColors.Black,
-                        unselectedContentColor = EreaderColors.DarkGray
-                    )
-                }
-            }
-
-            when (selectedTabIndex) {
-                0 -> AllBooksScreen(
-                    onBookClick = { currentBook = it },
-                    onLoadComplete = { fileScanComplete = true }
-                )
-                1 -> Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.TopStart) {
-                    Text(text = tabs[1], modifier = Modifier.padding(EreaderSpacing.L))
-                }
-            }
-        }
+        AllBooksScreen(
+            onBookClick = { currentBook = it },
+            onLoadComplete = { fileScanComplete = true }
+        )
 
         // 뷰어 오버레이
         if (currentBook != null) {
