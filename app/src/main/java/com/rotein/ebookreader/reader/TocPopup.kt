@@ -1,14 +1,19 @@
 package com.rotein.ebookreader.reader
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -59,22 +64,43 @@ internal fun TocPopup(
                         Text("목차를 불러오는 중입니다.", style = MaterialTheme.typography.bodyMedium)
                     }
                 } else {
+                    val pageNumberWidth = 40.dp
+                    val startPadding = EreaderSpacing.L
+                    val gapWidth = EreaderSpacing.S
+                    val lineSpacing = 16.dp
                     pageItems.forEach { item ->
+                        val lineColor = EreaderColors.Gray
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clickable { onNavigate(item.href) }
+                                .then(
+                                    if (item.depth > 0) {
+                                        Modifier.drawBehind {
+                                            val baseX = startPadding.toPx() + pageNumberWidth.toPx() + gapWidth.toPx()
+                                            for (d in 1..item.depth) {
+                                                val lineX = baseX + (d - 1) * lineSpacing.toPx()
+                                                drawLine(
+                                                    color = lineColor,
+                                                    start = Offset(lineX, 0f),
+                                                    end = Offset(lineX, size.height),
+                                                    strokeWidth = 1.dp.toPx()
+                                                )
+                                            }
+                                        }
+                                    } else Modifier
+                                )
                                 .padding(
-                                    start = EreaderSpacing.L,
+                                    start = startPadding,
                                     end = EreaderSpacing.L,
                                     top = EreaderSpacing.M,
                                     bottom = EreaderSpacing.M
                                 ),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(EreaderSpacing.S)
+                            horizontalArrangement = Arrangement.spacedBy(gapWidth)
                         ) {
                             Box(
-                                modifier = Modifier.width(40.dp),
+                                modifier = Modifier.width(pageNumberWidth),
                                 contentAlignment = Alignment.CenterStart
                             ) {
                                 if (item.page > 0) {
@@ -88,10 +114,10 @@ internal fun TocPopup(
                             Text(
                                 item.label,
                                 style = if (item.depth == 0) MaterialTheme.typography.bodyLarge else MaterialTheme.typography.bodyMedium,
-                                color = if (item.label == currentChapterTitle) EreaderColors.Black else EreaderColors.Black,
+                                color = EreaderColors.Black,
                                 modifier = Modifier
                                     .weight(1f)
-                                    .padding(start = (item.depth * 16).dp)
+                                    .padding(start = (item.depth * lineSpacing.value).dp)
                             )
                         }
                         HorizontalDivider(color = EreaderColors.Gray)
