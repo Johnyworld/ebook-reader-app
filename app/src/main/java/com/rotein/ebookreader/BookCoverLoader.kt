@@ -19,6 +19,8 @@ object BookCoverLoader {
         }
     }
 
+    fun getCached(path: String): Bitmap? = cache.get(path)
+
     suspend fun load(path: String, extension: String): Bitmap? {
         cache.get(path)?.let { return it }
 

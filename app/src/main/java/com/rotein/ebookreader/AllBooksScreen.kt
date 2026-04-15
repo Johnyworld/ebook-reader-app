@@ -379,9 +379,11 @@ private fun BookItem(
     val displayTitle = book.metadata?.title ?: book.name.substringBeforeLast('.')
     val author = book.metadata?.author
 
-    var cover by remember(book.path) { mutableStateOf<Bitmap?>(null) }
+    var cover by remember(book.path) { mutableStateOf(BookCoverLoader.getCached(book.path)) }
     LaunchedEffect(book.path) {
-        cover = BookCoverLoader.load(book.path, book.extension)
+        if (cover == null) {
+            cover = BookCoverLoader.load(book.path, book.extension)
+        }
     }
 
     Row(
