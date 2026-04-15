@@ -177,7 +177,7 @@ fun AllBooksScreen(
             onFilterChange = { filterMode = it }
         )
 
-        Box(modifier = Modifier.weight(1f)) {
+        Box(modifier = Modifier.weight(1f).fillMaxSize()) {
             when {
                 !hasPermission -> {
                     Column(
@@ -208,9 +208,8 @@ fun AllBooksScreen(
 
                 processedBooks.isEmpty() -> {
                     Text(
-                        if (searchQuery.isBlank()) "epub, txt, mobi, pdf 파일을 찾을 수 없습니다."
-                        else "\"$searchQuery\"에 해당하는 파일이 없습니다.",
-                        modifier = Modifier.align(Alignment.Center).padding(EreaderSpacing.XL)
+                        "비어있음",
+                        modifier = Modifier.align(Alignment.Center)
                     )
                 }
 
