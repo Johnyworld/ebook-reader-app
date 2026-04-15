@@ -83,6 +83,9 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
     val currentTime by vm.currentTime.collectAsState()
     val onCenterTap = { vm.toggleMenu() }
 
+    val isPdf = book.extension.lowercase() == "pdf"
+    val isEpub = book.extension.lowercase() == "epub"
+
     val tocItems by vm.tocItems.collectAsState()
     val pageCalcState by vm.pageCalcState.collectAsState()
 
@@ -91,12 +94,12 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
     val annotationState by vm.annotationState.collectAsState()
     val annotationUiState by vm.annotationUiState.collectAsState()
     val searchState by vm.searchState.collectAsState()
-    val epubWebView = remember { mutableStateOf<WebView?>(null) }
+    val viewerWebView = remember { mutableStateOf<WebView?>(null) }
     val onNavigationCompleteRef = remember { mutableStateOf<(() -> Unit)?>(null) }
 
     val activity = LocalContext.current as? MainActivity
-    DisposableEffect(epubWebView.value) {
-        activity?.currentEpubWebView = epubWebView.value
+    DisposableEffect(viewerWebView.value) {
+        activity?.currentEpubWebView = viewerWebView.value
         onDispose { activity?.currentEpubWebView = null }
     }
 
@@ -118,8 +121,8 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
     BackHandler(enabled = popupState.showFontPopup) { vm.setShowFontPopup(false) }
 
     LaunchedEffect(popupState.showMenu) {
-        if (popupState.showMenu) {
-            epubWebView.value?.evaluateJavascript("window._currentCfi || ''") { result ->
+        if (popupState.showMenu && isEpub) {
+            viewerWebView.value?.evaluateJavascript("window._currentCfi || ''") { result ->
                 val cfi = result?.removeSurrounding("\"")?.trim().orEmpty()
                 if (cfi.isNotEmpty()) vm.updateCurrentCfi(cfi)
             }
@@ -132,23 +135,31 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
 
     LaunchedEffect(contentState.isContentRendered) {
         if (!contentState.isContentRendered) return@LaunchedEffect
+        if (isPdf) return@LaunchedEffect
         if (annotationState.highlights.isNotEmpty()) {
             val json = annotationState.highlights.joinToString(",", "[", "]") {
                 """{"id":${it.id},"cfi":"${it.cfi.escapeCfiForJs()}"}"""
             }
-            epubWebView.value?.evaluateJavascript("window._applyHighlights('$json')", null)
+            viewerWebView.value?.evaluateJavascript("window._applyHighlights('$json')", null)
         }
         if (annotationState.memos.isNotEmpty()) {
             val json = annotationState.memos.joinToString(",", "[", "]") {
                 """{"id":${it.id},"cfi":"${it.cfi.escapeCfiForJs()}"}"""
             }
-            epubWebView.value?.evaluateJavascript("window._applyMemos('$json')", null)
+            viewerWebView.value?.evaluateJavascript("window._applyMemos('$json')", null)
         }
     }
 
     LaunchedEffect(readingState.currentCfi, annotationState.bookmarks, contentState.isContentRendered) {
         if (!contentState.isContentRendered) return@LaunchedEffect
-        val wv = epubWebView.value ?: return@LaunchedEffect
+        if (isPdf) {
+            val currentPageCfi = readingState.currentCfi
+            val isBookmarked = annotationState.bookmarks.any { it.cfi == currentPageCfi }
+            vm.setCurrentPageBookmarked(isBookmarked)
+            viewerWebView.value?.evaluateJavascript("window._showBookmarkRibbon($isBookmarked)", null)
+            return@LaunchedEffect
+        }
+        val wv = viewerWebView.value ?: return@LaunchedEffect
         if (readingState.currentCfi.isEmpty() || annotationState.bookmarks.isEmpty()) {
             vm.setCurrentPageBookmarked(false)
             wv.evaluateJavascript("window._showBookmarkRibbon(false)", null)
@@ -186,7 +197,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                         val js = "_epub.spinePageOffsets=$jsonObj;_epub.totalVisualPages=${readingState.totalPages};$charBreaksJs" +
                             "if(_epub.pendingLocation){reportLocation(_epub.pendingLocation);_epub.pendingLocation=null;}" +
                             "else{var l=_epub.rendition.currentLocation();if(l&&l.start)reportLocation(l);}"
-                        epubWebView.value?.evaluateJavascript(js, null)
+                        viewerWebView.value?.evaluateJavascript(js, null)
                     } else {
                         vm.setScanning(true)
                     }
@@ -194,7 +205,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                         .filter { it.isNotEmpty() }.distinct()
                     if (allCfis.isNotEmpty()) {
                         val cfiArray = org.json.JSONArray(allCfis)
-                        epubWebView.value?.evaluateJavascript("window._setCfiList('${cfiArray.toString().replace("'", "\\'")}')", null)
+                        viewerWebView.value?.evaluateJavascript("window._setCfiList('${cfiArray.toString().replace("'", "\\'")}')", null)
                     }
                 },
                 onHighlight = { text, cfi ->
@@ -202,7 +213,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                         scope.launch {
                             val saved = vm.addHighlight(cfi, text)
                             val escapedCfi = cfi.escapeCfiForJs()
-                            epubWebView.value?.evaluateJavascript("window._addHighlight(\"$escapedCfi\", ${saved.id})", null)
+                            viewerWebView.value?.evaluateJavascript("window._addHighlight(\"$escapedCfi\", ${saved.id})", null)
                         }
                     }
                 },
@@ -210,7 +221,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                 onMemo = { text, cfi -> vm.onMemoRequest(text, cfi) },
                 onHighlightLongPress = { id, x, y, bottom -> vm.onHighlightLongPress(id, x, y, bottom) },
                 onMemoLongPress = { id, x, y, bottom -> vm.onMemoLongPress(id, x, y, bottom) },
-                onWebViewCreated = { webView -> epubWebView.value = webView },
+                onWebViewCreated = { webView -> viewerWebView.value = webView },
                 onPageInfoChanged = { page, total ->
                     vm.updatePageInfo(page, total)
                 },
@@ -228,7 +239,33 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                 },
                 readerSettings = readerSettings
             )
-            "pdf"  -> PdfViewer(book.path, onCenterTap)
+            "pdf"  -> if (readingState.savedCfi == null) LoadingIndicator() else PdfViewer(
+                path = book.path,
+                savedPage = readingState.savedCfi
+                    ?.removePrefix("pdf-page:")?.toIntOrNull() ?: 1,
+                pageFlip = readerSettings.pageFlip,
+                onCenterTap = onCenterTap,
+                onPageChanged = { page, total ->
+                    vm.updatePageInfo(page, total)
+                },
+                onLocationUpdate = { _, pageNum ->
+                    val cfi = "pdf-page:$pageNum"
+                    vm.updateCurrentCfi(cfi)
+                    vm.saveCfi(cfi)
+                },
+                onContentLoaded = {
+                    vm.setLoading(false)
+                    vm.setContentRendered(true)
+                },
+                onTocLoaded = { tocJson -> vm.onTocLoaded(tocJson) },
+                onSearchResultsPartial = { json -> vm.onSearchResultsPartial(json) },
+                onSearchComplete = { vm.onSearchComplete() },
+                onNavigationComplete = {
+                    onNavigationCompleteRef.value?.invoke()
+                    onNavigationCompleteRef.value = null
+                },
+                onWebViewCreated = { webView -> viewerWebView.value = webView }
+            )
             "mobi" -> MobiViewer(book.path, onCenterTap)
             else   -> CenteredMessage("지원하지 않는 형식입니다.")
         }
@@ -350,6 +387,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                             vm.setShowSearchPopup(true)
                         })
                         HorizontalDivider(color = EreaderColors.Gray)
+                        if (!isPdf) {
                         ReaderMenuItem(Icons.Default.Star, "하이라이트", onClick = {
                             vm.setShowHighlightPopup(true)
                         })
@@ -358,6 +396,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                             vm.setShowMemoListPopup(true)
                         })
                         HorizontalDivider(color = EreaderColors.Gray)
+                        }
                         ReaderMenuItem(Icons.Default.Bookmark, "북마크", onClick = {
                             vm.setShowBookmarkPopup(true)
                         })
@@ -395,8 +434,11 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                         IconButton(onClick = {
                             if (readingState.currentCfi.isEmpty()) return@IconButton
                             if (annotationState.isCurrentPageBookmarked) {
+                                if (isPdf) {
+                                    vm.removeBookmarksByCfis(setOf(readingState.currentCfi))
+                                } else {
                                 scope.launch {
-                                    val wv = epubWebView.value
+                                    val wv = viewerWebView.value
                                     if (wv != null) {
                                         val cfiListJson = annotationState.bookmarks.map { it.cfi }.filter { it.isNotEmpty() }
                                             .joinToString(",", "[", "]") { "\"${it.replace("\"", "\\\"")}\"" }
@@ -411,8 +453,21 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                                         }
                                     }
                                 }
+                                }
                             } else {
-                                val wv = epubWebView.value
+                                if (isPdf) {
+                                    val pageNum = readingState.currentCfi.removePrefix("pdf-page:").toIntOrNull() ?: 0
+                                    val bookmark = Bookmark(
+                                        bookPath = book.path,
+                                        cfi = readingState.currentCfi,
+                                        chapterTitle = "",
+                                        excerpt = "${pageNum}페이지",
+                                        page = pageNum,
+                                        createdAt = System.currentTimeMillis()
+                                    )
+                                    vm.addBookmark(bookmark)
+                                } else {
+                                val wv = viewerWebView.value
                                 val saveBookmark = { cfi: String, excerpt: String ->
                                     val bookmark = Bookmark(
                                         bookPath = book.path,
@@ -446,6 +501,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                                 } else {
                                     saveBookmark("", "")
                                 }
+                                }
                             }
                         }) {
                             Icon(
@@ -467,13 +523,20 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                 currentChapterTitle = readingState.chapterTitle,
                 totalBookPages = readingState.totalPages,
                 onNavigate = { href ->
-                    if (onNavigationCompleteRef.value != null) return@TocPopup
-                    onNavigationCompleteRef.value = { vm.setShowTocPopup(false); vm.setShowMenu(false) }
-                    epubWebView.value?.post {
-                        epubWebView.value?.evaluateJavascript(
-                            "window._displayHref(\"${href.escapeCfiForJs()}\")",
-                            null
-                        )
+                    if (isPdf) {
+                        if (onNavigationCompleteRef.value != null) return@TocPopup
+                        onNavigationCompleteRef.value = { vm.setShowTocPopup(false); vm.setShowMenu(false) }
+                        val pageNum = href.removePrefix("pdf-page:").toIntOrNull() ?: 1
+                        viewerWebView.value?.evaluateJavascript("window._goToPage($pageNum)", null)
+                    } else {
+                        if (onNavigationCompleteRef.value != null) return@TocPopup
+                        onNavigationCompleteRef.value = { vm.setShowTocPopup(false); vm.setShowMenu(false) }
+                        viewerWebView.value?.post {
+                            viewerWebView.value?.evaluateJavascript(
+                                "window._displayHref(\"${href.escapeCfiForJs()}\")",
+                                null
+                            )
+                        }
                     }
                 },
                 onDismiss = { vm.setShowTocPopup(false); onNavigationCompleteRef.value = null }
@@ -490,23 +553,30 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                 onSearch = { query ->
                     vm.startSearch(query)
                     val escaped = query.escapeCfiForJs()
-                    epubWebView.value?.post {
-                        epubWebView.value?.evaluateJavascript("window._setSearchHighlight(\"$escaped\")", null)
-                        epubWebView.value?.evaluateJavascript("window._search(\"$escaped\")", null)
+                    viewerWebView.value?.post {
+                        viewerWebView.value?.evaluateJavascript("window._setSearchHighlight(\"$escaped\")", null)
+                        viewerWebView.value?.evaluateJavascript("window._search(\"$escaped\")", null)
                     }
                 },
                 onNavigate = { cfi, page ->
-                    if (onNavigationCompleteRef.value != null) return@SearchPopup
-                    onNavigationCompleteRef.value = { vm.setShowSearchPopup(false); vm.setShowMenu(false) }
-                    epubWebView.value?.post {
-                        val escaped = cfi.escapeCfiForJs()
-                        epubWebView.value?.evaluateJavascript("window._displayCfi(\"$escaped\")", null)
+                    if (isPdf) {
+                        if (onNavigationCompleteRef.value != null) return@SearchPopup
+                        onNavigationCompleteRef.value = { vm.setShowSearchPopup(false); vm.setShowMenu(false) }
+                        val pageNum = cfi.removePrefix("pdf-page:").toIntOrNull() ?: page
+                        viewerWebView.value?.evaluateJavascript("window._goToPage($pageNum)", null)
+                    } else {
+                        if (onNavigationCompleteRef.value != null) return@SearchPopup
+                        onNavigationCompleteRef.value = { vm.setShowSearchPopup(false); vm.setShowMenu(false) }
+                        viewerWebView.value?.post {
+                            val escaped = cfi.escapeCfiForJs()
+                            viewerWebView.value?.evaluateJavascript("window._displayCfi(\"$escaped\")", null)
+                        }
                     }
                 },
                 onClear = {
                     vm.clearSearch()
-                    epubWebView.value?.post {
-                        epubWebView.value?.evaluateJavascript("window._clearSearchHighlight()", null)
+                    viewerWebView.value?.post {
+                        viewerWebView.value?.evaluateJavascript("window._clearSearchHighlight()", null)
                     }
                 },
                 onDismiss = { vm.setShowSearchPopup(false); onNavigationCompleteRef.value = null }
@@ -522,14 +592,14 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                 onNavigate = { cfi ->
                     if (onNavigationCompleteRef.value != null) return@HighlightPopup
                     onNavigationCompleteRef.value = { vm.setShowHighlightPopup(false); vm.setShowMenu(false) }
-                    epubWebView.value?.post {
+                    viewerWebView.value?.post {
                         val escaped = cfi.escapeCfiForJs()
-                        epubWebView.value?.evaluateJavascript("window._displayCfi(\"$escaped\")", null)
+                        viewerWebView.value?.evaluateJavascript("window._displayCfi(\"$escaped\")", null)
                     }
                 },
                 onDelete = { highlight ->
                     vm.removeHighlight(highlight.id)
-                    epubWebView.value?.evaluateJavascript("window._removeHighlight(${highlight.id})", null)
+                    viewerWebView.value?.evaluateJavascript("window._removeHighlight(${highlight.id})", null)
                 },
                 onDismiss = { vm.setShowHighlightPopup(false); onNavigationCompleteRef.value = null }
             )
@@ -545,7 +615,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                         val id = state.id
                         vm.setHighlightAction(null)
                         vm.removeHighlight(id)
-                        epubWebView.value?.evaluateJavascript("window._removeHighlight($id)", null)
+                        viewerWebView.value?.evaluateJavascript("window._removeHighlight($id)", null)
                     },
                     ActionItem("메모") {
                         val hl = annotationState.highlights.find { it.id == state.id }
@@ -576,7 +646,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                         val hid = state.highlightId
                         vm.setCombinedAnnotation(null)
                         vm.removeHighlight(hid)
-                        epubWebView.value?.evaluateJavascript("window._removeHighlight($hid)", null)
+                        viewerWebView.value?.evaluateJavascript("window._removeHighlight($hid)", null)
                     },
                     ActionItem("메모 편집") {
                         val memo = annotationState.memos.find { it.id == state.memoId }
@@ -589,7 +659,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                         val mid = state.memoId
                         vm.setCombinedAnnotation(null)
                         vm.removeMemo(mid)
-                        epubWebView.value?.evaluateJavascript("window._removeMemo($mid)", null)
+                        viewerWebView.value?.evaluateJavascript("window._removeMemo($mid)", null)
                     },
                     ActionItem("공유") {
                         val hl = annotationState.highlights.find { it.id == state.highlightId }
@@ -623,7 +693,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                             scope.launch {
                                 val saved = vm.addHighlightFromMemo(memo)
                                 val escapedCfi = memo.cfi.escapeCfiForJs()
-                                epubWebView.value?.evaluateJavascript("window._addHighlight(\"$escapedCfi\", ${saved.id})", null)
+                                viewerWebView.value?.evaluateJavascript("window._addHighlight(\"$escapedCfi\", ${saved.id})", null)
                             }
                         }
                     },
@@ -637,7 +707,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                         val id = state.id
                         vm.setMemoAction(null)
                         vm.removeMemo(id)
-                        epubWebView.value?.evaluateJavascript("window._removeMemo($id)", null)
+                        viewerWebView.value?.evaluateJavascript("window._removeMemo($id)", null)
                     },
                     ActionItem("공유") {
                         val text = memo?.let { "${it.text}\n\n${it.note}" } ?: ""
@@ -661,9 +731,9 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                 onNavigate = { memo ->
                     if (onNavigationCompleteRef.value != null) return@MemoListPopup
                     onNavigationCompleteRef.value = { vm.setShowMemoListPopup(false); vm.setShowMenu(false) }
-                    epubWebView.value?.post {
+                    viewerWebView.value?.post {
                         val escaped = memo.cfi.escapeCfiForJs()
-                        epubWebView.value?.evaluateJavascript("window._displayCfi(\"$escaped\")", null)
+                        viewerWebView.value?.evaluateJavascript("window._displayCfi(\"$escaped\")", null)
                     }
                 },
                 onEdit = { memo ->
@@ -671,7 +741,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                 },
                 onDelete = { memo ->
                     vm.removeMemo(memo.id)
-                    epubWebView.value?.evaluateJavascript("window._removeMemo(${memo.id})", null)
+                    viewerWebView.value?.evaluateJavascript("window._removeMemo(${memo.id})", null)
                 },
                 onDismiss = { vm.setShowMemoListPopup(false); onNavigationCompleteRef.value = null }
             )
@@ -686,7 +756,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                         val saved = vm.saveMemo(note, annotationUiState.editingMemo, annotationUiState.pendingMemoText, annotationUiState.pendingMemoCfi)
                         if (saved != null && annotationUiState.editingMemo == null && annotationUiState.pendingMemoCfi.isNotEmpty()) {
                             val escapedCfi = annotationUiState.pendingMemoCfi.escapeCfiForJs()
-                            epubWebView.value?.evaluateJavascript("window._addMemo(\"$escapedCfi\", ${saved.id})", null)
+                            viewerWebView.value?.evaluateJavascript("window._addMemo(\"$escapedCfi\", ${saved.id})", null)
                         }
                         vm.closeMemoEditor()
                     }
@@ -695,16 +765,16 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                 onDelete = if (annotationUiState.editingMemo != null) ({
                     val id = annotationUiState.editingMemo!!.id
                     vm.removeMemo(id)
-                    epubWebView.value?.evaluateJavascript("window._removeMemo($id)", null)
+                    viewerWebView.value?.evaluateJavascript("window._removeMemo($id)", null)
                     vm.closeMemoEditor()
                 }) else null,
                 onNavigate = if (annotationUiState.editingMemo != null) ({
                     if (onNavigationCompleteRef.value != null) return@MemoEditorScreen
                     val cfi = annotationUiState.editingMemo!!.cfi
                     onNavigationCompleteRef.value = { vm.closeMemoEditor(); vm.setShowMenu(false) }
-                    epubWebView.value?.post {
+                    viewerWebView.value?.post {
                         val escaped = cfi.escapeCfiForJs()
-                        epubWebView.value?.evaluateJavascript("window._displayCfi(\"$escaped\")", null)
+                        viewerWebView.value?.evaluateJavascript("window._displayCfi(\"$escaped\")", null)
                     }
                 }) else null
             )
@@ -734,7 +804,8 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                         settings = readerSettings,
                         onSettingsChange = { vm.updateSettings(it) },
                         onDismiss = { vm.setShowSettingsPopup(false) },
-                        onOpenFontPopup = { vm.setShowFontPopup(true) }
+                        onOpenFontPopup = { vm.setShowFontPopup(true) },
+                        isPdf = isPdf
                     )
                 }
             }
@@ -758,11 +829,18 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                 spinePageOffsets = pageCalcState.spinePageOffsets,
                 cfiPageMap = pageCalcState.cfiPageMap,
                 onNavigate = { cfi ->
-                    if (onNavigationCompleteRef.value != null) return@BookmarkPopup
-                    onNavigationCompleteRef.value = { vm.setShowBookmarkPopup(false); vm.setShowMenu(false) }
-                    epubWebView.value?.post {
-                        val escaped = cfi.escapeCfiForJs()
-                        epubWebView.value?.evaluateJavascript("window._displayCfi(\"$escaped\")", null)
+                    if (isPdf) {
+                        if (onNavigationCompleteRef.value != null) return@BookmarkPopup
+                        onNavigationCompleteRef.value = { vm.setShowBookmarkPopup(false); vm.setShowMenu(false) }
+                        val pageNum = cfi.removePrefix("pdf-page:").toIntOrNull() ?: 1
+                        viewerWebView.value?.evaluateJavascript("window._goToPage($pageNum)", null)
+                    } else {
+                        if (onNavigationCompleteRef.value != null) return@BookmarkPopup
+                        onNavigationCompleteRef.value = { vm.setShowBookmarkPopup(false); vm.setShowMenu(false) }
+                        viewerWebView.value?.post {
+                            val escaped = cfi.escapeCfiForJs()
+                            viewerWebView.value?.evaluateJavascript("window._displayCfi(\"$escaped\")", null)
+                        }
                     }
                 },
                 onDelete = { bookmark -> vm.removeBookmark(bookmark) },
