@@ -87,6 +87,7 @@ fun AllBooksScreen(
     var isSearchActive by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
     var sortPref by remember { mutableStateOf(SortPreferenceStore.load(context)) }
+    var filterMode by remember { mutableStateOf(FilterMode.ALL) }
     var lastReadTimes by remember { mutableStateOf<Map<String, Long>>(emptyMap()) }
 
     // 정렬 설정 변경 시 기기에 저장
@@ -105,9 +106,13 @@ fun AllBooksScreen(
         hiddenBooks = records.filter { it.isHidden }.map { it.bookPath }.toSet()
     }
 
-    val processedBooks = remember(books, searchQuery, sortPref, lastReadTimes, hiddenBooks) {
-        // 0) 숨긴 도서 제외
-        val visible = books.filter { it.path !in hiddenBooks }
+    val processedBooks = remember(books, searchQuery, sortPref, lastReadTimes, hiddenBooks, favorites, filterMode) {
+        // 0) 필터 모드 적용
+        val visible = when (filterMode) {
+            FilterMode.ALL -> books.filter { it.path !in hiddenBooks }
+            FilterMode.FAVORITE -> books.filter { it.path in favorites && it.path !in hiddenBooks }
+            FilterMode.HIDDEN -> books.filter { it.path in hiddenBooks }
+        }
         // 1) 검색 필터
         val filtered = if (searchQuery.isBlank()) visible
         else {
@@ -161,13 +166,15 @@ fun AllBooksScreen(
             isSearchActive = isSearchActive,
             searchQuery = searchQuery,
             sortPref = sortPref,
+            filterMode = filterMode,
             onSearchClick = { isSearchActive = true },
             onQueryChange = { searchQuery = it },
             onSearchClear = {
                 searchQuery = ""
                 isSearchActive = false
             },
-            onSortChange = { sortPref = it }
+            onSortChange = { sortPref = it },
+            onFilterChange = { filterMode = it }
         )
 
         Box(modifier = Modifier.weight(1f)) {
@@ -249,10 +256,12 @@ private fun TopBar(
     isSearchActive: Boolean,
     searchQuery: String,
     sortPref: SortPreference,
+    filterMode: FilterMode,
     onSearchClick: () -> Unit,
     onQueryChange: (String) -> Unit,
     onSearchClear: () -> Unit,
-    onSortChange: (SortPreference) -> Unit
+    onSortChange: (SortPreference) -> Unit,
+    onFilterChange: (FilterMode) -> Unit
 ) {
     val focusRequester = remember { FocusRequester() }
     LaunchedEffect(isSearchActive) {
@@ -280,6 +289,14 @@ private fun TopBar(
             }
 
             Box(modifier = Modifier.weight(1f))
+
+            // 필터 드롭다운
+            EreaderDropdownMenu(
+                items = FilterMode.entries.toList(),
+                selectedItem = filterMode,
+                onSelect = { onFilterChange(it) },
+                label = { it.label },
+            )
 
             // 정렬 필드 드롭다운
             EreaderDropdownMenu(
