@@ -48,12 +48,13 @@ import com.rotein.ebookreader.ui.theme.EreaderSpacing
 @Composable
 fun <T> EreaderDropdownMenu(
     items: List<T>,
-    selectedItem: T,
+    selectedItem: T? = null,
     onSelect: (T) -> Unit,
     label: (T) -> String,
     popupWidth: Dp? = null,
     popupAlignment: Alignment = Alignment.TopEnd,
     forceAbove: Boolean = false,
+    trigger: (@Composable (onClick: () -> Unit) -> Unit)? = null,
 ) {
     var expanded by remember { mutableStateOf(false) }
     var currentPage by remember { mutableStateOf(0) }
@@ -70,15 +71,19 @@ fun <T> EreaderDropdownMenu(
             buttonHeightPx = coords.size.height.toFloat()
         }
     ) {
-        TextButton(onClick = { expanded = true; currentPage = 0 }) {
-            Text(
-                text = label(selectedItem),
-                style = MaterialTheme.typography.labelMedium,
-                color = EreaderColors.Black,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                textAlign = TextAlign.Center
-            )
+        if (trigger != null) {
+            trigger { expanded = true; currentPage = 0 }
+        } else {
+            TextButton(onClick = { expanded = true; currentPage = 0 }) {
+                Text(
+                    text = label(selectedItem ?: items.first()),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = EreaderColors.Black,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    textAlign = TextAlign.Center
+                )
+            }
         }
         if (expanded) {
             val itemHeightPx = with(density) { 44.dp.toPx() }
@@ -120,7 +125,7 @@ fun <T> EreaderDropdownMenu(
                         .onGloballyPositioned { dropdownHeightPx = it.size.height }
                 ) {
                     visibleItems.forEachIndexed { index, item ->
-                        val isSelected = item == selectedItem
+                        val isSelected = selectedItem != null && item == selectedItem
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier

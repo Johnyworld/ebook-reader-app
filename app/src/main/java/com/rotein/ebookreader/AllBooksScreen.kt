@@ -27,6 +27,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
@@ -93,19 +94,25 @@ fun AllBooksScreen(
         SortPreferenceStore.save(context, sortPref)
     }
 
-    // DB에서 읽은 시각 로드
+    var favorites by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var hiddenBooks by remember { mutableStateOf<Set<String>>(emptySet()) }
+
+    // DB에서 읽은 시각 + 즐겨찾기/숨기기 로드
     LaunchedEffect(Unit) {
-        lastReadTimes = withContext(Dispatchers.IO) {
-            dao.getAll().associate { it.bookPath to it.lastReadAt }
-        }
+        val records = withContext(Dispatchers.IO) { dao.getAll() }
+        lastReadTimes = records.associate { it.bookPath to it.lastReadAt }
+        favorites = records.filter { it.isFavorite }.map { it.bookPath }.toSet()
+        hiddenBooks = records.filter { it.isHidden }.map { it.bookPath }.toSet()
     }
 
-    val processedBooks = remember(books, searchQuery, sortPref, lastReadTimes) {
+    val processedBooks = remember(books, searchQuery, sortPref, lastReadTimes, hiddenBooks) {
+        // 0) 숨긴 도서 제외
+        val visible = books.filter { it.path !in hiddenBooks }
         // 1) 검색 필터
-        val filtered = if (searchQuery.isBlank()) books
+        val filtered = if (searchQuery.isBlank()) visible
         else {
             val q = searchQuery.trim().lowercase()
-            books.filter { book ->
+            visible.filter { book ->
                 val title = (book.metadata?.title ?: book.name).lowercase()
                 val author = book.metadata?.author?.lowercase() ?: ""
                 title.contains(q) || author.contains(q) || book.name.lowercase().contains(q)
@@ -203,14 +210,31 @@ fun AllBooksScreen(
                 else -> {
                     LazyColumn(modifier = Modifier.fillMaxSize()) {
                         items(processedBooks) { book ->
-                            BookItem(book, onClick = {
-                                val now = System.currentTimeMillis()
-                                scope.launch(Dispatchers.IO) {
-                                    dao.upsertLastReadAt(book.path, now)
+                            BookItem(
+                                book = book,
+                                isFavorite = book.path in favorites,
+                                onClick = {
+                                    val now = System.currentTimeMillis()
+                                    scope.launch(Dispatchers.IO) {
+                                        dao.upsertLastReadAt(book.path, now)
+                                    }
+                                    lastReadTimes = lastReadTimes + (book.path to now)
+                                    onBookClick(book)
+                                },
+                                onToggleFavorite = {
+                                    val newValue = book.path !in favorites
+                                    favorites = if (newValue) favorites + book.path else favorites - book.path
+                                    scope.launch(Dispatchers.IO) {
+                                        dao.upsertFavorite(book.path, newValue)
+                                    }
+                                },
+                                onHide = {
+                                    hiddenBooks = hiddenBooks + book.path
+                                    scope.launch(Dispatchers.IO) {
+                                        dao.upsertHidden(book.path, true)
+                                    }
                                 }
-                                lastReadTimes = lastReadTimes + (book.path to now)
-                                onBookClick(book)
-                            })
+                            )
                             HorizontalDivider(color = EreaderColors.Gray)
                         }
                     }
@@ -324,7 +348,13 @@ private fun TopBar(
 }
 
 @Composable
-private fun BookItem(book: BookFile, onClick: () -> Unit) {
+private fun BookItem(
+    book: BookFile,
+    isFavorite: Boolean,
+    onClick: () -> Unit,
+    onToggleFavorite: () -> Unit,
+    onHide: () -> Unit
+) {
     val displayTitle = book.metadata?.title ?: book.name.substringBeforeLast('.')
     val author = book.metadata?.author
 
@@ -337,7 +367,7 @@ private fun BookItem(book: BookFile, onClick: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onClick() }
-            .padding(horizontal = EreaderSpacing.L, vertical = 10.dp),
+            .padding(start = EreaderSpacing.L, top = 10.dp, bottom = 10.dp, end = EreaderSpacing.XS),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(EreaderSpacing.M)
     ) {
@@ -402,5 +432,24 @@ private fun BookItem(book: BookFile, onClick: () -> Unit) {
                 color = EreaderColors.Black
             )
         }
+
+        EreaderDropdownMenu(
+            items = listOf(
+                (if (isFavorite) "즐겨찾기 해제" else "즐겨찾기") to onToggleFavorite,
+                "숨기기" to onHide
+            ),
+            onSelect = { it.second() },
+            label = { it.first },
+            trigger = { onClick ->
+                IconButton(onClick = onClick) {
+                    Icon(
+                        imageVector = Icons.Default.MoreVert,
+                        contentDescription = "메뉴",
+                        tint = EreaderColors.DarkGray,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+        )
     }
 }
