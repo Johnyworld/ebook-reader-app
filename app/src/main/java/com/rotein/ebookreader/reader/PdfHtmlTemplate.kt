@@ -12,8 +12,14 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: #fff; }
     width: 100%; height: 100%;
     display: flex; align-items: center; justify-content: center;
     overflow: hidden;
+    position: relative;
 }
+#pdf-wrapper { position: relative; }
 #pdf-canvas { display: block; }
+.search-hl-overlay {
+    position: absolute; pointer-events: none;
+    background: #FFFF00; opacity: 0.4;
+}
 </style>
 </head>
 <body>

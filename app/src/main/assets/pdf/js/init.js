@@ -43,11 +43,18 @@ function _renderPage(pageNum) {
         var viewport = page.getViewport({ scale: scale * (window.devicePixelRatio || 1) });
         var displayViewport = page.getViewport({ scale: scale });
 
+        var wrapper = document.getElementById('pdf-wrapper');
+        if (!wrapper) {
+            wrapper = document.createElement('div');
+            wrapper.id = 'pdf-wrapper';
+            container.appendChild(wrapper);
+        }
+
         var canvas = document.getElementById('pdf-canvas');
         if (!canvas) {
             canvas = document.createElement('canvas');
             canvas.id = 'pdf-canvas';
-            container.appendChild(canvas);
+            wrapper.appendChild(canvas);
         }
 
         canvas.width = viewport.width;
@@ -59,6 +66,15 @@ function _renderPage(pageNum) {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
         page.render({ canvasContext: ctx, viewport: viewport }).promise.then(function() {
+            // 텍스트 아이템 저장 (검색 하이라이트용)
+            page.getTextContent().then(function(textContent) {
+                _pdf.currentTextItems = textContent.items;
+                _pdf.currentDisplayViewport = displayViewport;
+                if (_pdf.searchHighlightQuery) {
+                    _applySearchHighlights();
+                }
+            });
+
             _pdf.rendering = false;
 
             var progress = _pdf.currentPage / _pdf.totalPages;

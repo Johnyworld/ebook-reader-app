@@ -547,14 +547,10 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                 initialQuery = searchState.query,
                 onSearch = { query ->
                     vm.startSearch(query)
-                    if (isPdf) {
-                        viewerWebView.value?.evaluateJavascript("window._search(\"${query.escapeCfiForJs()}\")", null)
-                    } else {
-                        val escaped = query.escapeCfiForJs()
-                        viewerWebView.value?.post {
-                            viewerWebView.value?.evaluateJavascript("window._setSearchHighlight(\"$escaped\")", null)
-                            viewerWebView.value?.evaluateJavascript("window._search(\"$escaped\")", null)
-                        }
+                    val escaped = query.escapeCfiForJs()
+                    viewerWebView.value?.post {
+                        viewerWebView.value?.evaluateJavascript("window._setSearchHighlight(\"$escaped\")", null)
+                        viewerWebView.value?.evaluateJavascript("window._search(\"$escaped\")", null)
                     }
                 },
                 onNavigate = { cfi, page ->
@@ -574,10 +570,8 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                 },
                 onClear = {
                     vm.clearSearch()
-                    if (!isPdf) {
-                        viewerWebView.value?.post {
-                            viewerWebView.value?.evaluateJavascript("window._clearSearchHighlight()", null)
-                        }
+                    viewerWebView.value?.post {
+                        viewerWebView.value?.evaluateJavascript("window._clearSearchHighlight()", null)
                     }
                 },
                 onDismiss = { vm.setShowSearchPopup(false); onNavigationCompleteRef.value = null }
