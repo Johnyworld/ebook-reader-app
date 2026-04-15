@@ -217,9 +217,12 @@ fun AllBooksScreen(
                 else -> {
                     LazyColumn(modifier = Modifier.fillMaxSize()) {
                         items(processedBooks) { book ->
+                            val isHidden = book.path in hiddenBooks
+                            val isFavorite = book.path in favorites
                             BookItem(
                                 book = book,
-                                isFavorite = book.path in favorites,
+                                isFavorite = isFavorite,
+                                isHidden = isHidden,
                                 onClick = {
                                     val now = System.currentTimeMillis()
                                     scope.launch(Dispatchers.IO) {
@@ -228,17 +231,18 @@ fun AllBooksScreen(
                                     lastReadTimes = lastReadTimes + (book.path to now)
                                     onBookClick(book)
                                 },
-                                onToggleFavorite = {
-                                    val newValue = book.path !in favorites
+                                onToggleFavorite = if (isHidden && !isFavorite) null else {{
+                                    val newValue = !isFavorite
                                     favorites = if (newValue) favorites + book.path else favorites - book.path
                                     scope.launch(Dispatchers.IO) {
                                         dao.upsertFavorite(book.path, newValue)
                                     }
-                                },
-                                onHide = {
-                                    hiddenBooks = hiddenBooks + book.path
+                                }},
+                                onToggleHidden = {
+                                    val newValue = !isHidden
+                                    hiddenBooks = if (newValue) hiddenBooks + book.path else hiddenBooks - book.path
                                     scope.launch(Dispatchers.IO) {
-                                        dao.upsertHidden(book.path, true)
+                                        dao.upsertHidden(book.path, newValue)
                                     }
                                 }
                             )
@@ -368,9 +372,10 @@ private fun TopBar(
 private fun BookItem(
     book: BookFile,
     isFavorite: Boolean,
+    isHidden: Boolean,
     onClick: () -> Unit,
-    onToggleFavorite: () -> Unit,
-    onHide: () -> Unit
+    onToggleFavorite: (() -> Unit)?,
+    onToggleHidden: () -> Unit
 ) {
     val displayTitle = book.metadata?.title ?: book.name.substringBeforeLast('.')
     val author = book.metadata?.author
@@ -450,11 +455,14 @@ private fun BookItem(
             )
         }
 
+        val menuItems = buildList {
+            if (onToggleFavorite != null) {
+                add((if (isFavorite) "즐겨찾기 해제" else "즐겨찾기") to onToggleFavorite)
+            }
+            add((if (isHidden) "숨김 해제" else "숨기기") to onToggleHidden)
+        }
         EreaderDropdownMenu(
-            items = listOf(
-                (if (isFavorite) "즐겨찾기 해제" else "즐겨찾기") to onToggleFavorite,
-                "숨기기" to onHide
-            ),
+            items = menuItems,
             onSelect = { it.second() },
             label = { it.first },
             trigger = { onClick ->
