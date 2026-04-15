@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -51,8 +52,10 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.rotein.ebookreader.ui.components.EreaderDropdownMenu
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -322,7 +325,7 @@ private fun TopBar(
 
 @Composable
 private fun BookItem(book: BookFile, onClick: () -> Unit) {
-    val displayTitle = book.metadata?.title ?: book.name
+    val displayTitle = book.metadata?.title ?: book.name.substringBeforeLast('.')
     val author = book.metadata?.author
 
     var cover by remember(book.path) { mutableStateOf<Bitmap?>(null) }
@@ -351,6 +354,20 @@ private fun BookItem(book: BookFile, onClick: () -> Unit) {
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop
                 )
+                if (book.extension == "pdf") {
+                    Text(
+                        text = "PDF",
+                        color = EreaderColors.White,
+                        fontSize = 12.sp,
+                        lineHeight = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .offset(x = 4.dp)
+                            .background(EreaderColors.Black)
+                            .padding(horizontal = 4.dp)
+                    )
+                }
             } else {
                 Text(
                     text = book.extension.uppercase(),
@@ -367,13 +384,15 @@ private fun BookItem(book: BookFile, onClick: () -> Unit) {
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
-            Text(
-                text = author ?: book.path,
-                style = MaterialTheme.typography.bodySmall,
-                color = EreaderColors.DarkGray,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+            if (author != null) {
+                Text(
+                    text = author,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = EreaderColors.DarkGray,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
         }
 
         if (cover == null) {
