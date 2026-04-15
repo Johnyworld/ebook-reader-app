@@ -1,5 +1,10 @@
 // init.js — PDF.js 초기화, 페이지 렌더링
 
+window._showBookmarkRibbon = function(show) {
+    var el = document.getElementById('bookmark-ribbon');
+    if (el) el.style.display = show ? 'block' : 'none';
+};
+
 var _pdf = {};
 _pdf.pdfDoc = null;
 _pdf.currentPage = 1;

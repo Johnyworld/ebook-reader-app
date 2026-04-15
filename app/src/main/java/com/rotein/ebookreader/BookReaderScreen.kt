@@ -156,6 +156,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
             val currentPageCfi = readingState.currentCfi
             val isBookmarked = annotationState.bookmarks.any { it.cfi == currentPageCfi }
             vm.setCurrentPageBookmarked(isBookmarked)
+            viewerWebView.value?.evaluateJavascript("window._showBookmarkRibbon($isBookmarked)", null)
             return@LaunchedEffect
         }
         val wv = viewerWebView.value ?: return@LaunchedEffect

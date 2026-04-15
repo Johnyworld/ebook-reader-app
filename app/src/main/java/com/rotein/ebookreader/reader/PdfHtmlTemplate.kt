@@ -23,6 +23,11 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: #fff; }
 </style>
 </head>
 <body>
+<div id="bookmark-ribbon" style="display:none;position:absolute;top:-12px;right:16px;width:16px;height:40px;z-index:10;pointer-events:none;">
+<svg width="16" height="40" viewBox="0 0 16 40" xmlns="http://www.w3.org/2000/svg">
+<path d="M0,0 L16,0 L16,40 L8,30 L0,40 Z" fill="#ccc"/>
+</svg>
+</div>
 <div id="pdf-container"></div>
 <script>
 var _pdfConfig = {
