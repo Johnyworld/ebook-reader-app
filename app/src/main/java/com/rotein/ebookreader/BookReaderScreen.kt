@@ -259,6 +259,10 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                 onTocLoaded = { tocJson -> vm.onTocLoaded(tocJson) },
                 onSearchResultsPartial = { json -> vm.onSearchResultsPartial(json) },
                 onSearchComplete = { vm.onSearchComplete() },
+                onNavigationComplete = {
+                    onNavigationCompleteRef.value?.invoke()
+                    onNavigationCompleteRef.value = null
+                },
                 onWebViewCreated = { webView -> viewerWebView.value = webView }
             )
             "mobi" -> MobiViewer(book.path, onCenterTap)
@@ -519,10 +523,10 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                 totalBookPages = readingState.totalPages,
                 onNavigate = { href ->
                     if (isPdf) {
+                        if (onNavigationCompleteRef.value != null) return@TocPopup
+                        onNavigationCompleteRef.value = { vm.setShowTocPopup(false); vm.setShowMenu(false) }
                         val pageNum = href.removePrefix("pdf-page:").toIntOrNull() ?: 1
                         viewerWebView.value?.evaluateJavascript("window._goToPage($pageNum)", null)
-                        vm.setShowTocPopup(false)
-                        vm.setShowMenu(false)
                     } else {
                         if (onNavigationCompleteRef.value != null) return@TocPopup
                         onNavigationCompleteRef.value = { vm.setShowTocPopup(false); vm.setShowMenu(false) }
@@ -555,10 +559,10 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                 },
                 onNavigate = { cfi, page ->
                     if (isPdf) {
+                        if (onNavigationCompleteRef.value != null) return@SearchPopup
+                        onNavigationCompleteRef.value = { vm.setShowSearchPopup(false); vm.setShowMenu(false) }
                         val pageNum = cfi.removePrefix("pdf-page:").toIntOrNull() ?: page
                         viewerWebView.value?.evaluateJavascript("window._goToPage($pageNum)", null)
-                        vm.setShowSearchPopup(false)
-                        vm.setShowMenu(false)
                     } else {
                         if (onNavigationCompleteRef.value != null) return@SearchPopup
                         onNavigationCompleteRef.value = { vm.setShowSearchPopup(false); vm.setShowMenu(false) }
@@ -825,10 +829,10 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                 cfiPageMap = pageCalcState.cfiPageMap,
                 onNavigate = { cfi ->
                     if (isPdf) {
+                        if (onNavigationCompleteRef.value != null) return@BookmarkPopup
+                        onNavigationCompleteRef.value = { vm.setShowBookmarkPopup(false); vm.setShowMenu(false) }
                         val pageNum = cfi.removePrefix("pdf-page:").toIntOrNull() ?: 1
                         viewerWebView.value?.evaluateJavascript("window._goToPage($pageNum)", null)
-                        vm.setShowBookmarkPopup(false)
-                        vm.setShowMenu(false)
                     } else {
                         if (onNavigationCompleteRef.value != null) return@BookmarkPopup
                         onNavigationCompleteRef.value = { vm.setShowBookmarkPopup(false); vm.setShowMenu(false) }

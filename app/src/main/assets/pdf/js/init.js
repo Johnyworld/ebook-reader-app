@@ -82,6 +82,11 @@ function _renderPage(pageNum) {
             Android.onLocationUpdate(progress, _pdf.currentPage, '');
             Android.onContentLoaded();
 
+            if (_pdf.navigating) {
+                _pdf.navigating = false;
+                Android.onNavigationComplete();
+            }
+
             if (_pdf.pendingPage !== null) {
                 var next = _pdf.pendingPage;
                 _pdf.pendingPage = null;

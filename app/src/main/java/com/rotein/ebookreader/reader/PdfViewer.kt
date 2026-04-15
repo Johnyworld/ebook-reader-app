@@ -33,6 +33,7 @@ internal fun PdfViewer(
     onTocLoaded: (tocJson: String) -> Unit = {},
     onSearchResultsPartial: (resultsJson: String) -> Unit = {},
     onSearchComplete: () -> Unit = {},
+    onNavigationComplete: () -> Unit = {},
     onWebViewCreated: (WebView) -> Unit = {}
 ) {
     val file = remember(path) { File(path) }
@@ -70,7 +71,8 @@ internal fun PdfViewer(
                             },
                             onTocLoadedCallback = onTocLoaded,
                             onSearchResultsPartialCallback = onSearchResultsPartial,
-                            onSearchCompleteCallback = onSearchComplete
+                            onSearchCompleteCallback = onSearchComplete,
+                            onNavigationCompleteCallback = onNavigationComplete
                         ), "Android")
                     }
                     webViewRef.set(webView)

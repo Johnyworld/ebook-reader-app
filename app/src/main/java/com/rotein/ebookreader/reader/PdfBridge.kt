@@ -6,7 +6,8 @@ internal class PdfBridge(
     private val onContentLoadedCallback: () -> Unit = {},
     private val onTocLoadedCallback: (tocJson: String) -> Unit = {},
     private val onSearchResultsPartialCallback: (resultsJson: String) -> Unit = {},
-    private val onSearchCompleteCallback: () -> Unit = {}
+    private val onSearchCompleteCallback: () -> Unit = {},
+    private val onNavigationCompleteCallback: () -> Unit = {}
 ) {
     private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
 
@@ -38,5 +39,10 @@ internal class PdfBridge(
     @android.webkit.JavascriptInterface
     fun onSearchComplete() {
         mainHandler.post { onSearchCompleteCallback() }
+    }
+
+    @android.webkit.JavascriptInterface
+    fun onNavigationComplete() {
+        mainHandler.post { onNavigationCompleteCallback() }
     }
 }
