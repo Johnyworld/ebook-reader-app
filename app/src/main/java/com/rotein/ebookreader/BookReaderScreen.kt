@@ -238,7 +238,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                 },
                 readerSettings = readerSettings
             )
-            "pdf"  -> PdfViewer(
+            "pdf"  -> if (readingState.savedCfi == null) LoadingIndicator() else PdfViewer(
                 path = book.path,
                 savedPage = readingState.savedCfi
                     ?.removePrefix("pdf-page:")?.toIntOrNull() ?: 1,
