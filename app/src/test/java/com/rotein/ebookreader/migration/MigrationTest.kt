@@ -11,6 +11,7 @@ import com.rotein.ebookreader.BookDatabase
 import com.rotein.ebookreader.MIGRATION_11_12
 import com.rotein.ebookreader.MIGRATION_4_5
 import com.rotein.ebookreader.MIGRATION_5_6
+import com.rotein.ebookreader.MIGRATION_16_17
 import com.rotein.ebookreader.MIGRATION_9_10
 import org.junit.After
 import org.junit.Assert.*
@@ -216,6 +217,38 @@ class MigrationTest {
         assertEquals(-1, cursor.getColumnIndex("page"))
         cursor.close()
 
+        db.close()
+    }
+
+    @Test
+    fun `migration 16 to 17 - readingProgress 컬럼 추가`() {
+        val db = createDatabase(16) { db ->
+            db.execSQL(
+                "CREATE TABLE book_read_records (" +
+                "bookPath TEXT NOT NULL PRIMARY KEY, " +
+                "lastReadAt INTEGER NOT NULL, " +
+                "lastCfi TEXT NOT NULL DEFAULT '', " +
+                "tocJson TEXT NOT NULL DEFAULT '', " +
+                "cachedTotalPages INTEGER NOT NULL DEFAULT 0, " +
+                "cachedSpinePageOffsetsJson TEXT NOT NULL DEFAULT '', " +
+                "cachedSpineCharPageBreaksJson TEXT NOT NULL DEFAULT '', " +
+                "cachedSettingsFingerprint TEXT NOT NULL DEFAULT '', " +
+                "isFavorite INTEGER NOT NULL DEFAULT 0, " +
+                "isHidden INTEGER NOT NULL DEFAULT 0)"
+            )
+        }
+        db.execSQL("INSERT INTO book_read_records (bookPath, lastReadAt, isFavorite, isHidden) VALUES ('/book.epub', 5000, 1, 0)")
+
+        MIGRATION_16_17.migrate(db)
+
+        val cursor = db.query("SELECT * FROM book_read_records")
+        assertTrue(cursor.moveToFirst())
+        assertEquals("/book.epub", cursor.getString(cursor.getColumnIndexOrThrow("bookPath")))
+        assertEquals(5000L, cursor.getLong(cursor.getColumnIndexOrThrow("lastReadAt")))
+        assertEquals(1, cursor.getInt(cursor.getColumnIndexOrThrow("isFavorite")))
+        // 새로 추가된 readingProgress 컬럼 기본값 0.0 확인
+        assertEquals(0.0f, cursor.getFloat(cursor.getColumnIndexOrThrow("readingProgress")), 0.001f)
+        cursor.close()
         db.close()
     }
 
