@@ -22,8 +22,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
@@ -62,6 +61,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.rotein.ebookreader.ui.components.EreaderDropdownMenu
+import com.rotein.ebookreader.ui.components.PaginationBar
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -101,6 +101,22 @@ fun AllBooksScreen(
 
     var favorites by remember { mutableStateOf<Set<String>>(emptySet()) }
     var hiddenBooks by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var covers by remember { mutableStateOf<Map<String, Bitmap?>>(emptyMap()) }
+
+    // 전체 도서 커버 백그라운드 로드
+    LaunchedEffect(books) {
+        withContext(Dispatchers.IO) {
+            books.forEach { book ->
+                if (book.path !in covers) {
+                    val bitmap = BookCoverLoader.getCached(book.path)
+                        ?: BookCoverLoader.load(book.path, book.extension)
+                    withContext(Dispatchers.Main) {
+                        covers = covers + (book.path to bitmap)
+                    }
+                }
+            }
+        }
+    }
 
     // DB에서 읽은 시각 + 즐겨찾기/숨기기 로드
     LaunchedEffect(Unit) {
@@ -181,7 +197,16 @@ fun AllBooksScreen(
             onFilterChange = { filterMode = it }
         )
 
-        Box(modifier = Modifier.weight(1f).fillMaxSize()) {
+        var currentPage by remember { mutableStateOf(0) }
+        var targetPage by remember { mutableStateOf(0) }
+
+        // 필터/검색 변경 시 페이지 초기화
+        LaunchedEffect(processedBooks.size) {
+            currentPage = 0
+            targetPage = 0
+        }
+
+        BoxWithConstraints(modifier = Modifier.weight(1f).fillMaxSize()) {
             when {
                 !hasPermission -> {
                     Column(
@@ -218,39 +243,82 @@ fun AllBooksScreen(
                 }
 
                 else -> {
-                    LazyColumn(modifier = Modifier.fillMaxSize()) {
-                        items(processedBooks) { book ->
-                            val isHidden = book.path in hiddenBooks
-                            val isFavorite = book.path in favorites
-                            BookItem(
-                                book = book,
-                                isFavorite = isFavorite,
-                                isHidden = isHidden,
-                                onClick = {
-                                    val now = System.currentTimeMillis()
-                                    scope.launch(Dispatchers.IO) {
-                                        dao.upsertLastReadAt(book.path, now)
-                                    }
-                                    lastReadTimes = lastReadTimes + (book.path to now)
-                                    onBookClick(book)
-                                },
-                                onToggleFavorite = if (isHidden && !isFavorite) null else {{
-                                    val newValue = !isFavorite
-                                    favorites = if (newValue) favorites + book.path else favorites - book.path
-                                    scope.launch(Dispatchers.IO) {
-                                        dao.upsertFavorite(book.path, newValue)
-                                    }
-                                }},
-                                onToggleHidden = {
-                                    val newValue = !isHidden
-                                    hiddenBooks = if (newValue) hiddenBooks + book.path else hiddenBooks - book.path
-                                    scope.launch(Dispatchers.IO) {
-                                        dao.upsertHidden(book.path, newValue)
-                                    }
-                                }
-                            )
-                            HorizontalDivider(color = EreaderColors.Gray)
+                    val itemHeightDp = 81 // BookItem(80dp) + Divider(1dp)
+                    val paginationBarHeightDp = 56
+                    val availableHeightDp = maxHeight.value.toInt() - paginationBarHeightDp
+                    val itemsPerPage = (availableHeightDp / itemHeightDp).coerceAtLeast(1)
+                    val totalPages = ((processedBooks.size + itemsPerPage - 1) / itemsPerPage).coerceAtLeast(1)
+                    val safePage = currentPage.coerceIn(0, totalPages - 1)
+                    val startIndex = safePage * itemsPerPage
+                    val pageItems = processedBooks.subList(
+                        startIndex,
+                        (startIndex + itemsPerPage).coerceAtMost(processedBooks.size)
+                    )
+
+                    // targetPage 변경 시 커버를 먼저 로드한 뒤 페이지 전환
+                    LaunchedEffect(targetPage, itemsPerPage, processedBooks) {
+                        if (targetPage == currentPage) return@LaunchedEffect
+                        val tStart = (targetPage * itemsPerPage).coerceAtMost(processedBooks.size)
+                        val tEnd = ((targetPage + 1) * itemsPerPage).coerceAtMost(processedBooks.size)
+                        val newCovers = mutableMapOf<String, Bitmap?>()
+                        for (i in tStart until tEnd) {
+                            val book = processedBooks[i]
+                            if (book.path !in covers) {
+                                val bitmap = BookCoverLoader.getCached(book.path)
+                                    ?: BookCoverLoader.load(book.path, book.extension)
+                                newCovers[book.path] = bitmap
+                            }
                         }
+                        if (newCovers.isNotEmpty()) {
+                            covers = covers + newCovers
+                        }
+                        currentPage = targetPage
+                    }
+
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            pageItems.forEach { book ->
+                                val isHidden = book.path in hiddenBooks
+                                val isFavorite = book.path in favorites
+                                BookItem(
+                                    book = book,
+                                    cover = covers[book.path],
+                                    isFavorite = isFavorite,
+                                    isHidden = isHidden,
+                                    onClick = {
+                                        val now = System.currentTimeMillis()
+                                        scope.launch(Dispatchers.IO) {
+                                            dao.upsertLastReadAt(book.path, now)
+                                        }
+                                        lastReadTimes = lastReadTimes + (book.path to now)
+                                        onBookClick(book)
+                                    },
+                                    onToggleFavorite = if (isHidden && !isFavorite) null else {{
+                                        val newValue = !isFavorite
+                                        favorites = if (newValue) favorites + book.path else favorites - book.path
+                                        scope.launch(Dispatchers.IO) {
+                                            dao.upsertFavorite(book.path, newValue)
+                                        }
+                                    }},
+                                    onToggleHidden = {
+                                        val newValue = !isHidden
+                                        hiddenBooks = if (newValue) hiddenBooks + book.path else hiddenBooks - book.path
+                                        scope.launch(Dispatchers.IO) {
+                                            dao.upsertHidden(book.path, newValue)
+                                        }
+                                    }
+                                )
+                                HorizontalDivider(color = EreaderColors.Gray)
+                            }
+                        }
+
+                        PaginationBar(
+                            currentPage = safePage,
+                            totalPages = totalPages,
+                            centerText = "${safePage + 1}/$totalPages (${processedBooks.size}건)",
+                            onPrevious = { targetPage = safePage - 1 },
+                            onNext = { targetPage = safePage + 1 }
+                        )
                     }
                 }
             }
@@ -374,6 +442,7 @@ private fun TopBar(
 @Composable
 private fun BookItem(
     book: BookFile,
+    cover: Bitmap?,
     isFavorite: Boolean,
     isHidden: Boolean,
     onClick: () -> Unit,
@@ -382,13 +451,6 @@ private fun BookItem(
 ) {
     val displayTitle = book.metadata?.title ?: book.name.substringBeforeLast('.')
     val author = book.metadata?.author
-
-    var cover by remember(book.path) { mutableStateOf(BookCoverLoader.getCached(book.path)) }
-    LaunchedEffect(book.path) {
-        if (cover == null) {
-            cover = BookCoverLoader.load(book.path, book.extension)
-        }
-    }
 
     Row(
         modifier = Modifier
