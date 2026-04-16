@@ -141,6 +141,7 @@ class BookReaderViewModel(application: Application) : AndroidViewModel(applicati
         _contentState.value = ContentState(isLoading = true)
         _tocItems.value = emptyList()
         _pageCalcState.value = PageCalcState()
+        _searchState.value = SearchState()
 
         viewModelScope.launch {
             val record = withContext(Dispatchers.IO) { dao.getByPath(path) }
