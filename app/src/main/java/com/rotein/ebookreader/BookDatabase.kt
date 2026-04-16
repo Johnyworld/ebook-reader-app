@@ -24,7 +24,9 @@ data class BookReadRecord(
     val cachedTotalPages: Int = 0,
     val cachedSpinePageOffsetsJson: String = "",
     val cachedSpineCharPageBreaksJson: String = "",
-    val cachedSettingsFingerprint: String = ""
+    val cachedSettingsFingerprint: String = "",
+    val isFavorite: Boolean = false,
+    val isHidden: Boolean = false
 )
 
 @Dao
@@ -74,6 +76,23 @@ interface BookReadRecordDao {
         updatePageScanCache(bookPath, totalPages, spinePageOffsetsJson, spineCharPageBreaksJson, fingerprint)
     }
 
+    @Query("UPDATE book_read_records SET isFavorite = :isFavorite WHERE bookPath = :bookPath")
+    suspend fun updateFavorite(bookPath: String, isFavorite: Boolean)
+
+    @Transaction
+    suspend fun upsertFavorite(bookPath: String, isFavorite: Boolean) {
+        insertIfNotExists(BookReadRecord(bookPath = bookPath, lastReadAt = 0L))
+        updateFavorite(bookPath, isFavorite)
+    }
+
+    @Query("UPDATE book_read_records SET isHidden = :isHidden WHERE bookPath = :bookPath")
+    suspend fun updateHidden(bookPath: String, isHidden: Boolean)
+
+    @Transaction
+    suspend fun upsertHidden(bookPath: String, isHidden: Boolean) {
+        insertIfNotExists(BookReadRecord(bookPath = bookPath, lastReadAt = 0L))
+        updateHidden(bookPath, isHidden)
+    }
 }
 
 internal val MIGRATION_1_2 = object : Migration(1, 2) {
@@ -293,14 +312,21 @@ internal val MIGRATION_14_15 = object : Migration(14, 15) {
     }
 }
 
+internal val MIGRATION_15_16 = object : Migration(15, 16) {
+    override fun migrate(database: SupportSQLiteDatabase) {
+        database.execSQL("ALTER TABLE book_read_records ADD COLUMN isFavorite INTEGER NOT NULL DEFAULT 0")
+        database.execSQL("ALTER TABLE book_read_records ADD COLUMN isHidden INTEGER NOT NULL DEFAULT 0")
+    }
+}
+
 internal val ALL_MIGRATIONS = arrayOf(
     MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5,
     MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9,
     MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13,
-    MIGRATION_13_14, MIGRATION_14_15
+    MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16
 )
 
-@Database(entities = [BookReadRecord::class, Bookmark::class, Highlight::class, Memo::class], version = 15)
+@Database(entities = [BookReadRecord::class, Bookmark::class, Highlight::class, Memo::class], version = 16)
 abstract class BookDatabase : RoomDatabase() {
     abstract fun bookReadRecordDao(): BookReadRecordDao
     abstract fun bookmarkDao(): BookmarkDao

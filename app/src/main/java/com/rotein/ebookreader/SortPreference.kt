@@ -43,6 +43,12 @@ enum class SortField(val label: String) {
     val defaultDescending: Boolean get() = this == DATE_ADDED || this == LAST_READ
 }
 
+enum class FilterMode(val label: String) {
+    ALL("전체보기"),
+    FAVORITE("즐겨찾기"),
+    HIDDEN("숨김보기")
+}
+
 data class SortPreference(
     val field: SortField = SortField.LAST_READ
 )

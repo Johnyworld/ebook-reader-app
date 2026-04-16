@@ -27,6 +27,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
@@ -46,6 +47,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Fill
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.foundation.Canvas
 import com.rotein.ebookreader.ui.theme.EreaderColors
 import com.rotein.ebookreader.ui.theme.EreaderSpacing
 import androidx.compose.ui.graphics.SolidColor
@@ -86,6 +91,7 @@ fun AllBooksScreen(
     var isSearchActive by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
     var sortPref by remember { mutableStateOf(SortPreferenceStore.load(context)) }
+    var filterMode by remember { mutableStateOf(FilterMode.ALL) }
     var lastReadTimes by remember { mutableStateOf<Map<String, Long>>(emptyMap()) }
 
     // 정렬 설정 변경 시 기기에 저장
@@ -93,19 +99,29 @@ fun AllBooksScreen(
         SortPreferenceStore.save(context, sortPref)
     }
 
-    // DB에서 읽은 시각 로드
+    var favorites by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var hiddenBooks by remember { mutableStateOf<Set<String>>(emptySet()) }
+
+    // DB에서 읽은 시각 + 즐겨찾기/숨기기 로드
     LaunchedEffect(Unit) {
-        lastReadTimes = withContext(Dispatchers.IO) {
-            dao.getAll().associate { it.bookPath to it.lastReadAt }
-        }
+        val records = withContext(Dispatchers.IO) { dao.getAll() }
+        lastReadTimes = records.associate { it.bookPath to it.lastReadAt }
+        favorites = records.filter { it.isFavorite }.map { it.bookPath }.toSet()
+        hiddenBooks = records.filter { it.isHidden }.map { it.bookPath }.toSet()
     }
 
-    val processedBooks = remember(books, searchQuery, sortPref, lastReadTimes) {
+    val processedBooks = remember(books, searchQuery, sortPref, lastReadTimes, hiddenBooks, favorites, filterMode) {
+        // 0) 필터 모드 적용
+        val visible = when (filterMode) {
+            FilterMode.ALL -> books.filter { it.path !in hiddenBooks }
+            FilterMode.FAVORITE -> books.filter { it.path in favorites && it.path !in hiddenBooks }
+            FilterMode.HIDDEN -> books.filter { it.path in hiddenBooks }
+        }
         // 1) 검색 필터
-        val filtered = if (searchQuery.isBlank()) books
+        val filtered = if (searchQuery.isBlank()) visible
         else {
             val q = searchQuery.trim().lowercase()
-            books.filter { book ->
+            visible.filter { book ->
                 val title = (book.metadata?.title ?: book.name).lowercase()
                 val author = book.metadata?.author?.lowercase() ?: ""
                 title.contains(q) || author.contains(q) || book.name.lowercase().contains(q)
@@ -154,16 +170,18 @@ fun AllBooksScreen(
             isSearchActive = isSearchActive,
             searchQuery = searchQuery,
             sortPref = sortPref,
+            filterMode = filterMode,
             onSearchClick = { isSearchActive = true },
             onQueryChange = { searchQuery = it },
             onSearchClear = {
                 searchQuery = ""
                 isSearchActive = false
             },
-            onSortChange = { sortPref = it }
+            onSortChange = { sortPref = it },
+            onFilterChange = { filterMode = it }
         )
 
-        Box(modifier = Modifier.weight(1f)) {
+        Box(modifier = Modifier.weight(1f).fillMaxSize()) {
             when {
                 !hasPermission -> {
                     Column(
@@ -194,23 +212,43 @@ fun AllBooksScreen(
 
                 processedBooks.isEmpty() -> {
                     Text(
-                        if (searchQuery.isBlank()) "epub, txt, mobi, pdf 파일을 찾을 수 없습니다."
-                        else "\"$searchQuery\"에 해당하는 파일이 없습니다.",
-                        modifier = Modifier.align(Alignment.Center).padding(EreaderSpacing.XL)
+                        "비어있음",
+                        modifier = Modifier.align(Alignment.Center)
                     )
                 }
 
                 else -> {
                     LazyColumn(modifier = Modifier.fillMaxSize()) {
                         items(processedBooks) { book ->
-                            BookItem(book, onClick = {
-                                val now = System.currentTimeMillis()
-                                scope.launch(Dispatchers.IO) {
-                                    dao.upsertLastReadAt(book.path, now)
+                            val isHidden = book.path in hiddenBooks
+                            val isFavorite = book.path in favorites
+                            BookItem(
+                                book = book,
+                                isFavorite = isFavorite,
+                                isHidden = isHidden,
+                                onClick = {
+                                    val now = System.currentTimeMillis()
+                                    scope.launch(Dispatchers.IO) {
+                                        dao.upsertLastReadAt(book.path, now)
+                                    }
+                                    lastReadTimes = lastReadTimes + (book.path to now)
+                                    onBookClick(book)
+                                },
+                                onToggleFavorite = if (isHidden && !isFavorite) null else {{
+                                    val newValue = !isFavorite
+                                    favorites = if (newValue) favorites + book.path else favorites - book.path
+                                    scope.launch(Dispatchers.IO) {
+                                        dao.upsertFavorite(book.path, newValue)
+                                    }
+                                }},
+                                onToggleHidden = {
+                                    val newValue = !isHidden
+                                    hiddenBooks = if (newValue) hiddenBooks + book.path else hiddenBooks - book.path
+                                    scope.launch(Dispatchers.IO) {
+                                        dao.upsertHidden(book.path, newValue)
+                                    }
                                 }
-                                lastReadTimes = lastReadTimes + (book.path to now)
-                                onBookClick(book)
-                            })
+                            )
                             HorizontalDivider(color = EreaderColors.Gray)
                         }
                     }
@@ -225,10 +263,12 @@ private fun TopBar(
     isSearchActive: Boolean,
     searchQuery: String,
     sortPref: SortPreference,
+    filterMode: FilterMode,
     onSearchClick: () -> Unit,
     onQueryChange: (String) -> Unit,
     onSearchClear: () -> Unit,
-    onSortChange: (SortPreference) -> Unit
+    onSortChange: (SortPreference) -> Unit,
+    onFilterChange: (FilterMode) -> Unit
 ) {
     val focusRequester = remember { FocusRequester() }
     LaunchedEffect(isSearchActive) {
@@ -256,6 +296,14 @@ private fun TopBar(
             }
 
             Box(modifier = Modifier.weight(1f))
+
+            // 필터 드롭다운
+            EreaderDropdownMenu(
+                items = FilterMode.entries.toList(),
+                selectedItem = filterMode,
+                onSelect = { onFilterChange(it) },
+                label = { it.label },
+            )
 
             // 정렬 필드 드롭다운
             EreaderDropdownMenu(
@@ -324,20 +372,29 @@ private fun TopBar(
 }
 
 @Composable
-private fun BookItem(book: BookFile, onClick: () -> Unit) {
+private fun BookItem(
+    book: BookFile,
+    isFavorite: Boolean,
+    isHidden: Boolean,
+    onClick: () -> Unit,
+    onToggleFavorite: (() -> Unit)?,
+    onToggleHidden: () -> Unit
+) {
     val displayTitle = book.metadata?.title ?: book.name.substringBeforeLast('.')
     val author = book.metadata?.author
 
-    var cover by remember(book.path) { mutableStateOf<Bitmap?>(null) }
+    var cover by remember(book.path) { mutableStateOf(BookCoverLoader.getCached(book.path)) }
     LaunchedEffect(book.path) {
-        cover = BookCoverLoader.load(book.path, book.extension)
+        if (cover == null) {
+            cover = BookCoverLoader.load(book.path, book.extension)
+        }
     }
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onClick() }
-            .padding(horizontal = EreaderSpacing.L, vertical = 10.dp),
+            .padding(start = EreaderSpacing.L, top = 10.dp, bottom = 10.dp, end = EreaderSpacing.XS),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(EreaderSpacing.M)
     ) {
@@ -375,6 +432,36 @@ private fun BookItem(book: BookFile, onClick: () -> Unit) {
                     color = EreaderColors.DarkGray
                 )
             }
+            if (isFavorite) {
+                Canvas(
+                    modifier = Modifier
+                        .size(14.dp)
+                        .align(Alignment.TopStart)
+                        .offset(x = (-7).dp, y = (-7).dp)
+                ) {
+                    val w = size.width
+                    val h = size.height
+                    val cx = w / 2f
+                    val cy = h / 2f
+                    val outerR = w / 2f
+                    val innerR = outerR * 0.38f
+                    val starPath = Path().apply {
+                        for (i in 0 until 5) {
+                            val outerAngle = Math.toRadians(-90.0 + i * 72.0)
+                            val innerAngle = Math.toRadians(-90.0 + i * 72.0 + 36.0)
+                            val ox = cx + outerR * kotlin.math.cos(outerAngle).toFloat()
+                            val oy = cy + outerR * kotlin.math.sin(outerAngle).toFloat()
+                            val ix = cx + innerR * kotlin.math.cos(innerAngle).toFloat()
+                            val iy = cy + innerR * kotlin.math.sin(innerAngle).toFloat()
+                            if (i == 0) moveTo(ox, oy) else lineTo(ox, oy)
+                            lineTo(ix, iy)
+                        }
+                        close()
+                    }
+                    drawPath(starPath, Color.White, style = Stroke(width = 1.dp.toPx()))
+                    drawPath(starPath, Color.Black, style = Fill)
+                }
+            }
         }
 
         Column(modifier = Modifier.weight(1f)) {
@@ -402,5 +489,27 @@ private fun BookItem(book: BookFile, onClick: () -> Unit) {
                 color = EreaderColors.Black
             )
         }
+
+        val menuItems = buildList {
+            if (onToggleFavorite != null) {
+                add((if (isFavorite) "즐겨찾기 해제" else "즐겨찾기") to onToggleFavorite)
+            }
+            add((if (isHidden) "숨김 해제" else "숨기기") to onToggleHidden)
+        }
+        EreaderDropdownMenu(
+            items = menuItems,
+            onSelect = { it.second() },
+            label = { it.first },
+            trigger = { onClick ->
+                IconButton(onClick = onClick) {
+                    Icon(
+                        imageVector = Icons.Default.MoreVert,
+                        contentDescription = "메뉴",
+                        tint = EreaderColors.DarkGray,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+        )
     }
 }
