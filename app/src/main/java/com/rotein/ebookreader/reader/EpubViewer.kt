@@ -416,12 +416,26 @@ internal fun EpubViewer(
 }
 
 /** EPUB ZIP 을 캐시 디렉토리에 압축 해제하고 epub.js 를 복사한다. */
+private val jsModuleFiles = listOf("init.js", "settings.js", "location.js", "page-scan.js", "selection.js", "search.js", "annotation.js", "navigation.js")
+
+private fun copyJsModules(context: Context, outDir: File) {
+    val jsDir = File(outDir, "js")
+    jsDir.mkdirs()
+    for (jsFile in jsModuleFiles) {
+        context.assets.open("epub/js/$jsFile").use { input ->
+            File(jsDir, jsFile).outputStream().use { output -> input.copyTo(output) }
+        }
+    }
+}
+
 private fun extractEpub(context: Context, epubPath: String): Pair<String, String>? {
     val hash = epubPath.hashCode().toString()
     val outDir = File(context.cacheDir, "epub/$hash")
     val opfMarker = File(outDir, ".opf_path")
 
     if (outDir.exists() && opfMarker.exists() && File(outDir, "epub.min.js").exists() && File(outDir, "js/init.js").exists()) {
+        // JS 모듈 파일은 항상 최신 assets로 덮어쓴다 (코드 수정 반영)
+        copyJsModules(context, outDir)
         return Pair(outDir.absolutePath, opfMarker.readText())
     }
 
@@ -441,12 +455,7 @@ private fun extractEpub(context: Context, epubPath: String): Pair<String, String
     context.assets.open("epub.min.js").use { it.copyTo(File(outDir, "epub.min.js").outputStream()) }
 
     // assets 에서 JS 모듈 파일 복사
-    val jsDir = File(outDir, "js")
-    jsDir.mkdirs()
-    val jsFiles = listOf("init.js", "settings.js", "location.js", "page-scan.js", "selection.js", "search.js", "annotation.js", "navigation.js")
-    for (jsFile in jsFiles) {
-        context.assets.open("epub/js/$jsFile").use { it.copyTo(File(jsDir, jsFile).outputStream()) }
-    }
+    copyJsModules(context, outDir)
 
     val opfPath = findOpfPath(outDir) ?: return null
     opfMarker.writeText(opfPath)

@@ -15,6 +15,8 @@ function findTocEntry(href, items) {
     return "";
 }
 
+_epub.lastReportedSpineIndex = -1;
+
 function reportLocation(location) {
     try {
         var percentage = (location.start && location.start.percentage) ? location.start.percentage : 0;
@@ -36,6 +38,21 @@ function reportLocation(location) {
                 var delta = _epub.rendition.manager && _epub.rendition.manager.layout ? _epub.rendition.manager.layout.delta : 0;
                 if (delta > 0 && _epub.rendition.manager.container) {
                     var scrollLeft = _epub.rendition.manager.container.scrollLeft;
+                    var scrollWidth = _epub.rendition.manager.container.scrollWidth;
+
+                    // 이전 챕터로 전환 시 스크롤 보정
+                    // epub.js의 prev()가 iframe 레이아웃 완료 전에 scrollTo를 호출하여
+                    // 마지막 페이지가 아닌 중간 위치에 머무는 문제를 보정한다.
+                    // spine index가 감소했고, 마지막 페이지가 아니면 보정한다.
+                    if (_epub.lastReportedSpineIndex >= 0 && idx < _epub.lastReportedSpineIndex) {
+                        var target = scrollWidth - delta;
+                        if (target > delta * 0.5 && scrollLeft < target - delta * 0.1) {
+                            _epub.rendition.manager.container.scrollLeft = target;
+                            scrollLeft = target;
+                        }
+                    }
+                    _epub.lastReportedSpineIndex = idx;
+
                     pg = Math.round(scrollLeft / delta) + 1;
                 }
             } catch(e) {}
