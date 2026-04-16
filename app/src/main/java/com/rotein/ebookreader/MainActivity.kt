@@ -83,7 +83,8 @@ fun HomeScreen(modifier: Modifier = Modifier) {
         // 실제 콘텐츠 (스플래시 뒤에서 로딩 진행)
         AllBooksScreen(
             onBookClick = { currentBook = it },
-            onLoadComplete = { fileScanComplete = true }
+            onLoadComplete = { fileScanComplete = true },
+            refreshKey = currentBook
         )
 
         // 뷰어 오버레이

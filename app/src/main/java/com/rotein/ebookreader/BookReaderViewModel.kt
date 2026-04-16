@@ -184,6 +184,10 @@ class BookReaderViewModel(application: Application) : AndroidViewModel(applicati
         viewModelScope.launch(Dispatchers.IO) { dao.upsertCfi(bookPath, cfi) }
     }
 
+    fun saveReadingProgress(progress: Float) {
+        viewModelScope.launch(Dispatchers.IO) { dao.upsertReadingProgress(bookPath, progress) }
+    }
+
     fun onTocLoaded(tocJson: String) {
         if (!_contentState.value.locationsReady) {
             try { _tocItems.value = parseTocJson(org.json.JSONArray(tocJson)) } catch (_: Exception) {}
@@ -411,6 +415,7 @@ class BookReaderViewModel(application: Application) : AndroidViewModel(applicati
                 prevProgress = progress
             )
         }
+        if (newProgress > 0f) saveReadingProgress(newProgress)
     }
 
     fun updateCurrentCfi(cfi: String) {
@@ -427,6 +432,8 @@ class BookReaderViewModel(application: Application) : AndroidViewModel(applicati
             val progress = if (newTotal > 0) page.toFloat() / newTotal.toFloat() else it.readingProgress
             it.copy(currentPage = page, totalPages = newTotal, readingProgress = progress)
         }
+        val rs = _readingState.value
+        if (rs.readingProgress > 0f) saveReadingProgress(rs.readingProgress)
     }
 
     fun setLoading(loading: Boolean) {

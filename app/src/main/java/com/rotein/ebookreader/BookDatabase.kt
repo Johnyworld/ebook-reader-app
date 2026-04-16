@@ -26,7 +26,8 @@ data class BookReadRecord(
     val cachedSpineCharPageBreaksJson: String = "",
     val cachedSettingsFingerprint: String = "",
     val isFavorite: Boolean = false,
-    val isHidden: Boolean = false
+    val isHidden: Boolean = false,
+    val readingProgress: Float = 0f
 )
 
 @Dao
@@ -92,6 +93,15 @@ interface BookReadRecordDao {
     suspend fun upsertHidden(bookPath: String, isHidden: Boolean) {
         insertIfNotExists(BookReadRecord(bookPath = bookPath, lastReadAt = 0L))
         updateHidden(bookPath, isHidden)
+    }
+
+    @Query("UPDATE book_read_records SET readingProgress = :progress WHERE bookPath = :bookPath")
+    suspend fun updateReadingProgress(bookPath: String, progress: Float)
+
+    @Transaction
+    suspend fun upsertReadingProgress(bookPath: String, progress: Float) {
+        insertIfNotExists(BookReadRecord(bookPath = bookPath, lastReadAt = 0L))
+        updateReadingProgress(bookPath, progress)
     }
 }
 
@@ -319,14 +329,20 @@ internal val MIGRATION_15_16 = object : Migration(15, 16) {
     }
 }
 
+internal val MIGRATION_16_17 = object : Migration(16, 17) {
+    override fun migrate(database: SupportSQLiteDatabase) {
+        database.execSQL("ALTER TABLE book_read_records ADD COLUMN readingProgress REAL NOT NULL DEFAULT 0.0")
+    }
+}
+
 internal val ALL_MIGRATIONS = arrayOf(
     MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5,
     MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9,
     MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13,
-    MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16
+    MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17
 )
 
-@Database(entities = [BookReadRecord::class, Bookmark::class, Highlight::class, Memo::class], version = 16)
+@Database(entities = [BookReadRecord::class, Bookmark::class, Highlight::class, Memo::class], version = 17)
 abstract class BookDatabase : RoomDatabase() {
     abstract fun bookReadRecordDao(): BookReadRecordDao
     abstract fun bookmarkDao(): BookmarkDao
