@@ -16,10 +16,12 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -70,6 +72,7 @@ import kotlinx.coroutines.withContext
 fun AllBooksScreen(
     onBookClick: (BookFile) -> Unit,
     onLoadComplete: () -> Unit = {},
+    refreshKey: Any? = Unit,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -118,12 +121,15 @@ fun AllBooksScreen(
         }
     }
 
-    // DB에서 읽은 시각 + 즐겨찾기/숨기기 로드
-    LaunchedEffect(Unit) {
+    var readingProgressMap by remember { mutableStateOf<Map<String, Float>>(emptyMap()) }
+
+    // DB에서 읽은 시각 + 즐겨찾기/숨기기/진행률 로드
+    LaunchedEffect(refreshKey) {
         val records = withContext(Dispatchers.IO) { dao.getAll() }
         lastReadTimes = records.associate { it.bookPath to it.lastReadAt }
         favorites = records.filter { it.isFavorite }.map { it.bookPath }.toSet()
         hiddenBooks = records.filter { it.isHidden }.map { it.bookPath }.toSet()
+        readingProgressMap = records.filter { it.readingProgress > 0f }.associate { it.bookPath to it.readingProgress }
     }
 
     val processedBooks = remember(books, searchQuery, sortPref, lastReadTimes, hiddenBooks, favorites, filterMode) {
@@ -285,6 +291,7 @@ fun AllBooksScreen(
                                     cover = covers[book.path],
                                     isFavorite = isFavorite,
                                     isHidden = isHidden,
+                                    readingProgress = readingProgressMap[book.path] ?: 0f,
                                     onClick = {
                                         val now = System.currentTimeMillis()
                                         scope.launch(Dispatchers.IO) {
@@ -445,6 +452,7 @@ private fun BookItem(
     cover: Bitmap?,
     isFavorite: Boolean,
     isHidden: Boolean,
+    readingProgress: Float,
     onClick: () -> Unit,
     onToggleFavorite: (() -> Unit)?,
     onToggleHidden: () -> Unit
@@ -540,6 +548,31 @@ private fun BookItem(
                     color = EreaderColors.DarkGray,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
+                )
+            }
+            Row(
+                modifier = Modifier.padding(top = 2.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .width(40.dp)
+                        .height(2.dp)
+                        .background(EreaderColors.Gray)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxHeight()
+                            .fillMaxWidth(readingProgress.coerceIn(0f, 1f))
+                            .background(EreaderColors.Black)
+                    )
+                }
+                Text(
+                    text = "${(readingProgress * 100).toInt()}%",
+                    fontSize = 10.sp,
+                    lineHeight = 10.sp,
+                    color = EreaderColors.DarkGray
                 )
             }
         }
