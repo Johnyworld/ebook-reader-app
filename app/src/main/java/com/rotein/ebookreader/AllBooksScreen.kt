@@ -297,7 +297,6 @@ fun AllBooksScreen(
                                         scope.launch(Dispatchers.IO) {
                                             dao.upsertLastReadAt(book.path, now)
                                         }
-                                        lastReadTimes = lastReadTimes + (book.path to now)
                                         onBookClick(book)
                                     },
                                     onToggleFavorite = if (isHidden && !isFavorite) null else {{
@@ -488,7 +487,7 @@ private fun BookItem(
                         fontSize = 12.sp,
                         lineHeight = 12.sp,
                         fontWeight = FontWeight.Bold,
-                        modifier = Modifier
+                           modifier = Modifier
                             .align(Alignment.TopEnd)
                             .offset(x = 4.dp)
                             .background(EreaderColors.Black)
