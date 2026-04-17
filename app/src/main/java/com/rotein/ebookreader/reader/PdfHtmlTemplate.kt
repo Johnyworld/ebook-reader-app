@@ -10,11 +10,10 @@ internal fun buildPdfHtml(pdfPath: String, startPage: Int) = """<!DOCTYPE html>
 html, body { width: 100%; height: 100%; overflow: hidden; background: #fff; }
 #pdf-container {
     width: 100%; height: 100%;
-    display: flex; align-items: center; justify-content: center;
     overflow: hidden;
     position: relative;
 }
-#pdf-wrapper { position: relative; }
+#pdf-wrapper { position: absolute; top: 0; left: 0; transform-origin: 0 0; }
 #pdf-canvas { display: block; }
 .search-hl-overlay {
     position: absolute; pointer-events: none;
@@ -37,6 +36,7 @@ var _pdfConfig = {
 </script>
 <script src="pdfjs/pdf.min.js"></script>
 <script src="pdf/js/init.js"></script>
+<script src="pdf/js/zoom.js"></script>
 <script src="pdf/js/navigation.js"></script>
 <script src="pdf/js/search.js"></script>
 <script src="pdf/js/toc.js"></script>

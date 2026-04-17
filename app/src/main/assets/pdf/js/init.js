@@ -92,6 +92,8 @@ function _renderPage(pageNum) {
                 Android.onNavigationComplete();
             }
 
+            if (typeof window._resetZoom === 'function') window._resetZoom();
+
             if (_pdf.pendingPage !== null) {
                 var next = _pdf.pendingPage;
                 _pdf.pendingPage = null;
