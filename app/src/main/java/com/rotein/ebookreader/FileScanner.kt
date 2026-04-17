@@ -6,7 +6,7 @@ import java.io.File
 
 object FileScanner {
 
-    private val SUPPORTED_EXTENSIONS = setOf("epub", "txt", "mobi", "pdf")
+    private val SUPPORTED_EXTENSIONS = setOf("epub", "pdf")
 
     fun scanBooks(@Suppress("UNUSED_PARAMETER") context: Context): List<BookFile> {
         val root = Environment.getExternalStorageDirectory()
@@ -43,7 +43,6 @@ object FileScanner {
 
     private fun extractMetadata(path: String, extension: String): BookMetadata? = when (extension) {
         "epub" -> EpubMetadataParser.parse(path)
-        "mobi" -> MobiMetadataParser.parse(path)
         "pdf" -> PdfMetadataParser.parse(path)
         else -> null
     }
