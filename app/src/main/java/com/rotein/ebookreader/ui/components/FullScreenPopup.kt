@@ -10,9 +10,10 @@ import com.rotein.ebookreader.ui.theme.EreaderColors
 
 @Composable
 fun FullScreenPopup(
+    modifier: Modifier = Modifier,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    Surface(modifier = Modifier.fillMaxSize(), color = EreaderColors.White) {
+    Surface(modifier = modifier.fillMaxSize(), color = EreaderColors.White) {
         Column(modifier = Modifier.fillMaxSize()) {
             content()
         }

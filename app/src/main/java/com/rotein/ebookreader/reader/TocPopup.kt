@@ -1,6 +1,8 @@
 package com.rotein.ebookreader.reader
 
 import androidx.compose.foundation.background
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -41,23 +43,37 @@ internal fun TocPopup(
     tocItems: List<TocItem>,
     bookTitle: String,
     currentChapterTitle: String,
+    currentPage: Int,
     totalBookPages: Int,
     onNavigate: (String) -> Unit,
     onDismiss: () -> Unit
 ) {
     val flatItems = remember(tocItems) { flattenToc(tocItems) }
+
+    // 현재 읽고 있는 페이지 기준으로 현재 챕터의 flatItems 인덱스를 계산
+    val currentChapterIndex = remember(flatItems, currentPage) {
+        val paged = flatItems.withIndex().filter { it.value.page > 0 }
+        val match = paged.lastOrNull { it.value.page <= currentPage }
+        match?.index ?: -1
+    }
+
     val density = LocalDensity.current
     val itemHeightDp = 45 // Row(44.dp) + HorizontalDivider(1.dp)
     var listHeightPx by remember { mutableStateOf(0) }
     val listHeightDp = with(density) { listHeightPx.toDp().value.toInt() }
     val itemsPerPage = if (listHeightDp > 0) maxOf(1, listHeightDp / itemHeightDp) else 20
     val totalPages = maxOf(1, (flatItems.size + itemsPerPage - 1) / itemsPerPage)
-    var currentPage by remember { mutableStateOf(0) }
-    if (currentPage >= totalPages) currentPage = maxOf(0, totalPages - 1)
-    val startIndex = currentPage * itemsPerPage
+
+    val initialTocPage = if (currentChapterIndex >= 0 && itemsPerPage > 0)
+        (currentChapterIndex / itemsPerPage).coerceIn(0, totalPages - 1) else 0
+    var tocPage by remember(initialTocPage) { mutableStateOf(initialTocPage) }
+    if (tocPage >= totalPages) tocPage = maxOf(0, totalPages - 1)
+
+    val startIndex = tocPage * itemsPerPage
     val pageItems = flatItems.drop(startIndex).take(itemsPerPage)
 
-    FullScreenPopup {
+    val measured = listHeightPx > 0
+    FullScreenPopup(modifier = Modifier.alpha(if (measured) 1f else 0f)) {
             PopupHeaderBar(title = "목차: $bookTitle", onBack = onDismiss)
             Column(modifier = Modifier.weight(1f).onSizeChanged { listHeightPx = it.height }) {
                 if (flatItems.isEmpty()) {
@@ -70,6 +86,7 @@ internal fun TocPopup(
                     val gapWidth = EreaderSpacing.S
                     val lineSpacing = 16.dp
                     pageItems.forEachIndexed { index, item ->
+                        val isCurrentChapter = (startIndex + index) == currentChapterIndex
                         val lineColor = EreaderColors.Gray
                         Row(
                             modifier = Modifier
@@ -117,6 +134,7 @@ internal fun TocPopup(
                             Text(
                                 item.label,
                                 style = if (item.depth == 0) MaterialTheme.typography.bodyLarge else MaterialTheme.typography.bodyMedium,
+                                fontWeight = if (isCurrentChapter) FontWeight.Bold else null,
                                 color = EreaderColors.Black,
                                 maxLines = 1,
                                 overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
@@ -130,11 +148,11 @@ internal fun TocPopup(
                 }
             }
             PaginationBar(
-                currentPage = currentPage,
+                currentPage = tocPage,
                 totalPages = totalPages,
-                centerText = "${currentPage + 1}/$totalPages (${flatItems.size}건)",
-                onPrevious = { currentPage-- },
-                onNext = { currentPage++ },
+                centerText = "${tocPage + 1}/$totalPages (${flatItems.size}건)",
+                onPrevious = { tocPage-- },
+                onNext = { tocPage++ },
                 modifier = Modifier.padding(bottom = EreaderSpacing.L),
             )
     }

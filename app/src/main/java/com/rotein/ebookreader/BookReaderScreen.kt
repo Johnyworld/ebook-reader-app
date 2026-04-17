@@ -526,6 +526,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                 tocItems = tocItems,
                 bookTitle = book.metadata?.title ?: book.name,
                 currentChapterTitle = readingState.chapterTitle,
+                currentPage = readingState.currentPage,
                 totalBookPages = readingState.totalPages,
                 onNavigate = { href ->
                     if (isPdf) {
