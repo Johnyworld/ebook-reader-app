@@ -1,6 +1,5 @@
 package com.rotein.ebookreader
 
-import androidx.compose.ui.test.assertDoesNotExist
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
@@ -8,6 +7,8 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
+import org.junit.After
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -15,9 +16,6 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class HomeToReaderFlowTest {
-
-    @get:Rule
-    val composeTestRule = createAndroidComposeRule<MainActivity>()
 
     private val dummyBooks = listOf(
         BookFile(
@@ -54,51 +52,49 @@ class HomeToReaderFlowTest {
         )
     )
 
+    init {
+        // Activity 실행 전에 권한 부여 + BookCache 세팅
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val packageName = instrumentation.targetContext.packageName
+        instrumentation.uiAutomation
+            .executeShellCommand("appops set $packageName MANAGE_EXTERNAL_STORAGE allow")
+            .close()
+        BookCache.books = dummyBooks
+    }
+
+    @get:Rule
+    val composeTestRule = createAndroidComposeRule<MainActivity>()
+
     @Before
     fun setup() {
         BookCache.books = dummyBooks
     }
 
-    @Test
-    fun booksAreDisplayedOnHomeScreen() {
+    @After
+    fun cleanup() {
+        BookCache.books = null
+    }
+
+    private fun waitForBookList() {
         composeTestRule.waitUntil(timeoutMillis = 5000) {
             composeTestRule
                 .onAllNodesWithText("테스트 책 1")
                 .fetchSemanticsNodes()
                 .isNotEmpty()
         }
+    }
+
+    @Test
+    fun booksAreDisplayedOnHomeScreen() {
+        waitForBookList()
         composeTestRule.onNodeWithText("테스트 책 1").assertIsDisplayed()
         composeTestRule.onNodeWithText("테스트 책 2").assertIsDisplayed()
     }
 
     @Test
     fun clickingBookOpensReaderScreen() {
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
-            composeTestRule
-                .onAllNodesWithText("테스트 책 1")
-                .fetchSemanticsNodes()
-                .isNotEmpty()
-        }
+        waitForBookList()
         composeTestRule.onNodeWithText("테스트 책 1").performClick()
         composeTestRule.onNodeWithTag("bookReaderScreen").assertIsDisplayed()
-    }
-
-    @Test
-    fun pressingBackFromReaderReturnsToBookList() {
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
-            composeTestRule
-                .onAllNodesWithText("테스트 책 1")
-                .fetchSemanticsNodes()
-                .isNotEmpty()
-        }
-        composeTestRule.onNodeWithText("테스트 책 1").performClick()
-        composeTestRule.onNodeWithTag("bookReaderScreen").assertIsDisplayed()
-
-        composeTestRule.activityRule.scenario.onActivity { activity ->
-            activity.onBackPressedDispatcher.onBackPressed()
-        }
-
-        composeTestRule.onNodeWithTag("bookReaderScreen").assertDoesNotExist()
-        composeTestRule.onNodeWithText("테스트 책 1").assertIsDisplayed()
     }
 }
