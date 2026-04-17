@@ -25,7 +25,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import com.rotein.ebookreader.TocItem
@@ -46,19 +45,19 @@ internal fun TocPopup(
     onDismiss: () -> Unit
 ) {
     val flatItems = remember(tocItems) { flattenToc(tocItems) }
-    val screenHeightDp = LocalConfiguration.current.screenHeightDp
     val density = LocalDensity.current
-    val itemHeightDp = 49 // top(12) + bottom(12) padding + bodyLarge line height
-    var bottomBarHeightPx by remember { mutableStateOf(0) }
-    val bottomBarHeightDp = with(density) { bottomBarHeightPx.toDp().value.toInt() }
-    val itemsPerPage = maxOf(1, (screenHeightDp - 56 - bottomBarHeightDp) / itemHeightDp)
+    val itemHeightDp = 45 // Row(44.dp) + HorizontalDivider(1.dp)
+    var listHeightPx by remember { mutableStateOf(0) }
+    val listHeightDp = with(density) { listHeightPx.toDp().value.toInt() }
+    val itemsPerPage = if (listHeightDp > 0) maxOf(1, listHeightDp / itemHeightDp) else 20
     val totalPages = maxOf(1, (flatItems.size + itemsPerPage - 1) / itemsPerPage)
     var currentPage by remember { mutableStateOf(0) }
+    if (currentPage >= totalPages) currentPage = maxOf(0, totalPages - 1)
     val pageItems = flatItems.drop(currentPage * itemsPerPage).take(itemsPerPage)
 
     FullScreenPopup {
             PopupHeaderBar(title = "목차: $bookTitle", onBack = onDismiss)
-            Column(modifier = Modifier.weight(1f)) {
+            Column(modifier = Modifier.weight(1f).onSizeChanged { listHeightPx = it.height }) {
                 if (flatItems.isEmpty()) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Text("목차를 불러오는 중입니다.", style = MaterialTheme.typography.bodyMedium)
@@ -73,6 +72,7 @@ internal fun TocPopup(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
+                                .height(44.dp)
                                 .clickable { onNavigate(item.href) }
                                 .then(
                                     if (item.depth > 0) {
@@ -115,6 +115,8 @@ internal fun TocPopup(
                                 item.label,
                                 style = if (item.depth == 0) MaterialTheme.typography.bodyLarge else MaterialTheme.typography.bodyMedium,
                                 color = EreaderColors.Black,
+                                maxLines = 1,
+                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                                 modifier = Modifier
                                     .weight(1f)
                                     .padding(start = (item.depth * lineSpacing.value).dp)
@@ -130,7 +132,7 @@ internal fun TocPopup(
                 centerText = "${currentPage + 1}/$totalPages (${flatItems.size}건)",
                 onPrevious = { currentPage-- },
                 onNext = { currentPage++ },
-                modifier = Modifier.padding(bottom = EreaderSpacing.L).onSizeChanged { bottomBarHeightPx = it.height },
+                modifier = Modifier.padding(bottom = EreaderSpacing.L),
             )
     }
 }

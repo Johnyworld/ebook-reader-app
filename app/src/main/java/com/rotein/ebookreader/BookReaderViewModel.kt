@@ -141,6 +141,7 @@ class BookReaderViewModel(application: Application) : AndroidViewModel(applicati
         _contentState.value = ContentState(isLoading = true)
         _tocItems.value = emptyList()
         _pageCalcState.value = PageCalcState()
+        _searchState.value = SearchState()
 
         viewModelScope.launch {
             val record = withContext(Dispatchers.IO) { dao.getByPath(path) }
@@ -409,7 +410,7 @@ class BookReaderViewModel(application: Application) : AndroidViewModel(applicati
         _readingState.update {
             it.copy(
                 currentCfi = cfi,
-                chapterTitle = chapter,
+                chapterTitle = chapter.ifEmpty { it.chapterTitle },
                 currentPage = newPage,
                 readingProgress = newProgress,
                 prevProgress = progress
@@ -427,13 +428,29 @@ class BookReaderViewModel(application: Application) : AndroidViewModel(applicati
     }
 
     fun updatePageInfo(page: Int, total: Int) {
+        val chapterTitle = resolveChapterTitle(page)
         _readingState.update {
             val newTotal = if (total > 0) total else it.totalPages
             val progress = if (newTotal > 0) page.toFloat() / newTotal.toFloat() else it.readingProgress
-            it.copy(currentPage = page, totalPages = newTotal, readingProgress = progress)
+            it.copy(
+                currentPage = page,
+                totalPages = newTotal,
+                readingProgress = progress,
+                chapterTitle = chapterTitle ?: it.chapterTitle
+            )
         }
         val rs = _readingState.value
         if (rs.readingProgress > 0f) saveReadingProgress(rs.readingProgress)
+    }
+
+    private fun resolveChapterTitle(page: Int): String? {
+        val flat = flattenToc(_tocItems.value).filter { it.page > 0 }.sortedBy { it.page }
+        if (flat.isEmpty()) return null
+        var best: TocItem? = null
+        for (item in flat) {
+            if (item.page <= page) best = item else break
+        }
+        return best?.label
     }
 
     fun setLoading(loading: Boolean) {
@@ -444,8 +461,19 @@ class BookReaderViewModel(application: Application) : AndroidViewModel(applicati
         _contentState.update { it.copy(isContentRendered = rendered) }
     }
 
+    private var scanTimeoutJob: kotlinx.coroutines.Job? = null
+
     fun setScanning(scanning: Boolean) {
         _contentState.update { it.copy(isScanning = scanning) }
+        scanTimeoutJob?.cancel()
+        if (scanning) {
+            scanTimeoutJob = viewModelScope.launch {
+                delay(30_000)
+                if (_contentState.value.isScanning) {
+                    _contentState.update { it.copy(isScanning = false) }
+                }
+            }
+        }
     }
 
     fun setScanCacheValid(valid: Boolean) {

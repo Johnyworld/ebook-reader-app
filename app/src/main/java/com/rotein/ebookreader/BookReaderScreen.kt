@@ -376,7 +376,9 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                                 Text(
                                     readingState.chapterTitle.ifEmpty { "목차" },
                                     style = MaterialTheme.typography.bodySmall.copy(fontSize = 14.sp),
-                                    color = EreaderColors.Black
+                                    color = EreaderColors.Black,
+                                    maxLines = 1,
+                                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                                 )
                             }
                         }
