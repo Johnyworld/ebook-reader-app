@@ -3,7 +3,7 @@ package com.rotein.ebookreader
 import android.Manifest
 import android.content.Intent
 import android.graphics.Bitmap
-import android.net.Uri
+import androidx.core.net.toUri
 import android.os.Build
 import android.os.Environment
 import android.provider.Settings
@@ -39,6 +39,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -72,9 +73,9 @@ import kotlinx.coroutines.withContext
 @Composable
 fun AllBooksScreen(
     onBookClick: (BookFile) -> Unit,
+    modifier: Modifier = Modifier,
     onLoadComplete: () -> Unit = {},
-    refreshKey: Any? = Unit,
-    modifier: Modifier = Modifier
+    refreshKey: Any? = Unit
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -204,8 +205,8 @@ fun AllBooksScreen(
             onFilterChange = { filterMode = it }
         )
 
-        var currentPage by remember { mutableStateOf(0) }
-        var targetPage by remember { mutableStateOf(0) }
+        var currentPage by remember { mutableIntStateOf(0) }
+        var targetPage by remember { mutableIntStateOf(0) }
 
         // 필터/검색 변경 시 페이지 초기화
         LaunchedEffect(processedBooks.size) {
@@ -213,7 +214,7 @@ fun AllBooksScreen(
             targetPage = 0
         }
 
-        BoxWithConstraints(modifier = Modifier.weight(1f).fillMaxSize()) {
+        Box(modifier = Modifier.weight(1f).fillMaxSize()) {
             when {
                 !hasPermission -> {
                     Column(
@@ -226,7 +227,7 @@ fun AllBooksScreen(
                             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                                 val intent = Intent(
                                     Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
-                                    Uri.parse("package:${context.packageName}")
+                                    "package:${context.packageName}".toUri()
                                 )
                                 manageStorageLauncher.launch(intent)
                             } else {
@@ -250,9 +251,10 @@ fun AllBooksScreen(
                 }
 
                 else -> {
+                    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
                     val itemHeightDp = 81 // BookItem(80dp) + Divider(1dp)
                     val paginationBarHeightDp = 56
-                    val availableHeightDp = maxHeight.value.toInt() - paginationBarHeightDp
+                    val availableHeightDp = this.maxHeight.value.toInt() - paginationBarHeightDp
                     val itemsPerPage = (availableHeightDp / itemHeightDp).coerceAtLeast(1)
                     val totalPages = ((processedBooks.size + itemsPerPage - 1) / itemsPerPage).coerceAtLeast(1)
                     val safePage = currentPage.coerceIn(0, totalPages - 1)
@@ -326,6 +328,7 @@ fun AllBooksScreen(
                             onPrevious = { targetPage = safePage - 1 },
                             onNext = { targetPage = safePage + 1 }
                         )
+                    }
                     }
                 }
             }
@@ -478,7 +481,7 @@ private fun BookItem(
         ) {
             if (cover != null) {
                 Image(
-                    bitmap = cover!!.asImageBitmap(),
+                    bitmap = cover.asImageBitmap(),
                     contentDescription = null,
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop
