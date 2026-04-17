@@ -461,8 +461,19 @@ class BookReaderViewModel(application: Application) : AndroidViewModel(applicati
         _contentState.update { it.copy(isContentRendered = rendered) }
     }
 
+    private var scanTimeoutJob: kotlinx.coroutines.Job? = null
+
     fun setScanning(scanning: Boolean) {
         _contentState.update { it.copy(isScanning = scanning) }
+        scanTimeoutJob?.cancel()
+        if (scanning) {
+            scanTimeoutJob = viewModelScope.launch {
+                delay(30_000)
+                if (_contentState.value.isScanning) {
+                    _contentState.update { it.copy(isScanning = false) }
+                }
+            }
+        }
     }
 
     fun setScanCacheValid(valid: Boolean) {
