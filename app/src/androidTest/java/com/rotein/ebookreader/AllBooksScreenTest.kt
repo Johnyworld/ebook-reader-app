@@ -1,6 +1,6 @@
 package com.rotein.ebookreader
 
-import androidx.compose.ui.test.assertDoesNotExist
+import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
@@ -114,7 +114,7 @@ class AllBooksScreenTest {
 
         // "테스트 책 1"은 표시, "테스트 책 2"는 미표시
         composeTestRule.onNodeWithText("테스트 책 1").assertIsDisplayed()
-        composeTestRule.onNodeWithText("테스트 책 2").assertDoesNotExist()
+        composeTestRule.onNodeWithText("테스트 책 2").assertIsNotDisplayed()
     }
 
     @Test
