@@ -412,6 +412,7 @@ private fun TopBar(
                     onValueChange = onQueryChange,
                     modifier = Modifier
                         .weight(1f)
+                        .testTag("searchInput")
                         .focusRequester(focusRequester),
                     singleLine = true,
                     textStyle = MaterialTheme.typography.bodyLarge.copy(
