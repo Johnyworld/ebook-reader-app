@@ -448,7 +448,12 @@ class BookReaderViewModel(application: Application) : AndroidViewModel(applicati
         if (flat.isEmpty()) return null
         var best: TocItem? = null
         for (item in flat) {
-            if (item.page <= page) best = item else break
+            if (item.page <= page) {
+                // 같은 페이지에 여러 항목이 있으면 최상위(depth가 낮은) 항목 우선
+                if (best == null || item.page > best.page || item.depth < best.depth) {
+                    best = item
+                }
+            } else break
         }
         return best?.label
     }

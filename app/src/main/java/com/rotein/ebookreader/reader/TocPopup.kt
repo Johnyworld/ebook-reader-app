@@ -53,8 +53,15 @@ internal fun TocPopup(
     // 현재 읽고 있는 페이지 기준으로 현재 챕터의 flatItems 인덱스를 계산
     val currentChapterIndex = remember(flatItems, currentPage) {
         val paged = flatItems.withIndex().filter { it.value.page > 0 }
-        val match = paged.lastOrNull { it.value.page <= currentPage }
-        match?.index ?: -1
+        var best: IndexedValue<TocItem>? = null
+        for (iv in paged) {
+            if (iv.value.page <= currentPage) {
+                if (best == null || iv.value.page > best.value.page || iv.value.depth < best.value.depth) {
+                    best = iv
+                }
+            } else break
+        }
+        best?.index ?: -1
     }
 
     val density = LocalDensity.current
