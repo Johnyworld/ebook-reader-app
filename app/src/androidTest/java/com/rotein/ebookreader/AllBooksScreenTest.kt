@@ -116,6 +116,20 @@ class AllBooksScreenTest {
         composeTestRule.onNodeWithText("테스트 책 1").assertIsDisplayed()
         composeTestRule.onNodeWithText("테스트 책 2").assertDoesNotExist()
     }
+
+    @Test
+    fun sortByAuthorChangesOrder() {
+        waitForText("테스트 책 1")
+
+        // 정렬 드롭다운 클릭 (기본값은 "읽은순")
+        composeTestRule.onNodeWithText("읽은순").performClick()
+
+        // "작가순" 선택
+        composeTestRule.onNodeWithText("작가순").performClick()
+
+        // 정렬 후 저자가 표시되는지 확인
+        composeTestRule.onNodeWithText("가나다 저자").assertIsDisplayed()
+    }
 }
 
 @RunWith(AndroidJUnit4::class)
