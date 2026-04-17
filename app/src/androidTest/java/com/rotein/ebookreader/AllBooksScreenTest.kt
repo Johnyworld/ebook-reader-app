@@ -130,6 +130,30 @@ class AllBooksScreenTest {
         // 정렬 후 저자가 표시되는지 확인
         composeTestRule.onNodeWithText("가나다 저자").assertIsDisplayed()
     }
+
+    @Test
+    fun toggleFavoriteAndFilterByFavorite() {
+        waitForText("테스트 책 1")
+
+        // 첫 번째 책의 3-dot 메뉴 클릭
+        composeTestRule.onAllNodesWithContentDescription("메뉴")[0].performClick()
+
+        // "즐겨찾기" 메뉴 아이템 클릭
+        composeTestRule.onNodeWithText("즐겨찾기").performClick()
+
+        // 필터를 "즐겨찾기"로 변경
+        composeTestRule.onNodeWithText("전체보기").performClick()
+        composeTestRule.onNodeWithText("즐겨찾기").performClick()
+
+        // 즐겨찾기한 책만 표시
+        composeTestRule.waitUntil(timeoutMillis = 3000) {
+            composeTestRule
+                .onAllNodesWithText("테스트 책 1")
+                .fetchSemanticsNodes()
+                .isNotEmpty()
+        }
+        composeTestRule.onNodeWithText("테스트 책 1").assertIsDisplayed()
+    }
 }
 
 @RunWith(AndroidJUnit4::class)
