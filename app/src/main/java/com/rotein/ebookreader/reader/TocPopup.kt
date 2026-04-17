@@ -26,6 +26,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.rotein.ebookreader.TocItem
 import com.rotein.ebookreader.flattenToc
@@ -53,7 +54,8 @@ internal fun TocPopup(
     val totalPages = maxOf(1, (flatItems.size + itemsPerPage - 1) / itemsPerPage)
     var currentPage by remember { mutableStateOf(0) }
     if (currentPage >= totalPages) currentPage = maxOf(0, totalPages - 1)
-    val pageItems = flatItems.drop(currentPage * itemsPerPage).take(itemsPerPage)
+    val startIndex = currentPage * itemsPerPage
+    val pageItems = flatItems.drop(startIndex).take(itemsPerPage)
 
     FullScreenPopup {
             PopupHeaderBar(title = "목차: $bookTitle", onBack = onDismiss)
@@ -67,13 +69,14 @@ internal fun TocPopup(
                     val startPadding = EreaderSpacing.L
                     val gapWidth = EreaderSpacing.S
                     val lineSpacing = 16.dp
-                    pageItems.forEach { item ->
+                    pageItems.forEachIndexed { index, item ->
                         val lineColor = EreaderColors.Gray
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(44.dp)
                                 .clickable { onNavigate(item.href) }
+                                .testTag("tocItem_${startIndex + index}")
                                 .then(
                                     if (item.depth > 0) {
                                         Modifier.drawBehind {

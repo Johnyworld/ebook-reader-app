@@ -345,7 +345,8 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                                 )
                                 Text(
                                     "${readingState.currentPage} / ${readingState.totalPages}",
-                                    style = MaterialTheme.typography.bodyMedium
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    modifier = Modifier.testTag("pageInfoText")
                                 )
                             }
                             Spacer(Modifier.height(EreaderSpacing.S))
@@ -363,6 +364,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                                 modifier = Modifier
                                     .align(Alignment.CenterHorizontally)
                                     .clickable { vm.setShowTocPopup(true) }
+                                    .testTag("tocButton")
                                     .border(1.dp, EreaderColors.Black, RoundedCornerShape(4.dp))
                                     .padding(horizontal = EreaderSpacing.S, vertical = EreaderSpacing.XS),
                                 verticalAlignment = Alignment.CenterVertically,
