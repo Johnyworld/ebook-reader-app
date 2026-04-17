@@ -101,6 +101,20 @@ if (_config.savedCfi.length > 0) {
 _epub.pendingPrevChapter = false;
 _epub.prevTransition = false;
 
+window._isAtChapterStart = function() {
+    var manager = _epub.rendition.manager;
+    if (manager && manager.container && manager.layout) {
+        var scrollLeft = manager.container.scrollLeft;
+        var delta = manager.layout.delta;
+        if (scrollLeft < delta * 0.5) {
+            var loc = _epub.rendition.currentLocation();
+            var currentIdx = (loc && loc.start) ? loc.start.index : -1;
+            return currentIdx > 0;
+        }
+    }
+    return false;
+};
+
 window._prev = function() {
     var manager = _epub.rendition.manager;
     if (manager && manager.container && manager.layout) {

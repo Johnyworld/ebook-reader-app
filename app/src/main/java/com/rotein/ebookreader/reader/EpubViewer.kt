@@ -219,20 +219,23 @@ internal fun EpubViewer(
                     val doPrev = {
                         val wv = webViewRef.get()
                         val ov = overlayRef.get()
-                        if (wv != null && ov != null && wv.width > 0 && wv.height > 0) {
-                            val bmp = Bitmap.createBitmap(wv.width, wv.height, Bitmap.Config.RGB_565)
-                            wv.draw(Canvas(bmp))
-                            ov.background = BitmapDrawable(ctx.resources, bmp)
-                            // 안전장치: 콜백이 오지 않을 경우 500ms 후 오버레이 제거
-                            val runnable = Runnable {
-                                prevSafetyRef.set(null)
-                                (ov.background as? BitmapDrawable)?.bitmap?.recycle()
-                                ov.background = null
+                        wv?.evaluateJavascript("window._isAtChapterStart()") { result ->
+                            val isChapterStart = result?.trim() == "true"
+                            if (isChapterStart && wv.width > 0 && wv.height > 0 && ov != null) {
+                                val bmp = Bitmap.createBitmap(wv.width, wv.height, Bitmap.Config.RGB_565)
+                                wv.draw(Canvas(bmp))
+                                ov.background = BitmapDrawable(ctx.resources, bmp)
+                                // 안전장치: 콜백이 오지 않을 경우 500ms 후 오버레이 제거
+                                val runnable = Runnable {
+                                    prevSafetyRef.set(null)
+                                    (ov.background as? BitmapDrawable)?.bitmap?.recycle()
+                                    ov.background = null
+                                }
+                                prevSafetyRef.getAndSet(runnable)?.let { wv.removeCallbacks(it) }
+                                wv.postDelayed(runnable, 500)
                             }
-                            prevSafetyRef.getAndSet(runnable)?.let { wv.removeCallbacks(it) }
-                            wv.postDelayed(runnable, 500)
+                            wv.evaluateJavascript("window._prev()", null)
                         }
-                        wv?.evaluateJavascript("window._prev()", null)
                     }
                     val overlay = android.view.View(ctx).apply {
                         var isLongPress = false
