@@ -234,7 +234,10 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                 onSearchResultsPartial = { json -> vm.onSearchResultsPartial(json) },
                 onSearchComplete = { vm.onSearchComplete() },
                 onNavigationComplete = {
-                    vm.setLoading(false)
+                    val wv = viewerWebView.value
+                    wv?.visibility = android.view.View.VISIBLE
+                    // VISIBLE 전환 후 Android compositor가 최소 한 프레임을 그릴 때까지 대기
+                    wv?.postDelayed({ vm.setLoading(false) }, 100) ?: vm.setLoading(false)
                     onNavigationCompleteRef.value?.invoke()
                     onNavigationCompleteRef.value = null
                 },

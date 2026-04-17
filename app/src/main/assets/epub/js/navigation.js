@@ -76,7 +76,13 @@ function _finishNavigation() {
             Android.onLocationChanged(0, loc.start.cfi, "");
         }
     } catch(e) {}
-    Android.onNavigationComplete();
+    // 브라우저가 실제로 화면에 paint를 마친 뒤 콜백을 보낸다.
+    // requestAnimationFrame 2회 중첩: 1회째는 다음 프레임 준비, 2회째는 해당 프레임 paint 완료 후 실행.
+    requestAnimationFrame(function() {
+        requestAnimationFrame(function() {
+            Android.onNavigationComplete();
+        });
+    });
     if (_epub.searchHighlightQuery) { setTimeout(_applySearchHighlights, 50); }
 }
 
@@ -89,7 +95,7 @@ if (_config.savedCfi.length > 0) {
         }, 0);
     }).catch(_finishNavigation);
 } else {
-    _epub.rendition.display();
+    _epub.rendition.display().then(_finishNavigation).catch(_finishNavigation);
 }
 
 _epub.pendingPrevChapter = false;

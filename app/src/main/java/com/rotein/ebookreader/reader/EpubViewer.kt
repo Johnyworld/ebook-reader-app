@@ -177,6 +177,9 @@ internal fun EpubViewer(
                         settings.useWideViewPort = false
                         isHorizontalScrollBarEnabled = false
                         isVerticalScrollBarEnabled = false
+                        // 초기 로딩 중 epub.js가 페이지를 잡기 전의 중간 상태가 보이지 않도록
+                        // INVISIBLE로 시작하고, onNavigationComplete에서 VISIBLE로 전환한다.
+                        visibility = View.INVISIBLE
                         webViewClient = WebViewClient()
                         addJavascriptInterface(EpubBridge(onLocationUpdate, onTocLoaded, onContentRendered, onChapterChanged, onTocReady, onPageInfoChanged, onDebugInfo, onScanStart, onScanComplete, onSearchResultsPartial, onSearchComplete, selectionOnTextSelected, selectionOnSelectionTapped,
                             onAutoSelectReadyCallback = autoSelect@{ cssX, cssY ->
