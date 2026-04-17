@@ -82,4 +82,23 @@ class HomeToReaderFlowTest {
         composeTestRule.onNodeWithText("테스트 책 1").performClick()
         composeTestRule.onNodeWithTag("bookReaderScreen").assertIsDisplayed()
     }
+
+    @Test
+    fun pressingBackFromReaderReturnsToBookList() {
+        composeTestRule.waitUntil(timeoutMillis = 5000) {
+            composeTestRule
+                .onAllNodesWithText("테스트 책 1")
+                .fetchSemanticsNodes()
+                .isNotEmpty()
+        }
+        composeTestRule.onNodeWithText("테스트 책 1").performClick()
+        composeTestRule.onNodeWithTag("bookReaderScreen").assertIsDisplayed()
+
+        composeTestRule.activityRule.scenario.onActivity { activity ->
+            activity.onBackPressedDispatcher.onBackPressed()
+        }
+
+        composeTestRule.onNodeWithTag("bookReaderScreen").assertDoesNotExist()
+        composeTestRule.onNodeWithText("테스트 책 1").assertIsDisplayed()
+    }
 }
