@@ -58,6 +58,7 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -411,6 +412,7 @@ private fun TopBar(
                     onValueChange = onQueryChange,
                     modifier = Modifier
                         .weight(1f)
+                        .testTag("searchInput")
                         .focusRequester(focusRequester),
                     singleLine = true,
                     textStyle = MaterialTheme.typography.bodyLarge.copy(
@@ -463,6 +465,7 @@ private fun BookItem(
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onClick() }
+            .testTag("bookItem_${book.name}")
             .padding(start = EreaderSpacing.L, top = 10.dp, bottom = 10.dp, end = EreaderSpacing.XS),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(EreaderSpacing.M)

@@ -50,6 +50,7 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.rotein.ebookreader.reader.BookmarkPopup
@@ -174,7 +175,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
         }
     }
 
-    Box(modifier = modifier.fillMaxSize().clipToBounds()) {
+    Box(modifier = modifier.fillMaxSize().clipToBounds().testTag("bookReaderScreen")) {
         when (book.extension.lowercase()) {
             "txt"  -> TxtViewer(book.path, onCenterTap)
             "epub" -> EpubViewer(
@@ -293,7 +294,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
         // 로딩 오버레이
         if (contentState.isLoading) {
             Box(
-                modifier = Modifier.fillMaxSize().background(EreaderColors.White).clickable(enabled = false) {},
+                modifier = Modifier.fillMaxSize().background(EreaderColors.White).clickable(enabled = false) {}.testTag("readerLoading"),
                 contentAlignment = Alignment.Center
             ) {
                 CircularProgressIndicator(color = EreaderColors.Black)
@@ -344,7 +345,8 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                                 )
                                 Text(
                                     "${readingState.currentPage} / ${readingState.totalPages}",
-                                    style = MaterialTheme.typography.bodyMedium
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    modifier = Modifier.testTag("pageInfoText")
                                 )
                             }
                             Spacer(Modifier.height(EreaderSpacing.S))
@@ -362,6 +364,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                                 modifier = Modifier
                                     .align(Alignment.CenterHorizontally)
                                     .clickable { vm.setShowTocPopup(true) }
+                                    .testTag("tocButton")
                                     .border(1.dp, EreaderColors.Black, RoundedCornerShape(4.dp))
                                     .padding(horizontal = EreaderSpacing.S, vertical = EreaderSpacing.XS),
                                 verticalAlignment = Alignment.CenterVertically,
