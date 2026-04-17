@@ -92,6 +92,9 @@ if (_config.savedCfi.length > 0) {
     _epub.rendition.display();
 }
 
+_epub.pendingPrevChapter = false;
+_epub.prevTransition = false;
+
 window._prev = function() {
     var manager = _epub.rendition.manager;
     if (manager && manager.container && manager.layout) {
@@ -101,7 +104,13 @@ window._prev = function() {
         // 서브픽셀 오차로 scrollLeft가 0보다 약간 클 수 있다.
         // epub.js는 scrollLeft > 0 이면 같은 챕터 내 이전 페이지로 판단하므로,
         // 0으로 보정하여 이전 챕터로 정상 전환되게 한다.
-        if (scrollLeft > 0 && scrollLeft < delta * 0.5) {
+        if (scrollLeft < delta * 0.5) {
+            var loc = _epub.rendition.currentLocation();
+            var currentIdx = (loc && loc.start) ? loc.start.index : -1;
+            if (currentIdx > 0) {
+                _epub.pendingPrevChapter = true;
+                _epub.prevTransition = true;
+            }
             manager.container.scrollLeft = 0;
         }
     }

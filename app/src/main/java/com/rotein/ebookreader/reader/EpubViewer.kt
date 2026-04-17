@@ -3,6 +3,9 @@ package com.rotein.ebookreader.reader
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.drawable.BitmapDrawable
 import android.os.SystemClock
 import android.util.Xml
 import android.view.ActionMode
@@ -80,6 +83,7 @@ internal fun EpubViewer(
     val selectionActive = remember { java.util.concurrent.atomic.AtomicBoolean(false) }
     val webViewRef = remember { java.util.concurrent.atomic.AtomicReference<android.webkit.WebView?>(null) }
     val overlayRef = remember { java.util.concurrent.atomic.AtomicReference<android.view.View?>(null) }
+    val prevSafetyRef = remember { java.util.concurrent.atomic.AtomicReference<Runnable?>(null) }
     val onHighlightLongPressRef = remember { java.util.concurrent.atomic.AtomicReference<((Long, Float, Float, Float) -> Unit)?>(null) }
     onHighlightLongPressRef.set(onHighlightLongPress)
     val onMemoLongPressRef = remember { java.util.concurrent.atomic.AtomicReference<((Long, Float, Float, Float) -> Unit)?>(null) }
@@ -197,11 +201,36 @@ internal fun EpubViewer(
                             },
                             onNavigationCompleteCallback = {
                                 onNavigationComplete()
+                            },
+                            onPrevTransitionDoneCallback = {
+                                val wv = webViewRef.get()
+                                val ov = overlayRef.get()
+                                prevSafetyRef.getAndSet(null)?.let { wv?.removeCallbacks(it) }
+                                (ov?.background as? BitmapDrawable)?.bitmap?.recycle()
+                                ov?.background = null
                             }
                         ), "Android")
                     }
                     webViewRef.set(webView)
                     onWebViewCreated(webView)
+                    val doPrev = {
+                        val wv = webViewRef.get()
+                        val ov = overlayRef.get()
+                        if (wv != null && ov != null && wv.width > 0 && wv.height > 0) {
+                            val bmp = Bitmap.createBitmap(wv.width, wv.height, Bitmap.Config.RGB_565)
+                            wv.draw(Canvas(bmp))
+                            ov.background = BitmapDrawable(ctx.resources, bmp)
+                            // 안전장치: 콜백이 오지 않을 경우 500ms 후 오버레이 제거
+                            val runnable = Runnable {
+                                prevSafetyRef.set(null)
+                                (ov.background as? BitmapDrawable)?.bitmap?.recycle()
+                                ov.background = null
+                            }
+                            prevSafetyRef.getAndSet(runnable)?.let { wv.removeCallbacks(it) }
+                            wv.postDelayed(runnable, 500)
+                        }
+                        wv?.evaluateJavascript("window._prev()", null)
+                    }
                     val overlay = android.view.View(ctx).apply {
                         var isLongPress = false
                         val gestureDetector = GestureDetector(ctx, object : GestureDetector.SimpleOnGestureListener() {
@@ -254,23 +283,23 @@ internal fun EpubViewer(
                                 val h = this@apply.height.toFloat()
                                 when (pageFlipRef.get()) {
                                     ReaderPageFlip.LR_PREV_NEXT -> when {
-                                        x < w / 3f -> webView.evaluateJavascript("window._prev()", null)
+                                        x < w / 3f -> doPrev()
                                         x > w * 2f / 3f -> webView.evaluateJavascript("window._next()", null)
                                         else -> onCenterTap()
                                     }
                                     ReaderPageFlip.LR_NEXT_PREV -> when {
                                         x < w / 3f -> webView.evaluateJavascript("window._next()", null)
-                                        x > w * 2f / 3f -> webView.evaluateJavascript("window._prev()", null)
+                                        x > w * 2f / 3f -> doPrev()
                                         else -> onCenterTap()
                                     }
                                     ReaderPageFlip.TB_PREV_NEXT -> when {
-                                        y < h / 3f -> webView.evaluateJavascript("window._prev()", null)
+                                        y < h / 3f -> doPrev()
                                         y > h * 2f / 3f -> webView.evaluateJavascript("window._next()", null)
                                         else -> onCenterTap()
                                     }
                                     ReaderPageFlip.TB_NEXT_PREV -> when {
                                         y < h / 3f -> webView.evaluateJavascript("window._next()", null)
-                                        y > h * 2f / 3f -> webView.evaluateJavascript("window._prev()", null)
+                                        y > h * 2f / 3f -> doPrev()
                                         else -> onCenterTap()
                                     }
                                 }

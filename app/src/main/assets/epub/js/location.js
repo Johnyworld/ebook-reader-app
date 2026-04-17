@@ -127,6 +127,17 @@ window._isBookmarkedInRange = function(cfiListJson) {
 _epub.waitingForFonts = false;
 
 _epub.rendition.on("relocated", function(location) {
+    // 이전 챕터 전환 시 브라우저가 첫 페이지를 paint하기 전에 마지막 페이지로 스크롤한다.
+    if (_epub.pendingPrevChapter) {
+        _epub.pendingPrevChapter = false;
+        try {
+            var m = _epub.rendition.manager;
+            if (m && m.container && m.layout) {
+                var target = m.container.scrollWidth - m.layout.delta;
+                if (target > 0) m.container.scrollLeft = target;
+            }
+        } catch(e) {}
+    }
     if (!_epub.rendered || _epub.waitingForFonts) {
         _epub.rendered = true;
         if (!_epub.waitingForFonts) {
@@ -183,6 +194,10 @@ _epub.rendition.on("relocated", function(location) {
                 Android.onAutoSelectReady(pos.x, pos.y);
             }
         });
+    }
+    if (_epub.prevTransition) {
+        _epub.prevTransition = false;
+        try { Android.onPrevTransitionDone(); } catch(e) {}
     }
 });
 
