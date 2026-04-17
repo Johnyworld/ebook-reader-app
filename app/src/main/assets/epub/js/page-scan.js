@@ -83,33 +83,107 @@ function computeVisualPages() {
             try {
                 var tocNav = _epub.book.navigation ? (_epub.book.navigation.toc || []) : [];
                 var spineItemsForToc = _epub.book.spine ? (_epub.book.spine.items || []) : [];
+
+                function findSpineIndex(hrefBase) {
+                    for (var si = 0; si < spineItemsForToc.length; si++) {
+                        var siHref = (spineItemsForToc[si].href || '').split('?')[0];
+                        if (siHref === hrefBase || siHref.endsWith('/' + hrefBase) || hrefBase.endsWith('/' + siHref)) {
+                            return si;
+                        }
+                    }
+                    return -1;
+                }
+
+                // fragment가 있는 href의 정확한 페이지를 비동기로 계산
                 function buildTocWithPages(tocItems, depth) {
                     var result = [];
                     for (var ti = 0; ti < tocItems.length; ti++) {
                         var tocItem = tocItems[ti];
                         var hrefBase = tocItem.href.split('#')[0];
-                        var page = 0;
-                        for (var si = 0; si < spineItemsForToc.length; si++) {
-                            var siHref = (spineItemsForToc[si].href || '').split('?')[0];
-                            if (siHref === hrefBase || siHref.endsWith('/' + hrefBase) || hrefBase.endsWith('/' + siHref)) {
-                                page = (_epub.spinePageOffsets[si] || 0) + 1;
-                                break;
-                            }
-                        }
+                        var si = findSpineIndex(hrefBase);
+                        var page = si >= 0 ? (_epub.spinePageOffsets[si] || 0) + 1 : 0;
                         result.push({
                             label: tocItem.label.trim(),
                             href: tocItem.href,
                             page: page,
                             depth: depth,
+                            spineIndex: si,
                             subitems: tocItem.subitems ? buildTocWithPages(tocItem.subitems, depth + 1) : []
                         });
                     }
                     return result;
                 }
-                Android.onTocReady(JSON.stringify(buildTocWithPages(tocNav, 0)));
-            } catch(e) {}
-            _epub.pendingLocation = null;
-            _cleanupScan();
+
+                var tocWithPages = buildTocWithPages(tocNav, 0);
+
+                // fragment가 있는 항목들의 정확한 페이지를 scanRendition으로 계산
+                function flattenForResolve(items) {
+                    var arr = [];
+                    for (var j = 0; j < items.length; j++) {
+                        if (items[j].href.indexOf('#') >= 0 && items[j].spineIndex >= 0) {
+                            arr.push(items[j]);
+                        }
+                        if (items[j].subitems) {
+                            arr = arr.concat(flattenForResolve(items[j].subitems));
+                        }
+                    }
+                    return arr;
+                }
+
+                var toResolve = flattenForResolve(tocWithPages);
+                var ri = 0;
+
+                function resolveNext() {
+                    if (ri >= toResolve.length) {
+                        // spineIndex 필드 제거 후 전송
+                        function cleanToc(items) {
+                            return items.map(function(it) {
+                                var o = { label: it.label, href: it.href, page: it.page, depth: it.depth };
+                                if (it.subitems && it.subitems.length > 0) o.subitems = cleanToc(it.subitems);
+                                return o;
+                            });
+                        }
+                        Android.onTocReady(JSON.stringify(cleanToc(tocWithPages)));
+                        finishToc();
+                        return;
+                    }
+                    var entry = toResolve[ri];
+                    scanRendition.display(entry.href).then(function() {
+                        try {
+                            var pg = 1;
+                            var sDelta = scanRendition.manager && scanRendition.manager.layout ? scanRendition.manager.layout.delta : 0;
+                            if (sDelta > 0 && scanRendition.manager.container) {
+                                var sScrollLeft = scanRendition.manager.container.scrollLeft;
+                                pg = Math.round(sScrollLeft / sDelta) + 1;
+                            } else {
+                                var cfiLoc = scanRendition.currentLocation();
+                                pg = (cfiLoc && cfiLoc.start && cfiLoc.start.displayed) ? cfiLoc.start.displayed.page : 1;
+                            }
+                            entry.page = (_epub.spinePageOffsets[entry.spineIndex] || 0) + pg;
+                        } catch(e) {}
+                        ri++;
+                        resolveNext();
+                    }).catch(function() {
+                        ri++;
+                        resolveNext();
+                    });
+                }
+
+                function finishToc() {
+                    _epub.pendingLocation = null;
+                    _cleanupScan();
+                }
+
+                if (toResolve.length > 0) {
+                    resolveNext();
+                } else {
+                    Android.onTocReady(JSON.stringify(tocWithPages));
+                    finishToc();
+                }
+            } catch(e) {
+                _epub.pendingLocation = null;
+                _cleanupScan();
+            }
             var _scanCurrentPage = 0;
             try {
                 var loc = _epub.rendition.currentLocation();
