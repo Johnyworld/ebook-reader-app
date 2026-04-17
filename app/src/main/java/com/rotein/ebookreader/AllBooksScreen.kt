@@ -108,20 +108,6 @@ fun AllBooksScreen(
     var hiddenBooks by remember { mutableStateOf<Set<String>>(emptySet()) }
     var covers by remember { mutableStateOf<Map<String, Bitmap?>>(emptyMap()) }
 
-    // 전체 도서 커버 백그라운드 로드
-    LaunchedEffect(books) {
-        withContext(Dispatchers.IO) {
-            books.forEach { book ->
-                if (book.path !in covers) {
-                    val bitmap = BookCoverLoader.getCached(book.path)
-                        ?: BookCoverLoader.load(book.path, book.extension)
-                    withContext(Dispatchers.Main) {
-                        covers = covers + (book.path to bitmap)
-                    }
-                }
-            }
-        }
-    }
 
     var readingProgressMap by remember { mutableStateOf<Map<String, Float>>(emptyMap()) }
 
@@ -176,16 +162,28 @@ fun AllBooksScreen(
 
     LaunchedEffect(hasPermission) {
         if (hasPermission) {
-            if (BookCache.books != null) {
-                onLoadComplete()
+            val bookList = if (BookCache.books != null) {
+                BookCache.books!!
             } else {
                 isLoading = true
                 val scanned = withContext(Dispatchers.IO) { FileScanner.scanBooks(context) }
                 BookCache.books = scanned
-                books = scanned
                 isLoading = false
-                onLoadComplete()
+                scanned
             }
+            books = bookList
+            // 스플래시 동안 커버를 미리 로드한 후 완료 통지
+            val newCovers = withContext(Dispatchers.IO) {
+                val result = mutableMapOf<String, Bitmap?>()
+                bookList.forEach { book ->
+                    val bitmap = BookCoverLoader.getCached(book.path)
+                        ?: BookCoverLoader.load(book.path, book.extension)
+                    result[book.path] = bitmap
+                }
+                result
+            }
+            covers = covers + newCovers
+            onLoadComplete()
         } else {
             onLoadComplete()
         }
@@ -584,13 +582,6 @@ private fun BookItem(
             }
         }
 
-        if (cover == null) {
-            Text(
-                text = book.extension.uppercase(),
-                style = MaterialTheme.typography.labelSmall,
-                color = EreaderColors.Black
-            )
-        }
 
         val menuItems = buildList {
             if (onToggleFavorite != null) {
