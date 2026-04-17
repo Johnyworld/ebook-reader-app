@@ -1,54 +1,44 @@
 package com.rotein.ebookreader
 
 import android.content.Context
-import android.provider.MediaStore
+import android.os.Environment
+import java.io.File
 
 object FileScanner {
 
     private val SUPPORTED_EXTENSIONS = setOf("epub", "txt", "mobi", "pdf")
 
-    fun scanBooks(context: Context): List<BookFile> {
+    fun scanBooks(@Suppress("UNUSED_PARAMETER") context: Context): List<BookFile> {
+        val root = Environment.getExternalStorageDirectory()
         val books = mutableListOf<BookFile>()
-        val uri = MediaStore.Files.getContentUri("external")
+        scanDirectory(root, books)
+        return books
+    }
 
-        val projection = arrayOf(
-            MediaStore.Files.FileColumns.DISPLAY_NAME,
-            MediaStore.Files.FileColumns.DATA,
-            MediaStore.Files.FileColumns.SIZE,
-            MediaStore.Files.FileColumns.DATE_ADDED,
-            MediaStore.Files.FileColumns.DATE_MODIFIED
-        )
-
-        val selectionParts = SUPPORTED_EXTENSIONS.map {
-            "${MediaStore.Files.FileColumns.DISPLAY_NAME} LIKE ?"
-        }
-        val selection = selectionParts.joinToString(" OR ")
-        val selectionArgs = SUPPORTED_EXTENSIONS.map { "%.${it}" }.toTypedArray()
-
-        context.contentResolver.query(
-            uri, projection, selection, selectionArgs, null
-        )?.use { cursor ->
-            val nameCol = cursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns.DISPLAY_NAME)
-            val pathCol = cursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns.DATA)
-            val sizeCol = cursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns.SIZE)
-            val dateAddedCol = cursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns.DATE_ADDED)
-            val dateModifiedCol = cursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns.DATE_MODIFIED)
-
-            while (cursor.moveToNext()) {
-                val name = cursor.getString(nameCol) ?: continue
-                val path = cursor.getString(pathCol) ?: continue
-                val size = cursor.getLong(sizeCol)
-                val dateAdded = cursor.getLong(dateAddedCol)
-                val dateModified = cursor.getLong(dateModifiedCol)
-                val ext = name.substringAfterLast('.', "").lowercase()
+    private fun scanDirectory(dir: File, result: MutableList<BookFile>) {
+        val files = dir.listFiles() ?: return
+        for (file in files) {
+            if (file.isDirectory) {
+                if (file.name.startsWith(".")) continue
+                scanDirectory(file, result)
+            } else {
+                val ext = file.extension.lowercase()
                 if (ext in SUPPORTED_EXTENSIONS) {
-                    val metadata = extractMetadata(path, ext)
-                    books.add(BookFile(name, path, ext, size, dateAdded, dateModified, metadata))
+                    val metadata = extractMetadata(file.absolutePath, ext)
+                    result.add(
+                        BookFile(
+                            name = file.name,
+                            path = file.absolutePath,
+                            extension = ext,
+                            size = file.length(),
+                            dateAdded = file.lastModified() / 1000,
+                            dateModified = file.lastModified() / 1000,
+                            metadata = metadata
+                        )
+                    )
                 }
             }
         }
-
-        return books
     }
 
     private fun extractMetadata(path: String, extension: String): BookMetadata? = when (extension) {

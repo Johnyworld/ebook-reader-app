@@ -186,6 +186,8 @@ fun AllBooksScreen(
                 isLoading = false
                 onLoadComplete()
             }
+        } else {
+            onLoadComplete()
         }
     }
 
