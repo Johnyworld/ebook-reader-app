@@ -166,4 +166,71 @@ class ViewerNavigationTest {
             "EPUB prev page failed: pageB($pageB) + 1 != pageA($pageA)"
         }
     }
+
+    @Test
+    fun pdfTocNavigationAndPrevPage() {
+        testFilePath = copyAssetToStorage("test.pdf")
+        BookCache.books = listOf(
+            BookFile(
+                name = "test.pdf",
+                path = testFilePath,
+                extension = "pdf",
+                size = File(testFilePath).length(),
+                dateAdded = 1000L,
+                dateModified = 1000L,
+                metadata = BookMetadata(
+                    title = "테스트 PDF",
+                    author = "테스트 저자",
+                    language = null,
+                    publisher = null,
+                    publishedDate = null,
+                    description = null
+                )
+            )
+        )
+
+        // Enter reader
+        waitForText("테스트 PDF")
+        composeTestRule.onNodeWithText("테스트 PDF").performClick()
+        waitForTag("bookReaderScreen")
+
+        // Wait for content to load
+        waitForTagToDisappear("readerLoading")
+        Thread.sleep(3000)
+
+        // Open menu
+        tapCenter()
+
+        // Open TOC
+        waitForTag("tocButton")
+        composeTestRule.onNodeWithTag("tocButton").performClick()
+
+        // Tap 3rd chapter
+        waitForTag("tocItem_2")
+        composeTestRule.onNodeWithTag("tocItem_2").performClick()
+        Thread.sleep(2000)
+
+        // Open menu → read page A
+        tapCenter()
+        waitForTag("pageInfoText")
+        val pageA = getCurrentPage()
+
+        // Close menu
+        tapCenter()
+        Thread.sleep(300)
+
+        // Previous page
+        tapPrevPage()
+        Thread.sleep(1000)
+
+        // Open menu → read page B
+        tapCenter()
+        waitForTag("pageInfoText")
+        val pageB = getCurrentPage()
+
+        // Assert B + 1 == A
+        assert(pageB + 1 == pageA) {
+            "PDF prev page failed: pageB($pageB) + 1 != pageA($pageA)"
+        }
+    }
 }
