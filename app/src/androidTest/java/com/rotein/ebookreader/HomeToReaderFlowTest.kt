@@ -70,4 +70,16 @@ class HomeToReaderFlowTest {
         composeTestRule.onNodeWithText("테스트 책 1").assertIsDisplayed()
         composeTestRule.onNodeWithText("테스트 책 2").assertIsDisplayed()
     }
+
+    @Test
+    fun clickingBookOpensReaderScreen() {
+        composeTestRule.waitUntil(timeoutMillis = 5000) {
+            composeTestRule
+                .onAllNodesWithText("테스트 책 1")
+                .fetchSemanticsNodes()
+                .isNotEmpty()
+        }
+        composeTestRule.onNodeWithText("테스트 책 1").performClick()
+        composeTestRule.onNodeWithTag("bookReaderScreen").assertIsDisplayed()
+    }
 }
