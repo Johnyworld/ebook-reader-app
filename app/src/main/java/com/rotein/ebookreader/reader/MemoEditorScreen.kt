@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -30,6 +29,7 @@ import com.rotein.ebookreader.R
 import com.rotein.ebookreader.ui.components.FullScreenPopup
 import com.rotein.ebookreader.ui.components.PopupHeaderBar
 import com.rotein.ebookreader.ui.theme.EreaderColors
+import com.rotein.ebookreader.ui.theme.EreaderFontSize
 import com.rotein.ebookreader.ui.theme.EreaderSpacing
 
 @Composable
@@ -58,7 +58,7 @@ internal fun MemoEditorScreen(
                 if (selectedText.isNotEmpty()) {
                     Text(
                         selectedText,
-                        style = MaterialTheme.typography.bodyMedium,
+                        style = EreaderFontSize.M,
                         maxLines = 3,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier
@@ -75,11 +75,11 @@ internal fun MemoEditorScreen(
                         .weight(1f)
                         .border(1.dp, EreaderColors.Gray, RoundedCornerShape(4.dp))
                         .padding(EreaderSpacing.M),
-                    textStyle = MaterialTheme.typography.bodyMedium.copy(color = EreaderColors.Black),
+                    textStyle = EreaderFontSize.M.copy(color = EreaderColors.Black),
                     decorationBox = { inner ->
                         Box {
                             if (note.isEmpty()) {
-                                Text(stringResource(R.string.memo_placeholder), style = MaterialTheme.typography.bodyMedium, color = EreaderColors.Gray)
+                                Text(stringResource(R.string.memo_placeholder), style = EreaderFontSize.M, color = EreaderColors.Gray)
                             }
                             inner()
                         }

@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -31,6 +30,7 @@ import com.rotein.ebookreader.ui.components.FullScreenPopup
 import com.rotein.ebookreader.ui.components.PaginationBar
 import com.rotein.ebookreader.ui.components.PopupHeaderBar
 import com.rotein.ebookreader.ui.theme.EreaderColors
+import com.rotein.ebookreader.ui.theme.EreaderFontSize
 import com.rotein.ebookreader.ui.theme.EreaderSpacing
 import java.util.Locale
 
@@ -87,7 +87,7 @@ internal fun <T : AnnotationItem> AnnotationListPopup(
         Box(modifier = Modifier.weight(1f)) {
             if (items.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text(emptyText, style = MaterialTheme.typography.bodyMedium)
+                    Text(emptyText, style = EreaderFontSize.M)
                 }
             } else {
                 Column(modifier = Modifier.fillMaxSize()) {

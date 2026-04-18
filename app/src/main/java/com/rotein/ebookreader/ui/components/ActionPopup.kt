@@ -82,7 +82,7 @@ fun ActionPopup(
             ) {
                 actions.forEachIndexed { index, action ->
                     TextButton(onClick = action.onClick) {
-                        Text(action.label, color = EreaderColors.Black, fontSize = EreaderFontSize.M)
+                        Text(action.label, color = EreaderColors.Black, style = EreaderFontSize.M)
                     }
                     if (index < actions.lastIndex) {
                         Box(Modifier.width(1.dp).height(20.dp).background(EreaderColors.Black))

@@ -19,7 +19,6 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -49,6 +48,7 @@ import com.rotein.ebookreader.ui.components.EreaderTabBar
 import com.rotein.ebookreader.ui.components.FullScreenPopup
 import com.rotein.ebookreader.ui.components.PaginationBar
 import com.rotein.ebookreader.ui.theme.EreaderColors
+import com.rotein.ebookreader.ui.theme.EreaderFontSize
 import com.rotein.ebookreader.ui.theme.EreaderSpacing
 import java.io.File
 
@@ -161,7 +161,7 @@ internal fun FontLayerPopup(
                 IconButton(onClick = onDismiss) {
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.close))
                 }
-                Text(stringResource(R.string.font_label), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                Text(stringResource(R.string.font_label), style = EreaderFontSize.L, modifier = Modifier.weight(1f))
                 if (selectedTab == 0) {
                     EreaderDropdownMenu(
                         items = FontSortOrder.entries.toList(),
@@ -191,7 +191,7 @@ internal fun FontLayerPopup(
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Text(
                             stringResource(if (selectedTab == 0) R.string.font_none else R.string.font_none_device),
-                            style = MaterialTheme.typography.bodyMedium
+                            style = EreaderFontSize.M
                         )
                     }
                 } else {
@@ -216,7 +216,7 @@ internal fun FontLayerPopup(
                             ) {
                                 Text(
                                     fontDisplayName(fontName),
-                                    style = MaterialTheme.typography.bodyMedium,
+                                    style = EreaderFontSize.M,
                                     modifier = Modifier.weight(1f)
                                 )
                                 if (selectedTab == 0 && fontName == currentFontName) {

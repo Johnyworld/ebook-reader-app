@@ -10,7 +10,6 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -20,6 +19,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.rotein.ebookreader.R
 import com.rotein.ebookreader.ui.theme.EreaderColors
+import com.rotein.ebookreader.ui.theme.EreaderFontSize
 import com.rotein.ebookreader.ui.theme.EreaderSpacing
 
 @Composable
@@ -42,7 +42,7 @@ fun PopupHeaderBar(
             }
             Text(
                 text = title,
-                style = MaterialTheme.typography.titleMedium,
+                style = EreaderFontSize.L,
                 modifier = Modifier.weight(1f),
                 maxLines = maxLines,
                 overflow = TextOverflow.Ellipsis

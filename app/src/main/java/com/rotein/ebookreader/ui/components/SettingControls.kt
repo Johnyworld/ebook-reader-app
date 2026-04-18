@@ -12,7 +12,6 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -20,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.rotein.ebookreader.ui.theme.EreaderFontSize
 import com.rotein.ebookreader.ui.theme.EreaderSpacing
 
 @Composable
@@ -31,7 +31,7 @@ fun ReaderSettingRow(label: String, field: @Composable () -> Unit) {
             .padding(horizontal = EreaderSpacing.L),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+        Text(label, style = EreaderFontSize.M, modifier = Modifier.weight(1f))
         field()
     }
 }
@@ -55,7 +55,7 @@ fun ReaderStepperField(
         }
         Text(
             value,
-            style = MaterialTheme.typography.bodyMedium,
+            style = EreaderFontSize.M,
             modifier = Modifier.weight(1f),
             textAlign = TextAlign.Center,
             maxLines = 1,

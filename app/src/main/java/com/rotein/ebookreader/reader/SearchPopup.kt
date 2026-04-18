@@ -24,7 +24,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -54,6 +53,7 @@ import com.rotein.ebookreader.ui.components.FullScreenPopup
 import com.rotein.ebookreader.ui.components.PaginationBar
 import com.rotein.ebookreader.ui.components.PopupHeaderBar
 import com.rotein.ebookreader.ui.theme.EreaderColors
+import com.rotein.ebookreader.ui.theme.EreaderFontSize
 import com.rotein.ebookreader.ui.theme.EreaderSpacing
 
 @Composable
@@ -104,7 +104,7 @@ internal fun SearchPopup(
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(stringResource(R.string.enter_search_query), style = MaterialTheme.typography.bodyMedium)
+                        Text(stringResource(R.string.enter_search_query), style = EreaderFontSize.M)
                     }
                     isSearching && searchResults.isEmpty() -> Box(
                         modifier = Modifier.fillMaxSize(),
@@ -116,7 +116,7 @@ internal fun SearchPopup(
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(stringResource(R.string.no_search_results), style = MaterialTheme.typography.bodyMedium)
+                        Text(stringResource(R.string.no_search_results), style = EreaderFontSize.M)
                     }
                     else -> Column(modifier = Modifier.fillMaxSize()) {
                         pageItems.forEachIndexed { index, result ->
@@ -137,7 +137,7 @@ internal fun SearchPopup(
                                     ) {
                                         Text(
                                             result.chapter,
-                                            style = MaterialTheme.typography.bodySmall,
+                                            style = EreaderFontSize.S,
                                             color = EreaderColors.DarkGray,
                                             modifier = Modifier.weight(1f),
                                             maxLines = 1,
@@ -146,7 +146,7 @@ internal fun SearchPopup(
                                         if (result.page > 0) {
                                             Text(
                                                 "p.$effectivePage",
-                                                style = MaterialTheme.typography.bodySmall,
+                                                style = EreaderFontSize.S,
                                                 color = EreaderColors.DarkGray
                                             )
                                         }
@@ -171,7 +171,7 @@ internal fun SearchPopup(
                                         }
                                         append(excerpt.substring(cursor))
                                     },
-                                    style = MaterialTheme.typography.bodyMedium,
+                                    style = EreaderFontSize.M,
                                     maxLines = 2,
                                     overflow = TextOverflow.Ellipsis
                                 )
@@ -210,7 +210,7 @@ internal fun SearchPopup(
                         onValueChange = { query = it },
                         modifier = Modifier.weight(1f).focusRequester(focusRequester),
                         singleLine = true,
-                        textStyle = MaterialTheme.typography.bodyLarge.copy(color = EreaderColors.Black),
+                        textStyle = EreaderFontSize.L.copy(color = EreaderColors.Black),
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                         keyboardActions = KeyboardActions(onSearch = {
                             if (query.length >= 2) { val q = query.trim().replace(Regex("\\s+"), " "); searchedQuery = q; onSearch(q) }
@@ -220,7 +220,7 @@ internal fun SearchPopup(
                                 if (query.isEmpty()) {
                                     Text(
                                         stringResource(R.string.search_min_chars),
-                                        style = MaterialTheme.typography.bodyLarge,
+                                        style = EreaderFontSize.L,
                                         color = EreaderColors.DarkGray
                                     )
                                 }
@@ -248,7 +248,7 @@ internal fun SearchPopup(
                             .padding(horizontal = EreaderSpacing.L, vertical = 10.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(stringResource(R.string.search), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                        Text(stringResource(R.string.search), style = EreaderFontSize.M, fontWeight = FontWeight.Bold)
                     }
                 }
             }

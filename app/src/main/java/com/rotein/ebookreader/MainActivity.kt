@@ -106,7 +106,7 @@ fun HomeScreen(modifier: Modifier = Modifier) {
             ) {
                 Text(
                     text = "ebook-reader",
-                    fontSize = EreaderFontSize.XL,
+                    style = EreaderFontSize.XL,
                     fontWeight = FontWeight.Bold,
                     color = EreaderColors.Black
                 )

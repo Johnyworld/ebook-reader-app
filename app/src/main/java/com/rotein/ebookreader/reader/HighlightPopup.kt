@@ -13,7 +13,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -27,6 +26,7 @@ import com.rotein.ebookreader.R
 import com.rotein.ebookreader.Highlight
 import com.rotein.ebookreader.HighlightSortStore
 import com.rotein.ebookreader.ui.theme.EreaderColors
+import com.rotein.ebookreader.ui.theme.EreaderFontSize
 import com.rotein.ebookreader.ui.theme.EreaderSpacing
 
 @Composable
@@ -64,11 +64,11 @@ internal fun HighlightPopup(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     if (page > 0) {
-                        Text("p.$page", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold), color = EreaderColors.Black)
+                        Text("p.$page", style = EreaderFontSize.S.copy(fontWeight = FontWeight.Bold), color = EreaderColors.Black)
                     }
                     Text(
                         highlight.chapterTitle,
-                        style = MaterialTheme.typography.bodySmall,
+                        style = EreaderFontSize.S,
                         color = EreaderColors.DarkGray,
                         modifier = Modifier.weight(1f).padding(start = if (page > 0) EreaderSpacing.S else 0.dp),
                         maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.End
@@ -76,11 +76,11 @@ internal fun HighlightPopup(
                 }
                 Text(
                     highlight.text,
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = EreaderFontSize.M,
                     maxLines = 1, overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.padding(bottom = EreaderSpacing.XS)
                 )
-                Text(dateStr, style = MaterialTheme.typography.bodySmall, color = EreaderColors.DarkGray)
+                Text(dateStr, style = EreaderFontSize.S, color = EreaderColors.DarkGray)
             }
             IconButton(onClick = { onDelete(highlight) }) {
                 Icon(Icons.Default.Close, contentDescription = stringResource(R.string.delete), modifier = Modifier.size(18.dp))

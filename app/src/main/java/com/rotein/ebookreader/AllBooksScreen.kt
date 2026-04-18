@@ -34,7 +34,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -416,7 +415,7 @@ private fun TopBar(
                 trigger = { onClick ->
                     Text(
                         text = stringResource(R.string.language),
-                        style = MaterialTheme.typography.bodyMedium,
+                        style = EreaderFontSize.M,
                         modifier = Modifier
                             .clickable { onClick() }
                             .padding(horizontal = EreaderSpacing.M, vertical = EreaderSpacing.S)
@@ -451,7 +450,7 @@ private fun TopBar(
                         .testTag("searchInput")
                         .focusRequester(focusRequester),
                     singleLine = true,
-                    textStyle = MaterialTheme.typography.bodyLarge.copy(
+                    textStyle = EreaderFontSize.L.copy(
                         color = EreaderColors.Black
                     ),
                     cursorBrush = SolidColor(EreaderColors.Black),
@@ -460,7 +459,7 @@ private fun TopBar(
                             if (searchQuery.isEmpty()) {
                                 Text(
                                     text = stringResource(R.string.search_books_hint),
-                                    style = MaterialTheme.typography.bodyLarge,
+                                    style = EreaderFontSize.L,
                                     color = EreaderColors.DarkGray
                                 )
                             }
@@ -523,8 +522,7 @@ private fun BookItem(
                     Text(
                         text = "PDF",
                         color = EreaderColors.White,
-                        fontSize = EreaderFontSize.S,
-                        lineHeight = EreaderFontSize.S,
+                        style = EreaderFontSize.S,
                         fontWeight = FontWeight.Bold,
                            modifier = Modifier
                             .align(Alignment.TopEnd)
@@ -536,7 +534,7 @@ private fun BookItem(
             } else {
                 Text(
                     text = book.extension.uppercase(),
-                    style = MaterialTheme.typography.bodySmall,
+                    style = EreaderFontSize.S,
                     color = EreaderColors.DarkGray
                 )
             }
@@ -575,14 +573,14 @@ private fun BookItem(
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = displayTitle,
-                style = MaterialTheme.typography.bodyLarge,
+                style = EreaderFontSize.L,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
             if (author != null) {
                 Text(
                     text = author,
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = EreaderFontSize.M,
                     color = EreaderColors.DarkGray,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -608,8 +606,7 @@ private fun BookItem(
                 }
                 Text(
                     text = "${(readingProgress * 100).toInt()}%",
-                    fontSize = EreaderFontSize.XS,
-                    lineHeight = EreaderFontSize.XS,
+                    style = EreaderFontSize.XS,
                     color = EreaderColors.DarkGray
                 )
             }
