@@ -51,10 +51,9 @@ import com.rotein.ebookreader.ui.theme.EreaderFontSize
 import com.rotein.ebookreader.ui.theme.EreaderSpacing
 
 @Composable
-internal fun ReaderMenuItem(icon: ImageVector, label: String, onClick: () -> Unit = {}) {
+internal fun ReaderMenuItem(icon: ImageVector, label: String, modifier: Modifier = Modifier, onClick: () -> Unit = {}) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
+        modifier = modifier
             .height(52.dp)
             .clickable { onClick() }
             .padding(horizontal = EreaderSpacing.L),

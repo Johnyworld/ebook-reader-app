@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -391,27 +392,34 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
 
                         HorizontalDivider(color = EreaderColors.Black)
 
-                        ReaderMenuItem(Icons.Default.Search, stringResource(R.string.search_content), onClick = {
-                            vm.setShowSearchPopup(true)
-                        })
-                        HorizontalDivider(color = EreaderColors.Gray)
                         if (!isPdf) {
-                        ReaderMenuItem(Icons.Default.Star, stringResource(R.string.highlight), onClick = {
-                            vm.setShowHighlightPopup(true)
-                        })
-                        HorizontalDivider(color = EreaderColors.Gray)
-                        ReaderMenuItem(Icons.Default.Edit, stringResource(R.string.memo), onClick = {
-                            vm.setShowMemoListPopup(true)
-                        })
+                        // Row 1: 하이라이트 | 메모
+                        Row(modifier = Modifier.fillMaxWidth()) {
+                            ReaderMenuItem(Icons.Default.Star, stringResource(R.string.highlight), modifier = Modifier.weight(1f), onClick = {
+                                vm.setShowHighlightPopup(true)
+                            })
+                            Box(Modifier.width(1.dp).height(52.dp).background(EreaderColors.Gray))
+                            ReaderMenuItem(Icons.Default.Edit, stringResource(R.string.memo), modifier = Modifier.weight(1f), onClick = {
+                                vm.setShowMemoListPopup(true)
+                            })
+                        }
                         HorizontalDivider(color = EreaderColors.Gray)
                         }
-                        ReaderMenuItem(Icons.Default.Bookmark, stringResource(R.string.bookmark), onClick = {
-                            vm.setShowBookmarkPopup(true)
-                        })
+                        // Row 2: 북마크 | 설정
+                        Row(modifier = Modifier.fillMaxWidth()) {
+                            ReaderMenuItem(Icons.Default.Bookmark, stringResource(R.string.bookmark), modifier = Modifier.weight(1f), onClick = {
+                                vm.setShowBookmarkPopup(true)
+                            })
+                            Box(Modifier.width(1.dp).height(52.dp).background(EreaderColors.Gray))
+                            ReaderMenuItem(Icons.Default.Settings, stringResource(R.string.settings), modifier = Modifier.weight(1f), onClick = {
+                                vm.setShowSettingsPopup(true)
+                                vm.setShowMenu(false)
+                            })
+                        }
                         HorizontalDivider(color = EreaderColors.Gray)
-                        ReaderMenuItem(Icons.Default.Settings, stringResource(R.string.settings), onClick = {
-                            vm.setShowSettingsPopup(true)
-                            vm.setShowMenu(false)
+                        // Row 3: 본문검색 (전체 너비)
+                        ReaderMenuItem(Icons.Default.Search, stringResource(R.string.search_content), modifier = Modifier.fillMaxWidth(), onClick = {
+                            vm.setShowSearchPopup(true)
                         })
 
                         Spacer(Modifier.height(EreaderSpacing.XXS))
