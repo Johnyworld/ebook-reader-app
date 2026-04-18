@@ -32,8 +32,6 @@ import com.rotein.ebookreader.ui.components.PaginationBar
 import com.rotein.ebookreader.ui.components.PopupHeaderBar
 import com.rotein.ebookreader.ui.theme.EreaderColors
 import com.rotein.ebookreader.ui.theme.EreaderSpacing
-import java.text.SimpleDateFormat
-import java.util.Date
 import java.util.Locale
 
 @Composable
@@ -66,7 +64,10 @@ internal fun <T : AnnotationItem> AnnotationListPopup(
     }
     val totalPages = maxOf(1, (sortedItems.size + itemsPerPage - 1) / itemsPerPage)
     val pageItems = sortedItems.drop(currentPage * itemsPerPage).take(itemsPerPage)
-    val dateFormat = remember { SimpleDateFormat("yyyy.MM.dd HH:mm", Locale.getDefault()) }
+    val dateFormat = remember {
+        java.time.format.DateTimeFormatter.ofLocalizedDateTime(java.time.format.FormatStyle.SHORT)
+            .withLocale(Locale.getDefault())
+    }
 
     LaunchedEffect(sortOrder) { sortStore.save(context, sortOrder) }
     LaunchedEffect(sortedItems.size) {
@@ -93,7 +94,7 @@ internal fun <T : AnnotationItem> AnnotationListPopup(
                     pageItems.forEachIndexed { index, item ->
                         if (index > 0) HorizontalDivider(color = EreaderColors.Gray)
                         val itemPage = item.page.takeIf { it > 0 } ?: cfiToPage(item.cfi, spinePageOffsets, cfiPageMap)
-                        itemContent(item, itemPage, dateFormat.format(Date(item.createdAt)))
+                        itemContent(item, itemPage, dateFormat.format(java.time.Instant.ofEpochMilli(item.createdAt).atZone(java.time.ZoneId.systemDefault()).toLocalDateTime()))
                     }
                 }
             }
