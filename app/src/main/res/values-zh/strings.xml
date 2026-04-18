@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- AllBooksScreen -->
+    <string name="permission_description">要搜索设备上的文件，\n需要存储访问权限。</string>
+    <string name="grant_permission">授予权限</string>
+    <string name="loading_files">正在搜索文件…</string>
+    <string name="empty">无内容</string>
+    <string name="search">搜索</string>
+    <string name="search_books_hint">搜索书名、作者…</string>
+    <string name="close_search">关闭搜索</string>
+    <string name="remove_favorite">取消收藏</string>
+    <string name="add_favorite">收藏</string>
+    <string name="unhide">取消隐藏</string>
+    <string name="hide">隐藏</string>
+    <string name="menu">菜单</string>
+    <string name="pagination_format">%1$d/%2$d（共%3$d项）</string>
+    <string name="pagination_books_format">%1$d/%2$d（共%3$d本）</string>
+    <string name="read_percentage">已读%d%%</string>
+    <string name="page_number">第%d页</string>
+
+    <!-- Language -->
+    <string name="language">语言</string>
+
+    <!-- SortPreference enums -->
+    <string name="sort_created_asc">添加时间</string>
+    <string name="sort_created_desc">最新添加</string>
+    <string name="sort_page_asc">页数排序</string>
+    <string name="sort_title">按书名</string>
+    <string name="sort_author">按作者</string>
+    <string name="sort_date_added">添加时间</string>
+    <string name="sort_last_read">最近阅读</string>
+    <string name="filter_all">全部</string>
+    <string name="filter_favorite">收藏</string>
+    <string name="filter_hidden">已隐藏</string>
+
+    <!-- Font -->
+    <string name="font_epub_original">电子书字体</string>
+    <string name="font_system">系统字体</string>
+    <string name="font_system_fonts">系统字体</string>
+    <string name="font_sort_name_asc">名称 A–Z</string>
+    <string name="font_sort_name_desc">名称 Z–A</string>
+    <string name="font_sort_latest">最新</string>
+    <string name="font_sort_imported">导入时间</string>
+    <string name="font_label">字体</string>
+    <string name="font_tab_fonts">字体</string>
+    <string name="font_tab_import">导入字体</string>
+    <string name="font_import_title">导入字体</string>
+    <string name="font_import_message">要导入%s字体吗？</string>
+    <string name="font_delete_title">删除字体</string>
+    <string name="font_delete_message">要删除%s字体吗？</string>
+    <string name="font_none">没有字体。</string>
+    <string name="font_none_device">设备上没有字体。</string>
+
+    <!-- ReaderTextAlign -->
+    <string name="align_justify">两端对齐</string>
+    <string name="align_left">左对齐</string>
+    <string name="align_right">右对齐</string>
+    <string name="align_center">居中</string>
+
+    <!-- ReaderPageFlip -->
+    <string name="page_flip_lr_prev_next">左右\n上页/下页</string>
+    <string name="page_flip_lr_next_prev">左右\n下页/上页</string>
+    <string name="page_flip_tb_prev_next">上下\n上页/下页</string>
+    <string name="page_flip_tb_next_prev">上下\n下页/上页</string>
+
+    <!-- ReaderBottomInfo -->
+    <string name="bottom_info_none">无</string>
+    <string name="bottom_info_book_title">书名</string>
+    <string name="bottom_info_chapter_title">章节</string>
+    <string name="bottom_info_page">页码</string>
+    <string name="bottom_info_clock">时钟</string>
+    <string name="bottom_info_progress">进度</string>
+
+    <!-- ReaderSettingsSheet -->
+    <string name="tab_glyph">文字</string>
+    <string name="tab_margin">边距</string>
+    <string name="tab_viewer">阅读器</string>
+    <string name="close">关闭</string>
+    <string name="setting_font_size">字号</string>
+    <string name="setting_line_height">行距</string>
+    <string name="setting_paragraph_spacing">段落间距</string>
+    <string name="setting_padding_vertical">上下边距</string>
+    <string name="setting_padding_horizontal">左右边距</string>
+    <string name="setting_page_flip">翻页方式</string>
+    <string name="setting_left_info">左下角信息</string>
+    <string name="setting_right_info">右下角信息</string>
+    <string name="setting_dual_page">横屏双页显示</string>
+
+    <!-- BookReaderScreen -->
+    <string name="unsupported_format">不支持的格式。</string>
+    <string name="loading_book_info">正在加载图书信息。</string>
+    <string name="toc">目录</string>
+    <string name="search_content">搜索正文</string>
+    <string name="highlight">高亮</string>
+    <string name="memo">备注</string>
+    <string name="bookmark">书签</string>
+    <string name="settings">设置</string>
+    <string name="delete_highlight">删除高亮</string>
+    <string name="edit_memo">编辑备注</string>
+    <string name="delete_memo">删除备注</string>
+    <string name="share">分享</string>
+    <string name="continue_selection">继续选择</string>
+
+    <!-- MemoEditorScreen -->
+    <string name="save">保存</string>
+    <string name="memo_placeholder">输入备注…</string>
+    <string name="delete">删除</string>
+    <string name="go_to_page">跳转到页面</string>
+
+    <!-- SearchPopup -->
+    <string name="enter_search_query">请输入搜索内容。</string>
+    <string name="no_search_results">未找到结果。</string>
+    <string name="search_min_chars">请输入至少2个字符。</string>
+    <string name="clear_search">清除搜索</string>
+
+    <!-- TocPopup -->
+    <string name="toc_title_format">目录: %s</string>
+    <string name="loading_toc">正在加载目录。</string>
+
+    <!-- Annotation popups -->
+    <string name="no_highlights">没有高亮。</string>
+    <string name="no_bookmarks">没有书签。</string>
+    <string name="no_memos">没有备注。</string>
+
+    <!-- TxtViewer -->
+    <string name="error_cannot_read">无法读取文件。</string>
+
+    <!-- PaginationBar -->
+    <string name="previous">上一页</string>
+    <string name="next">下一页</string>
+
+    <!-- PopupHeaderBar -->
+    <string name="back">返回</string>
+
+    <!-- Common -->
+    <string name="yes">是</string>
+    <string name="no">否</string>
+</resources>
