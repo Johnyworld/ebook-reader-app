@@ -49,6 +49,9 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         val splashScreen = installSplashScreen()
         super.onCreate(savedInstanceState)
+        WebView.setWebContentsDebuggingEnabled(
+            0 != applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE
+        )
         splashScreen.setOnExitAnimationListener { it.remove() }
         enableEdgeToEdge()
         setContent {
