@@ -20,6 +20,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
+import com.rotein.ebookreader.R
 import com.rotein.ebookreader.AnnotationItem
 import com.rotein.ebookreader.AnnotationSortStore
 import com.rotein.ebookreader.BookmarkSortOrder
@@ -77,7 +79,7 @@ internal fun <T : AnnotationItem> AnnotationListPopup(
                 items = BookmarkSortOrder.entries.toList(),
                 selectedItem = sortOrder,
                 onSelect = { sortOrder = it },
-                label = { it.label },
+                label = { stringResource(it.labelRes) },
             )
         }
 
@@ -102,7 +104,7 @@ internal fun <T : AnnotationItem> AnnotationListPopup(
                 PaginationBar(
                     currentPage = currentPage,
                     totalPages = totalPages,
-                    centerText = "${currentPage + 1}/$totalPages (${sortedItems.size}건)",
+                    centerText = stringResource(R.string.pagination_format, currentPage + 1, totalPages, sortedItems.size),
                     onPrevious = { currentPage-- },
                     onNext = { currentPage++ },
                     modifier = Modifier.padding(bottom = EreaderSpacing.L),

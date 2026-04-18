@@ -63,7 +63,10 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.sp
+import androidx.appcompat.app.AppCompatDelegate
+import androidx.core.os.LocaleListCompat
 import com.rotein.ebookreader.ui.components.EreaderDropdownMenu
 import com.rotein.ebookreader.ui.components.PaginationBar
 import kotlinx.coroutines.Dispatchers
@@ -222,7 +225,7 @@ fun AllBooksScreen(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(EreaderSpacing.M)
                     ) {
-                        Text("기기 내 파일을 검색하려면\n저장소 접근 권한이 필요합니다.")
+                        Text(stringResource(R.string.permission_description))
                         Button(onClick = {
                             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                                 val intent = Intent(
@@ -234,18 +237,18 @@ fun AllBooksScreen(
                                 permissionLauncher.launch(Manifest.permission.READ_EXTERNAL_STORAGE)
                             }
                         }) {
-                            Text("권한 허용")
+                            Text(stringResource(R.string.grant_permission))
                         }
                     }
                 }
 
                 isLoading -> {
-                    Text("파일 검색 중...", modifier = Modifier.align(Alignment.Center))
+                    Text(stringResource(R.string.loading_files), modifier = Modifier.align(Alignment.Center))
                 }
 
                 processedBooks.isEmpty() -> {
                     Text(
-                        "비어있음",
+                        stringResource(R.string.empty),
                         modifier = Modifier.align(Alignment.Center)
                     )
                 }
@@ -324,7 +327,7 @@ fun AllBooksScreen(
                         PaginationBar(
                             currentPage = safePage,
                             totalPages = totalPages,
-                            centerText = "${safePage + 1}/$totalPages (${processedBooks.size}건)",
+                            centerText = stringResource(R.string.pagination_books_format, safePage + 1, totalPages, processedBooks.size),
                             onPrevious = { targetPage = safePage - 1 },
                             onNext = { targetPage = safePage + 1 }
                         )
@@ -368,7 +371,7 @@ private fun TopBar(
             IconButton(onClick = onSearchClick) {
                 Icon(
                     imageVector = Icons.Default.Search,
-                    contentDescription = "검색",
+                    contentDescription = stringResource(R.string.search),
                     tint = EreaderColors.DarkGray
                 )
             }
@@ -380,7 +383,7 @@ private fun TopBar(
                 items = FilterMode.entries.toList(),
                 selectedItem = filterMode,
                 onSelect = { onFilterChange(it) },
-                label = { it.label },
+                label = { stringResource(it.labelRes) },
             )
 
             // 정렬 필드 드롭다운
@@ -388,7 +391,28 @@ private fun TopBar(
                 items = SortField.entries.toList(),
                 selectedItem = sortPref.field,
                 onSelect = { onSortChange(sortPref.copy(field = it)) },
-                label = { it.label },
+                label = { stringResource(it.labelRes) },
+            )
+
+            // 언어 선택 드롭다운
+            val currentLocale = AppCompatDelegate.getApplicationLocales().get(0)?.language ?: "en"
+            val languageOptions = listOf(
+                "en" to stringResource(R.string.language_english),
+                "ko" to stringResource(R.string.language_korean),
+                "ja" to stringResource(R.string.language_japanese),
+                "zh" to stringResource(R.string.language_chinese),
+                "es" to stringResource(R.string.language_spanish),
+            )
+            val currentLanguageCode = languageOptions.firstOrNull { it.first == currentLocale }?.first ?: "en"
+
+            EreaderDropdownMenu(
+                items = languageOptions,
+                selectedItem = languageOptions.first { it.first == currentLanguageCode },
+                onSelect = { (code, _) ->
+                    val localeList = LocaleListCompat.forLanguageTags(code)
+                    AppCompatDelegate.setApplicationLocales(localeList)
+                },
+                label = { it.first.uppercase() },
             )
 
         }
@@ -426,7 +450,7 @@ private fun TopBar(
                         Box {
                             if (searchQuery.isEmpty()) {
                                 Text(
-                                    text = "책 제목, 저자 검색...",
+                                    text = stringResource(R.string.search_books_hint),
                                     style = MaterialTheme.typography.bodyLarge,
                                     color = EreaderColors.DarkGray
                                 )
@@ -439,7 +463,7 @@ private fun TopBar(
                 IconButton(onClick = onSearchClear) {
                     Icon(
                         imageVector = Icons.Default.Close,
-                        contentDescription = "검색 닫기",
+                        contentDescription = stringResource(R.string.close_search),
                         tint = EreaderColors.DarkGray
                     )
                 }
@@ -583,11 +607,13 @@ private fun BookItem(
         }
 
 
+        val favoriteLabel = if (isFavorite) stringResource(R.string.remove_favorite) else stringResource(R.string.add_favorite)
+        val hiddenLabel = if (isHidden) stringResource(R.string.unhide) else stringResource(R.string.hide)
         val menuItems = buildList {
             if (onToggleFavorite != null) {
-                add((if (isFavorite) "즐겨찾기 해제" else "즐겨찾기") to onToggleFavorite)
+                add(favoriteLabel to onToggleFavorite)
             }
-            add((if (isHidden) "숨김 해제" else "숨기기") to onToggleHidden)
+            add(hiddenLabel to onToggleHidden)
         }
         EreaderDropdownMenu(
             items = menuItems,
@@ -597,7 +623,7 @@ private fun BookItem(
                 IconButton(onClick = onClick) {
                     Icon(
                         imageVector = Icons.Default.MoreVert,
-                        contentDescription = "메뉴",
+                        contentDescription = stringResource(R.string.menu),
                         tint = EreaderColors.DarkGray,
                         modifier = Modifier.size(20.dp)
                     )

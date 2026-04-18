@@ -15,7 +15,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.rotein.ebookreader.R
 import com.rotein.ebookreader.ui.theme.EreaderColors
 import com.rotein.ebookreader.ui.theme.EreaderSpacing
 
@@ -47,12 +49,12 @@ fun PaginationBar(
         ) {
             Icon(
                 Icons.AutoMirrored.Filled.ArrowBack,
-                contentDescription = "이전",
+                contentDescription = stringResource(R.string.previous),
                 modifier = Modifier.height(16.dp),
                 tint = if (hasPrev) EreaderColors.Black else EreaderColors.DarkGray
             )
             Text(
-                "이전",
+                stringResource(R.string.previous),
                 style = MaterialTheme.typography.bodyMedium,
                 color = if (hasPrev) EreaderColors.Black else EreaderColors.DarkGray
             )
@@ -69,13 +71,13 @@ fun PaginationBar(
             horizontalArrangement = Arrangement.spacedBy(EreaderSpacing.XS)
         ) {
             Text(
-                "다음",
+                stringResource(R.string.next),
                 style = MaterialTheme.typography.bodyMedium,
                 color = if (hasNext) EreaderColors.Black else EreaderColors.DarkGray
             )
             Icon(
                 Icons.AutoMirrored.Filled.ArrowForward,
-                contentDescription = "다음",
+                contentDescription = stringResource(R.string.next),
                 modifier = Modifier.height(16.dp),
                 tint = if (hasNext) EreaderColors.Black else EreaderColors.DarkGray
             )

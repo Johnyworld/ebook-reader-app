@@ -76,7 +76,7 @@ fun <T> ReaderCycleSelectorField(
     options: List<T>,
     selected: T,
     onSelect: (T) -> Unit,
-    labelFor: (T) -> String,
+    labelFor: @Composable (T) -> String,
     forceAbove: Boolean = false
 ) {
     val currentIndex = options.indexOf(selected)

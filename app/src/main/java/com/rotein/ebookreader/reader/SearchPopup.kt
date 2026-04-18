@@ -42,9 +42,11 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import com.rotein.ebookreader.R
 import com.rotein.ebookreader.SearchResultItem
 import com.rotein.ebookreader.TocItem
 import com.rotein.ebookreader.flattenToc
@@ -94,7 +96,7 @@ internal fun SearchPopup(
     LaunchedEffect(searchedQuery) { currentPage = 0 }
 
     FullScreenPopup {
-            PopupHeaderBar(title = "본문 검색", onBack = onDismiss)
+            PopupHeaderBar(title = stringResource(R.string.search_content), onBack = onDismiss)
 
             Box(modifier = Modifier.weight(1f)) {
                 when {
@@ -102,7 +104,7 @@ internal fun SearchPopup(
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text("검색어를 입력하세요.", style = MaterialTheme.typography.bodyMedium)
+                        Text(stringResource(R.string.enter_search_query), style = MaterialTheme.typography.bodyMedium)
                     }
                     isSearching && searchResults.isEmpty() -> Box(
                         modifier = Modifier.fillMaxSize(),
@@ -114,7 +116,7 @@ internal fun SearchPopup(
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text("검색 결과가 없습니다.", style = MaterialTheme.typography.bodyMedium)
+                        Text(stringResource(R.string.no_search_results), style = MaterialTheme.typography.bodyMedium)
                     }
                     else -> Column(modifier = Modifier.fillMaxSize()) {
                         pageItems.forEachIndexed { index, result ->
@@ -184,7 +186,7 @@ internal fun SearchPopup(
                     PaginationBar(
                         currentPage = currentPage,
                         totalPages = totalPages,
-                        centerText = "${currentPage + 1}/$totalPages (${resultList.size}건)",
+                        centerText = stringResource(R.string.pagination_format, currentPage + 1, totalPages, resultList.size),
                         onPrevious = { currentPage-- },
                         onNext = { currentPage++ },
                     )
@@ -217,7 +219,7 @@ internal fun SearchPopup(
                             Box {
                                 if (query.isEmpty()) {
                                     Text(
-                                        "검색어를 두 글자 이상 입력하세요.",
+                                        stringResource(R.string.search_min_chars),
                                         style = MaterialTheme.typography.bodyLarge,
                                         color = EreaderColors.DarkGray
                                     )
@@ -233,7 +235,7 @@ internal fun SearchPopup(
                         ) {
                             Icon(
                                 Icons.Default.Close,
-                                contentDescription = "검색어 지우기",
+                                contentDescription = stringResource(R.string.clear_search),
                                 modifier = Modifier.size(20.dp),
                                 tint = EreaderColors.Black
                             )
@@ -246,7 +248,7 @@ internal fun SearchPopup(
                             .padding(horizontal = EreaderSpacing.L, vertical = 10.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text("검색", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                        Text(stringResource(R.string.search), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
                     }
                 }
             }

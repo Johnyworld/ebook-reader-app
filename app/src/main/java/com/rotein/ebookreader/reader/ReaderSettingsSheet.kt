@@ -30,10 +30,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.rotein.ebookreader.R
 import com.rotein.ebookreader.FONT_EPUB_ORIGINAL
 import com.rotein.ebookreader.FONT_SYSTEM
 import com.rotein.ebookreader.ImportedFontStore
@@ -79,7 +81,7 @@ internal fun ReaderSettingsBottomSheet(
     isPdf: Boolean = false
 ) {
     var selectedTab by remember { mutableStateOf(0) }
-    val tabLabels = if (isPdf) listOf("뷰어") else listOf("글자", "여백", "뷰어")
+    val tabLabels = if (isPdf) listOf(stringResource(R.string.tab_viewer)) else listOf(stringResource(R.string.tab_glyph), stringResource(R.string.tab_margin), stringResource(R.string.tab_viewer))
 
     Column(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.fillMaxWidth()) {
@@ -89,7 +91,7 @@ internal fun ReaderSettingsBottomSheet(
                 onSelect = { selectedTab = it },
                 trailingContent = {
                     IconButton(onClick = onDismiss, modifier = Modifier.size(56.dp)) {
-                        Icon(Icons.Default.Close, contentDescription = "닫기")
+                        Icon(Icons.Default.Close, contentDescription = stringResource(R.string.close))
                     }
                 }
             )
@@ -124,7 +126,7 @@ private fun ReaderGlyphTab(
     val currentIndex = allFonts.indexOf(settings.fontName).coerceAtLeast(0)
 
     Column(modifier = Modifier.fillMaxWidth()) {
-        ReaderSettingRow("글꼴") {
+        ReaderSettingRow(stringResource(R.string.font_label)) {
             Row(
                 modifier = Modifier.width(160.dp),
                 verticalAlignment = Alignment.CenterVertically
@@ -152,7 +154,7 @@ private fun ReaderGlyphTab(
             }
         }
         HorizontalDivider(color = EreaderColors.Gray)
-        ReaderSettingRow("글자 크기") {
+        ReaderSettingRow(stringResource(R.string.setting_font_size)) {
             ReaderStepperField(
                 value = settings.fontSize.toString(),
                 onDecrement = { if (settings.fontSize > 8) onSettingsChange(settings.copy(fontSize = settings.fontSize - 1)) },
@@ -165,7 +167,7 @@ private fun ReaderGlyphTab(
 @Composable
 private fun ReaderMarginTab(settings: ReaderSettings, onSettingsChange: (ReaderSettings) -> Unit) {
     Column(modifier = Modifier.fillMaxWidth()) {
-        ReaderSettingRow("줄 간격") {
+        ReaderSettingRow(stringResource(R.string.setting_line_height)) {
             ReaderStepperField(
                 value = "%.1f".format(settings.lineHeight),
                 onDecrement = { if (settings.lineHeight > 1.0f) onSettingsChange(settings.copy(lineHeight = (Math.round(settings.lineHeight * 10) - 1) / 10f)) },
@@ -173,7 +175,7 @@ private fun ReaderMarginTab(settings: ReaderSettings, onSettingsChange: (ReaderS
             )
         }
         HorizontalDivider(color = EreaderColors.Gray)
-        ReaderSettingRow("문단 간격") {
+        ReaderSettingRow(stringResource(R.string.setting_paragraph_spacing)) {
             ReaderStepperField(
                 value = settings.paragraphSpacing.toString(),
                 onDecrement = { if (settings.paragraphSpacing > 0) onSettingsChange(settings.copy(paragraphSpacing = settings.paragraphSpacing - 1)) },
@@ -181,7 +183,7 @@ private fun ReaderMarginTab(settings: ReaderSettings, onSettingsChange: (ReaderS
             )
         }
         HorizontalDivider(color = EreaderColors.Gray)
-        ReaderSettingRow("상하 여백") {
+        ReaderSettingRow(stringResource(R.string.setting_padding_vertical)) {
             ReaderStepperField(
                 value = settings.paddingVertical.toString(),
                 onDecrement = { if (settings.paddingVertical > -16) onSettingsChange(settings.copy(paddingVertical = settings.paddingVertical - 2)) },
@@ -189,7 +191,7 @@ private fun ReaderMarginTab(settings: ReaderSettings, onSettingsChange: (ReaderS
             )
         }
         HorizontalDivider(color = EreaderColors.Gray)
-        ReaderSettingRow("좌우 여백") {
+        ReaderSettingRow(stringResource(R.string.setting_padding_horizontal)) {
             ReaderStepperField(
                 value = settings.paddingHorizontal.toString(),
                 onDecrement = { if (settings.paddingHorizontal > -16) onSettingsChange(settings.copy(paddingHorizontal = settings.paddingHorizontal - 2)) },
@@ -202,31 +204,31 @@ private fun ReaderMarginTab(settings: ReaderSettings, onSettingsChange: (ReaderS
 @Composable
 private fun ReaderViewerTab(settings: ReaderSettings, onSettingsChange: (ReaderSettings) -> Unit) {
     Column(modifier = Modifier.fillMaxWidth()) {
-        ReaderSettingRow("페이지 넘김") {
+        ReaderSettingRow(stringResource(R.string.setting_page_flip)) {
             ReaderCycleSelectorField(
                 options = ReaderPageFlip.entries,
                 selected = settings.pageFlip,
                 onSelect = { onSettingsChange(settings.copy(pageFlip = it)) },
-                labelFor = { it.label },
+                labelFor = { stringResource(it.labelRes) },
                 forceAbove = true
             )
         }
         HorizontalDivider(color = EreaderColors.Gray)
-        ReaderSettingRow("왼쪽 하단 정보") {
+        ReaderSettingRow(stringResource(R.string.setting_left_info)) {
             ReaderCycleSelectorField(
                 options = ReaderBottomInfo.entries,
                 selected = settings.leftInfo,
                 onSelect = { onSettingsChange(settings.copy(leftInfo = it)) },
-                labelFor = { it.label }
+                labelFor = { stringResource(it.labelRes) }
             )
         }
         HorizontalDivider(color = EreaderColors.Gray)
-        ReaderSettingRow("오른쪽 하단 정보") {
+        ReaderSettingRow(stringResource(R.string.setting_right_info)) {
             ReaderCycleSelectorField(
                 options = ReaderBottomInfo.entries,
                 selected = settings.rightInfo,
                 onSelect = { onSettingsChange(settings.copy(rightInfo = it)) },
-                labelFor = { it.label }
+                labelFor = { stringResource(it.labelRes) }
             )
         }
         HorizontalDivider(color = EreaderColors.Gray)
@@ -237,7 +239,7 @@ private fun ReaderViewerTab(settings: ReaderSettings, onSettingsChange: (ReaderS
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                "가로모드 두 쪽 보기",
+                stringResource(R.string.setting_dual_page),
                 style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier.weight(1f)
             )
