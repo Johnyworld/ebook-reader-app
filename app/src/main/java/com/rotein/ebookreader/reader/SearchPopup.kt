@@ -137,7 +137,7 @@ internal fun SearchPopup(
                                     ) {
                                         Text(
                                             result.chapter,
-                                            style = MaterialTheme.typography.labelSmall,
+                                            style = MaterialTheme.typography.bodySmall,
                                             color = EreaderColors.DarkGray,
                                             modifier = Modifier.weight(1f),
                                             maxLines = 1,
@@ -146,7 +146,7 @@ internal fun SearchPopup(
                                         if (result.page > 0) {
                                             Text(
                                                 "p.$effectivePage",
-                                                style = MaterialTheme.typography.labelSmall,
+                                                style = MaterialTheme.typography.bodySmall,
                                                 color = EreaderColors.DarkGray
                                             )
                                         }

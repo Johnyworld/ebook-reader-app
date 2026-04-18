@@ -67,13 +67,13 @@ internal fun BookmarkPopup(
                     if (page > 0) {
                         Text(
                             "p.$page",
-                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
                             color = EreaderColors.Black
                         )
                     }
                     Text(
                         bookmark.chapterTitle,
-                        style = MaterialTheme.typography.labelSmall,
+                        style = MaterialTheme.typography.bodySmall,
                         color = EreaderColors.DarkGray,
                         modifier = Modifier.weight(1f).padding(start = if (page > 0) EreaderSpacing.S else 0.dp),
                         maxLines = 1,
@@ -90,7 +90,7 @@ internal fun BookmarkPopup(
                 )
                 Text(
                     dateStr,
-                    style = MaterialTheme.typography.labelSmall,
+                    style = MaterialTheme.typography.bodySmall,
                     color = EreaderColors.DarkGray
                 )
             }

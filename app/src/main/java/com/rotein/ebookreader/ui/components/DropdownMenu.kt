@@ -77,7 +77,7 @@ fun <T> EreaderDropdownMenu(
             TextButton(onClick = { expanded = true; currentPage = 0 }) {
                 Text(
                     text = label(selectedItem ?: items.first()),
-                    style = MaterialTheme.typography.labelMedium,
+                    style = MaterialTheme.typography.bodyMedium,
                     color = EreaderColors.Black,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,

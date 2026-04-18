@@ -536,7 +536,7 @@ private fun BookItem(
             } else {
                 Text(
                     text = book.extension.uppercase(),
-                    style = MaterialTheme.typography.labelSmall,
+                    style = MaterialTheme.typography.bodySmall,
                     color = EreaderColors.DarkGray
                 )
             }
@@ -582,7 +582,7 @@ private fun BookItem(
             if (author != null) {
                 Text(
                     text = author,
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.bodyMedium,
                     color = EreaderColors.DarkGray,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis

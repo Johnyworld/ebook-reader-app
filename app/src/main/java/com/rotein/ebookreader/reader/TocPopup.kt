@@ -135,7 +135,7 @@ internal fun TocPopup(
                                 if (item.page > 0) {
                                     Text(
                                         "${item.page}",
-                                        style = MaterialTheme.typography.labelSmall,
+                                        style = MaterialTheme.typography.bodyMedium,
                                         color = EreaderColors.DarkGray
                                     )
                                 }
