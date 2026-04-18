@@ -14,7 +14,6 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ModeComment
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -28,6 +27,7 @@ import com.rotein.ebookreader.R
 import com.rotein.ebookreader.Memo
 import com.rotein.ebookreader.MemoSortStore
 import com.rotein.ebookreader.ui.theme.EreaderColors
+import com.rotein.ebookreader.ui.theme.EreaderFontSize
 import com.rotein.ebookreader.ui.theme.EreaderSpacing
 
 @Composable
@@ -66,11 +66,11 @@ internal fun MemoListPopup(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     if (page > 0) {
-                        Text("p.$page", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold), color = EreaderColors.Black)
+                        Text("p.$page", style = EreaderFontSize.S.copy(fontWeight = FontWeight.Bold), color = EreaderColors.Black)
                     }
                     Text(
                         memo.chapterTitle,
-                        style = MaterialTheme.typography.labelSmall,
+                        style = EreaderFontSize.S,
                         color = EreaderColors.DarkGray,
                         modifier = Modifier.weight(1f).padding(start = if (page > 0) EreaderSpacing.S else 0.dp),
                         maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.End
@@ -78,7 +78,7 @@ internal fun MemoListPopup(
                 }
                 Text(
                     memo.text,
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = EreaderFontSize.M,
                     maxLines = 1, overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.padding(bottom = EreaderSpacing.XS)
                 )
@@ -89,10 +89,10 @@ internal fun MemoListPopup(
                         modifier = Modifier.padding(bottom = EreaderSpacing.XS)
                     ) {
                         Icon(Icons.Default.ModeComment, contentDescription = null, modifier = Modifier.size(12.dp), tint = EreaderColors.DarkGray)
-                        Text(memo.note, style = MaterialTheme.typography.labelSmall, color = EreaderColors.DarkGray, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(memo.note, style = EreaderFontSize.S, color = EreaderColors.DarkGray, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
-                Text(dateStr, style = MaterialTheme.typography.labelSmall, color = EreaderColors.DarkGray)
+                Text(dateStr, style = EreaderFontSize.S, color = EreaderColors.DarkGray)
             }
             IconButton(onClick = { onDelete(memo) }) {
                 Icon(Icons.Default.Close, contentDescription = stringResource(R.string.delete), modifier = Modifier.size(18.dp))

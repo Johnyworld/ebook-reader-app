@@ -17,7 +17,6 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -34,7 +33,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.rotein.ebookreader.R
 import com.rotein.ebookreader.FONT_EPUB_ORIGINAL
 import com.rotein.ebookreader.FONT_SYSTEM
@@ -49,6 +47,7 @@ import com.rotein.ebookreader.ui.components.ReaderCycleSelectorField
 import com.rotein.ebookreader.ui.components.ReaderSettingRow
 import com.rotein.ebookreader.ui.components.ReaderStepperField
 import com.rotein.ebookreader.ui.theme.EreaderColors
+import com.rotein.ebookreader.ui.theme.EreaderFontSize
 import com.rotein.ebookreader.ui.theme.EreaderSpacing
 
 @Composable
@@ -63,7 +62,7 @@ internal fun ReaderMenuItem(icon: ImageVector, label: String, onClick: () -> Uni
         horizontalArrangement = Arrangement.spacedBy(EreaderSpacing.M)
     ) {
         Icon(icon, contentDescription = null)
-        Text(label, style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp))
+        Text(label, style = EreaderFontSize.M)
     }
 }
 
@@ -140,7 +139,7 @@ private fun ReaderGlyphTab(
                 Text(
                     fontDisplayName(settings.fontName),
                     modifier = Modifier.weight(1f).clickable { onOpenFontPopup() },
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = EreaderFontSize.M,
                     textAlign = TextAlign.Center,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -240,7 +239,7 @@ private fun ReaderViewerTab(settings: ReaderSettings, onSettingsChange: (ReaderS
         ) {
             Text(
                 stringResource(R.string.setting_dual_page),
-                style = MaterialTheme.typography.bodyMedium,
+                style = EreaderFontSize.M,
                 modifier = Modifier.weight(1f)
             )
             Switch(

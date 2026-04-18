@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -38,6 +37,7 @@ import com.rotein.ebookreader.ui.components.FullScreenPopup
 import com.rotein.ebookreader.ui.components.PaginationBar
 import com.rotein.ebookreader.ui.components.PopupHeaderBar
 import com.rotein.ebookreader.ui.theme.EreaderColors
+import com.rotein.ebookreader.ui.theme.EreaderFontSize
 import com.rotein.ebookreader.ui.theme.EreaderSpacing
 
 @Composable
@@ -87,7 +87,7 @@ internal fun TocPopup(
             Column(modifier = Modifier.weight(1f).onSizeChanged { listHeightPx = it.height }) {
                 if (flatItems.isEmpty()) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text(stringResource(R.string.loading_toc), style = MaterialTheme.typography.bodyMedium)
+                        Text(stringResource(R.string.loading_toc), style = EreaderFontSize.M)
                     }
                 } else {
                     val pageNumberWidth = 40.dp
@@ -135,14 +135,14 @@ internal fun TocPopup(
                                 if (item.page > 0) {
                                     Text(
                                         "${item.page}",
-                                        style = MaterialTheme.typography.labelSmall,
+                                        style = EreaderFontSize.M,
                                         color = EreaderColors.DarkGray
                                     )
                                 }
                             }
                             Text(
                                 item.label,
-                                style = if (item.depth == 0) MaterialTheme.typography.bodyLarge else MaterialTheme.typography.bodyMedium,
+                                style = if (item.depth == 0) EreaderFontSize.L else EreaderFontSize.M,
                                 fontWeight = if (isCurrentChapter) FontWeight.Bold else null,
                                 color = EreaderColors.Black,
                                 maxLines = 1,

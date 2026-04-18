@@ -10,7 +10,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -19,6 +18,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.rotein.ebookreader.R
 import com.rotein.ebookreader.ui.theme.EreaderColors
+import com.rotein.ebookreader.ui.theme.EreaderFontSize
 import com.rotein.ebookreader.ui.theme.EreaderSpacing
 
 @Composable
@@ -55,13 +55,13 @@ fun PaginationBar(
             )
             Text(
                 stringResource(R.string.previous),
-                style = MaterialTheme.typography.bodyMedium,
+                style = EreaderFontSize.M,
                 color = if (hasPrev) EreaderColors.Black else EreaderColors.DarkGray
             )
         }
         Text(
             centerText,
-            style = MaterialTheme.typography.bodyMedium
+            style = EreaderFontSize.M
         )
         Row(
             modifier = Modifier
@@ -72,7 +72,7 @@ fun PaginationBar(
         ) {
             Text(
                 stringResource(R.string.next),
-                style = MaterialTheme.typography.bodyMedium,
+                style = EreaderFontSize.M,
                 color = if (hasNext) EreaderColors.Black else EreaderColors.DarkGray
             )
             Icon(

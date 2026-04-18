@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -19,6 +18,7 @@ import androidx.compose.ui.res.stringResource
 import com.rotein.ebookreader.R
 import com.rotein.ebookreader.CenteredMessage
 import com.rotein.ebookreader.LoadingIndicator
+import com.rotein.ebookreader.ui.theme.EreaderFontSize
 import com.rotein.ebookreader.ui.theme.EreaderSpacing
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -42,7 +42,7 @@ internal fun TxtViewer(path: String, onCenterTap: () -> Unit) {
         text == null -> LoadingIndicator()
         else -> Text(
             text = text!!,
-            style = MaterialTheme.typography.bodyMedium,
+            style = EreaderFontSize.M,
             modifier = Modifier
                 .fillMaxSize()
                 .pointerInput(onCenterTap) {

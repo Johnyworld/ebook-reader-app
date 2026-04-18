@@ -7,7 +7,6 @@ import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.sp
 import com.rotein.ebookreader.R
 
 @OptIn(ExperimentalTextApi::class)
@@ -71,7 +70,7 @@ val Typography = Typography(
     titleLarge = defaultTextStyle,
     titleMedium = defaultTextStyle,
     titleSmall = defaultTextStyle,
-    bodyLarge = defaultTextStyle.copy(fontSize = 16.sp, lineHeight = 24.sp, letterSpacing = 0.5.sp),
+    bodyLarge = defaultTextStyle,
     bodyMedium = defaultTextStyle,
     bodySmall = defaultTextStyle,
     labelLarge = defaultTextStyle,

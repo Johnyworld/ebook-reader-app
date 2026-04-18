@@ -21,7 +21,6 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -43,6 +42,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
 import com.rotein.ebookreader.ui.theme.EreaderColors
+import com.rotein.ebookreader.ui.theme.EreaderFontSize
 import com.rotein.ebookreader.ui.theme.EreaderSpacing
 
 @Composable
@@ -77,7 +77,7 @@ fun <T> EreaderDropdownMenu(
             TextButton(onClick = { expanded = true; currentPage = 0 }) {
                 Text(
                     text = label(selectedItem ?: items.first()),
-                    style = MaterialTheme.typography.labelMedium,
+                    style = EreaderFontSize.M,
                     color = EreaderColors.Black,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
@@ -138,7 +138,7 @@ fun <T> EreaderDropdownMenu(
                         ) {
                             Text(
                                 text = label(item),
-                                style = MaterialTheme.typography.bodyMedium,
+                                style = EreaderFontSize.M,
                                 color = EreaderColors.Black,
                                 modifier = Modifier.weight(1f)
                             )
@@ -178,7 +178,7 @@ fun <T> EreaderDropdownMenu(
                             }
                             Text(
                                 "${currentPage + 1} / $totalPages",
-                                style = MaterialTheme.typography.bodySmall,
+                                style = EreaderFontSize.S,
                                 color = EreaderColors.Black
                             )
                             IconButton(

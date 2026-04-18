@@ -32,7 +32,6 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -53,7 +52,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.rotein.ebookreader.reader.BookmarkPopup
 import com.rotein.ebookreader.reader.EpubViewer
 import com.rotein.ebookreader.reader.FontLayerPopup
@@ -71,6 +69,7 @@ import com.rotein.ebookreader.ui.components.ActionItem
 import com.rotein.ebookreader.ui.components.ActionPopup
 import com.rotein.ebookreader.ui.components.PopupHeaderBar
 import com.rotein.ebookreader.ui.theme.EreaderColors
+import com.rotein.ebookreader.ui.theme.EreaderFontSize
 import com.rotein.ebookreader.ui.theme.EreaderSpacing
 import kotlinx.coroutines.launch
 
@@ -289,8 +288,8 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                         .padding(horizontal = maxOf(readerSettings.paddingHorizontal, 4).dp, vertical = EreaderSpacing.XS),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text(leftText ?: "", style = MaterialTheme.typography.bodySmall, color = EreaderColors.DarkGray)
-                    Text(rightText ?: "", style = MaterialTheme.typography.bodySmall, color = EreaderColors.DarkGray)
+                    Text(leftText ?: "", style = EreaderFontSize.S, color = EreaderColors.DarkGray)
+                    Text(rightText ?: "", style = EreaderFontSize.S, color = EreaderColors.DarkGray)
                 }
             }
         }
@@ -332,7 +331,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                                 .padding(horizontal = EreaderSpacing.L, vertical = EreaderSpacing.L),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text(stringResource(R.string.loading_book_info), style = MaterialTheme.typography.bodyMedium)
+                            Text(stringResource(R.string.loading_book_info), style = EreaderFontSize.M)
                         }
                     } else {
                     Column(modifier = Modifier.fillMaxWidth()) {
@@ -345,11 +344,11 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                             ) {
                                 Text(
                                     stringResource(R.string.read_percentage, (readingState.readingProgress * 100).toInt()),
-                                    style = MaterialTheme.typography.bodyMedium
+                                    style = EreaderFontSize.M
                                 )
                                 Text(
                                     "${readingState.currentPage} / ${readingState.totalPages}",
-                                    style = MaterialTheme.typography.bodyMedium,
+                                    style = EreaderFontSize.M,
                                     modifier = Modifier.testTag("pageInfoText")
                                 )
                             }
@@ -382,7 +381,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                                 )
                                 Text(
                                     readingState.chapterTitle.ifEmpty { stringResource(R.string.toc) },
-                                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 14.sp),
+                                    style = EreaderFontSize.M,
                                     color = EreaderColors.Black,
                                     maxLines = 1,
                                     overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis

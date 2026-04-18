@@ -13,7 +13,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -27,6 +26,7 @@ import com.rotein.ebookreader.R
 import com.rotein.ebookreader.Bookmark
 import com.rotein.ebookreader.BookmarkSortStore
 import com.rotein.ebookreader.ui.theme.EreaderColors
+import com.rotein.ebookreader.ui.theme.EreaderFontSize
 import com.rotein.ebookreader.ui.theme.EreaderSpacing
 
 @Composable
@@ -67,13 +67,13 @@ internal fun BookmarkPopup(
                     if (page > 0) {
                         Text(
                             "p.$page",
-                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                            style = EreaderFontSize.S.copy(fontWeight = FontWeight.Bold),
                             color = EreaderColors.Black
                         )
                     }
                     Text(
                         bookmark.chapterTitle,
-                        style = MaterialTheme.typography.labelSmall,
+                        style = EreaderFontSize.S,
                         color = EreaderColors.DarkGray,
                         modifier = Modifier.weight(1f).padding(start = if (page > 0) EreaderSpacing.S else 0.dp),
                         maxLines = 1,
@@ -83,14 +83,14 @@ internal fun BookmarkPopup(
                 }
                 Text(
                     bookmark.excerpt,
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = EreaderFontSize.M,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.padding(bottom = EreaderSpacing.XS)
                 )
                 Text(
                     dateStr,
-                    style = MaterialTheme.typography.labelSmall,
+                    style = EreaderFontSize.S,
                     color = EreaderColors.DarkGray
                 )
             }
