@@ -397,11 +397,11 @@ private fun TopBar(
             // 언어 선택 드롭다운
             val currentLocale = AppCompatDelegate.getApplicationLocales().get(0)?.language ?: "en"
             val languageOptions = listOf(
-                "en" to stringResource(R.string.language_english),
-                "ko" to stringResource(R.string.language_korean),
-                "ja" to stringResource(R.string.language_japanese),
-                "zh" to stringResource(R.string.language_chinese),
-                "es" to stringResource(R.string.language_spanish),
+                "en" to "English",
+                "ko" to "한국어",
+                "ja" to "日本語",
+                "zh" to "中文",
+                "es" to "Español",
             )
             val currentLanguageCode = languageOptions.firstOrNull { it.first == currentLocale }?.first ?: "en"
 
@@ -412,7 +412,16 @@ private fun TopBar(
                     val localeList = LocaleListCompat.forLanguageTags(code)
                     AppCompatDelegate.setApplicationLocales(localeList)
                 },
-                label = { it.first.uppercase() },
+                label = { it.second },
+                trigger = { onClick ->
+                    Text(
+                        text = stringResource(R.string.language),
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier
+                            .clickable { onClick() }
+                            .padding(horizontal = EreaderSpacing.M, vertical = EreaderSpacing.S)
+                    )
+                }
             )
 
         }
