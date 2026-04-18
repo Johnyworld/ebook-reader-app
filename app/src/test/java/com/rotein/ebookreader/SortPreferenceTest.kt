@@ -5,26 +5,6 @@ import org.junit.Test
 
 class SortPreferenceTest {
 
-    // --- extractFontFamilyName (private이지만 fontDisplayName, getSystemFontFamilies를 통해 간접 테스트 불가하므로
-    //     공개 함수/enum 위주로 테스트) ---
-
-    // --- fontDisplayName ---
-
-    @Test
-    fun `fontDisplayName - epub original`() {
-        assertEquals("전자책 글꼴", fontDisplayName(FONT_EPUB_ORIGINAL))
-    }
-
-    @Test
-    fun `fontDisplayName - system font`() {
-        assertEquals("시스템 글꼴", fontDisplayName(FONT_SYSTEM))
-    }
-
-    @Test
-    fun `fontDisplayName - 커스텀 폰트명 그대로 반환`() {
-        assertEquals("NotoSansKR", fontDisplayName("NotoSansKR"))
-    }
-
     // --- SortField ---
 
     @Test
@@ -46,19 +26,19 @@ class SortPreferenceTest {
     // --- FilterMode ---
 
     @Test
-    fun `FilterMode - label 확인`() {
-        assertEquals("전체보기", FilterMode.ALL.label)
-        assertEquals("즐겨찾기", FilterMode.FAVORITE.label)
-        assertEquals("숨김보기", FilterMode.HIDDEN.label)
+    fun `FilterMode - labelRes 매핑 확인`() {
+        assertEquals(R.string.filter_all, FilterMode.ALL.labelRes)
+        assertEquals(R.string.filter_favorite, FilterMode.FAVORITE.labelRes)
+        assertEquals(R.string.filter_hidden, FilterMode.HIDDEN.labelRes)
     }
 
     // --- BookmarkSortOrder ---
 
     @Test
-    fun `BookmarkSortOrder - 모든 값 label 확인`() {
-        assertEquals("등록순", BookmarkSortOrder.CREATED_ASC.label)
-        assertEquals("최신순", BookmarkSortOrder.CREATED_DESC.label)
-        assertEquals("페이지순", BookmarkSortOrder.PAGE_ASC.label)
+    fun `BookmarkSortOrder - labelRes 매핑 확인`() {
+        assertEquals(R.string.sort_created_asc, BookmarkSortOrder.CREATED_ASC.labelRes)
+        assertEquals(R.string.sort_created_desc, BookmarkSortOrder.CREATED_DESC.labelRes)
+        assertEquals(R.string.sort_page_asc, BookmarkSortOrder.PAGE_ASC.labelRes)
     }
 
     // --- ReaderPageFlip ---

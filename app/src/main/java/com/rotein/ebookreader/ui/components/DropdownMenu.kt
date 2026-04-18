@@ -50,7 +50,7 @@ fun <T> EreaderDropdownMenu(
     items: List<T>,
     selectedItem: T? = null,
     onSelect: (T) -> Unit,
-    label: (T) -> String,
+    label: @Composable (T) -> String,
     popupWidth: Dp? = null,
     popupAlignment: Alignment = Alignment.TopEnd,
     forceAbove: Boolean = false,

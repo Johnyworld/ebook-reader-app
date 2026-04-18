@@ -21,7 +21,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.rotein.ebookreader.R
 import com.rotein.ebookreader.Bookmark
 import com.rotein.ebookreader.BookmarkSortStore
 import com.rotein.ebookreader.ui.theme.EreaderColors
@@ -37,13 +39,13 @@ internal fun BookmarkPopup(
     onDismiss: () -> Unit
 ) {
     AnnotationListPopup(
-        title = "북마크",
+        title = stringResource(R.string.bookmark),
         items = bookmarks,
         spinePageOffsets = spinePageOffsets,
         cfiPageMap = cfiPageMap,
         sortStore = BookmarkSortStore,
         itemHeightDp = 88,
-        emptyText = "북마크가 없습니다.",
+        emptyText = stringResource(R.string.no_bookmarks),
         onDismiss = onDismiss
     ) { bookmark, page, dateStr ->
         Row(
@@ -95,7 +97,7 @@ internal fun BookmarkPopup(
             IconButton(onClick = { onDelete(bookmark) }) {
                 Icon(
                     Icons.Default.Close,
-                    contentDescription = "삭제",
+                    contentDescription = stringResource(R.string.delete),
                     modifier = Modifier.size(18.dp)
                 )
             }

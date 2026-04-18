@@ -15,6 +15,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.res.stringResource
+import com.rotein.ebookreader.R
 import com.rotein.ebookreader.CenteredMessage
 import com.rotein.ebookreader.LoadingIndicator
 import com.rotein.ebookreader.ui.theme.EreaderSpacing
@@ -36,7 +38,7 @@ internal fun TxtViewer(path: String, onCenterTap: () -> Unit) {
     }
 
     when {
-        error -> CenteredMessage("파일을 읽을 수 없습니다.")
+        error -> CenteredMessage(stringResource(R.string.error_cannot_read))
         text == null -> LoadingIndicator()
         else -> Text(
             text = text!!,

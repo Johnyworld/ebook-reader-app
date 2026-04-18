@@ -11,6 +11,8 @@ import android.widget.FrameLayout
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.res.stringResource
+import com.rotein.ebookreader.R
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -39,7 +41,7 @@ internal fun PdfViewer(
 ) {
     val file = remember(path) { File(path) }
     if (!file.exists() || !file.canRead()) {
-        CenteredMessage("PDF 파일을 읽을 수 없습니다.")
+        CenteredMessage(stringResource(R.string.error_cannot_read))
         return
     }
 

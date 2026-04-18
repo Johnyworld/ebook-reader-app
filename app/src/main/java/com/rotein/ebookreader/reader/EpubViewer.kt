@@ -28,6 +28,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.viewinterop.AndroidView
 import com.rotein.ebookreader.CenteredMessage
 import com.rotein.ebookreader.FONT_EPUB_ORIGINAL
@@ -36,6 +37,7 @@ import com.rotein.ebookreader.LoadingIndicator
 import com.rotein.ebookreader.ReaderPageFlip
 import com.rotein.ebookreader.ReaderSettings
 import com.rotein.ebookreader.fontFamilyForJs
+import com.rotein.ebookreader.R
 import com.rotein.ebookreader.ui.components.ActionItem
 import com.rotein.ebookreader.ui.components.ActionPopup
 import kotlinx.coroutines.Dispatchers
@@ -145,7 +147,7 @@ internal fun EpubViewer(
 
     Box(Modifier.fillMaxSize()) {
     when {
-        error -> CenteredMessage("EPUB 파일을 읽을 수 없습니다.")
+        error -> CenteredMessage(stringResource(R.string.error_cannot_read))
         bookDir == null || savedCfi == null -> LoadingIndicator()
         else -> AndroidView(
             factory = { ctx ->
@@ -384,7 +386,7 @@ internal fun EpubViewer(
             selectionBottom = sel.bottom,
             selectionCx = sel.x,
             actions = buildList {
-                add(ActionItem("하이라이트") {
+                add(ActionItem(stringResource(R.string.highlight)) {
                     fun doHighlight(text: String, cfi: String) {
                         onHighlight(text, cfi)
                         resetContinuation()
@@ -401,7 +403,7 @@ internal fun EpubViewer(
                         doHighlight(sel.text, sel.cfi)
                     }
                 })
-                add(ActionItem("메모") {
+                add(ActionItem(stringResource(R.string.memo)) {
                     fun doMemo(text: String, cfi: String) {
                         onMemo(text, cfi)
                         resetContinuation()
@@ -418,7 +420,7 @@ internal fun EpubViewer(
                         doMemo(sel.text, sel.cfi)
                     }
                 })
-                add(ActionItem("공유") {
+                add(ActionItem(stringResource(R.string.share)) {
                     val shareText = if (isContinuationMode) (pendingStartText ?: "") + sel.text else sel.text
                     val intent = Intent(Intent.ACTION_SEND).apply {
                         type = "text/plain"
@@ -429,7 +431,7 @@ internal fun EpubViewer(
                     clearSelection()
                 })
                 if (sel.isAtPageEnd && !isContinuationMode) {
-                    add(ActionItem("이어서 선택") {
+                    add(ActionItem(stringResource(R.string.continue_selection)) {
                         pendingStartText = sel.text
                         isContinuationMode = true
                         isContinuationTransitioning = true

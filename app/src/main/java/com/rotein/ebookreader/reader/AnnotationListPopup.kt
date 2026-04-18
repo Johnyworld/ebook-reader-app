@@ -20,6 +20,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
+import com.rotein.ebookreader.R
 import com.rotein.ebookreader.AnnotationItem
 import com.rotein.ebookreader.AnnotationSortStore
 import com.rotein.ebookreader.BookmarkSortOrder
@@ -30,8 +32,6 @@ import com.rotein.ebookreader.ui.components.PaginationBar
 import com.rotein.ebookreader.ui.components.PopupHeaderBar
 import com.rotein.ebookreader.ui.theme.EreaderColors
 import com.rotein.ebookreader.ui.theme.EreaderSpacing
-import java.text.SimpleDateFormat
-import java.util.Date
 import java.util.Locale
 
 @Composable
@@ -42,7 +42,7 @@ internal fun <T : AnnotationItem> AnnotationListPopup(
     cfiPageMap: Map<String, Int>,
     sortStore: AnnotationSortStore,
     itemHeightDp: Int = 88,
-    emptyText: String = "${title}이(가) 없습니다.",
+    emptyText: String = "",
     onDismiss: () -> Unit,
     itemContent: @Composable (item: T, page: Int, dateStr: String) -> Unit
 ) {
@@ -64,7 +64,10 @@ internal fun <T : AnnotationItem> AnnotationListPopup(
     }
     val totalPages = maxOf(1, (sortedItems.size + itemsPerPage - 1) / itemsPerPage)
     val pageItems = sortedItems.drop(currentPage * itemsPerPage).take(itemsPerPage)
-    val dateFormat = remember { SimpleDateFormat("yyyy.MM.dd HH:mm", Locale.getDefault()) }
+    val dateFormat = remember {
+        java.time.format.DateTimeFormatter.ofLocalizedDateTime(java.time.format.FormatStyle.SHORT)
+            .withLocale(Locale.getDefault())
+    }
 
     LaunchedEffect(sortOrder) { sortStore.save(context, sortOrder) }
     LaunchedEffect(sortedItems.size) {
@@ -77,7 +80,7 @@ internal fun <T : AnnotationItem> AnnotationListPopup(
                 items = BookmarkSortOrder.entries.toList(),
                 selectedItem = sortOrder,
                 onSelect = { sortOrder = it },
-                label = { it.label },
+                label = { stringResource(it.labelRes) },
             )
         }
 
@@ -91,7 +94,7 @@ internal fun <T : AnnotationItem> AnnotationListPopup(
                     pageItems.forEachIndexed { index, item ->
                         if (index > 0) HorizontalDivider(color = EreaderColors.Gray)
                         val itemPage = item.page.takeIf { it > 0 } ?: cfiToPage(item.cfi, spinePageOffsets, cfiPageMap)
-                        itemContent(item, itemPage, dateFormat.format(Date(item.createdAt)))
+                        itemContent(item, itemPage, dateFormat.format(java.time.Instant.ofEpochMilli(item.createdAt).atZone(java.time.ZoneId.systemDefault()).toLocalDateTime()))
                     }
                 }
             }
@@ -102,7 +105,7 @@ internal fun <T : AnnotationItem> AnnotationListPopup(
                 PaginationBar(
                     currentPage = currentPage,
                     totalPages = totalPages,
-                    centerText = "${currentPage + 1}/$totalPages (${sortedItems.size}건)",
+                    centerText = stringResource(R.string.pagination_format, currentPage + 1, totalPages, sortedItems.size),
                     onPrevious = { currentPage-- },
                     onNext = { currentPage++ },
                     modifier = Modifier.padding(bottom = EreaderSpacing.L),

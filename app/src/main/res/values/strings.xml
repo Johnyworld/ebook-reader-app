@@ -1,4 +1,150 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Ebook Reader</string>
+
+    <!-- AllBooksScreen -->
+    <string name="permission_description">To search files on your device,\nstorage access permission is required.</string>
+    <string name="grant_permission">Grant Permission</string>
+    <string name="loading_files">Searching files…</string>
+    <string name="empty">Empty</string>
+    <string name="search">Search</string>
+    <string name="search_books_hint">Search by title, author…</string>
+    <string name="close_search">Close search</string>
+    <string name="remove_favorite">Remove favorite</string>
+    <string name="add_favorite">Favorite</string>
+    <string name="unhide">Unhide</string>
+    <string name="hide">Hide</string>
+    <string name="menu">Menu</string>
+    <string name="pagination_format">%1$d/%2$d (%3$d items)</string>
+    <string name="pagination_books_format">%1$d/%2$d (%3$d books)</string>
+    <string name="read_percentage">%d%% read</string>
+    <string name="page_number">Page %d</string>
+
+    <!-- Language selector -->
+    <string name="language_en">EN</string>
+    <string name="language_ko">KO</string>
+    <string name="language_ja">JA</string>
+    <string name="language_zh">ZH</string>
+    <string name="language_es">ES</string>
+    <string name="language_english">English</string>
+    <string name="language_korean">한국어</string>
+    <string name="language_japanese">日本語</string>
+    <string name="language_chinese">中文</string>
+    <string name="language_spanish">Español</string>
+    <string name="language">Language</string>
+
+    <!-- SortPreference enums -->
+    <string name="sort_created_asc">Date added</string>
+    <string name="sort_created_desc">Latest</string>
+    <string name="sort_page_asc">Page order</string>
+    <string name="sort_title">By title</string>
+    <string name="sort_author">By author</string>
+    <string name="sort_date_added">Date added</string>
+    <string name="sort_last_read">Last read</string>
+    <string name="filter_all">All</string>
+    <string name="filter_favorite">Favorites</string>
+    <string name="filter_hidden">Hidden</string>
+
+    <!-- Font -->
+    <string name="font_epub_original">E-book font</string>
+    <string name="font_system">System font</string>
+    <string name="font_system_fonts">System fonts</string>
+    <string name="font_sort_name_asc">Name A–Z</string>
+    <string name="font_sort_name_desc">Name Z–A</string>
+    <string name="font_sort_latest">Latest</string>
+    <string name="font_sort_imported">Imported</string>
+    <string name="font_label">Font</string>
+    <string name="font_tab_fonts">Fonts</string>
+    <string name="font_tab_import">Import font</string>
+    <string name="font_import_title">Import font</string>
+    <string name="font_import_message">Import %s font?</string>
+    <string name="font_delete_title">Delete font</string>
+    <string name="font_delete_message">Delete %s font?</string>
+    <string name="font_none">No fonts.</string>
+    <string name="font_none_device">No fonts on device.</string>
+
+    <!-- ReaderTextAlign -->
+    <string name="align_justify">Justify</string>
+    <string name="align_left">Left</string>
+    <string name="align_right">Right</string>
+    <string name="align_center">Center</string>
+
+    <!-- ReaderPageFlip -->
+    <string name="page_flip_lr_prev_next">L/R\nPrev/Next</string>
+    <string name="page_flip_lr_next_prev">L/R\nNext/Prev</string>
+    <string name="page_flip_tb_prev_next">T/B\nPrev/Next</string>
+    <string name="page_flip_tb_next_prev">T/B\nNext/Prev</string>
+
+    <!-- ReaderBottomInfo -->
+    <string name="bottom_info_none">None</string>
+    <string name="bottom_info_book_title">Book title</string>
+    <string name="bottom_info_chapter_title">Chapter</string>
+    <string name="bottom_info_page">Page</string>
+    <string name="bottom_info_clock">Clock</string>
+    <string name="bottom_info_progress">Progress</string>
+
+    <!-- ReaderSettingsSheet -->
+    <string name="tab_glyph">Text</string>
+    <string name="tab_margin">Margin</string>
+    <string name="tab_viewer">Viewer</string>
+    <string name="close">Close</string>
+    <string name="setting_font_size">Font size</string>
+    <string name="setting_line_height">Line height</string>
+    <string name="setting_paragraph_spacing">Paragraph spacing</string>
+    <string name="setting_padding_vertical">Vertical margin</string>
+    <string name="setting_padding_horizontal">Horizontal margin</string>
+    <string name="setting_page_flip">Page flip</string>
+    <string name="setting_left_info">Left bottom info</string>
+    <string name="setting_right_info">Right bottom info</string>
+    <string name="setting_dual_page">Dual page in landscape</string>
+
+    <!-- BookReaderScreen -->
+    <string name="unsupported_format">Unsupported format.</string>
+    <string name="loading_book_info">Loading book information.</string>
+    <string name="toc">Table of contents</string>
+    <string name="search_content">Search in book</string>
+    <string name="highlight">Highlight</string>
+    <string name="memo">Memo</string>
+    <string name="bookmark">Bookmark</string>
+    <string name="settings">Settings</string>
+    <string name="delete_highlight">Delete highlight</string>
+    <string name="edit_memo">Edit memo</string>
+    <string name="delete_memo">Delete memo</string>
+    <string name="share">Share</string>
+    <string name="continue_selection">Continue selection</string>
+
+    <!-- MemoEditorScreen -->
+    <string name="save">Save</string>
+    <string name="memo_placeholder">Enter memo…</string>
+    <string name="delete">Delete</string>
+    <string name="go_to_page">Go to page</string>
+
+    <!-- SearchPopup -->
+    <string name="enter_search_query">Enter a search query.</string>
+    <string name="no_search_results">No results found.</string>
+    <string name="search_min_chars">Enter at least 2 characters.</string>
+    <string name="clear_search">Clear search</string>
+
+    <!-- TocPopup -->
+    <string name="toc_title_format">TOC: %s</string>
+    <string name="loading_toc">Loading table of contents.</string>
+
+    <!-- Annotation popups -->
+    <string name="no_highlights">No highlights.</string>
+    <string name="no_bookmarks">No bookmarks.</string>
+    <string name="no_memos">No memos.</string>
+
+    <!-- TxtViewer -->
+    <string name="error_cannot_read">Cannot read file.</string>
+
+    <!-- PaginationBar -->
+    <string name="previous">Previous</string>
+    <string name="next">Next</string>
+
+    <!-- PopupHeaderBar -->
+    <string name="back">Back</string>
+
+    <!-- Common -->
+    <string name="yes">Yes</string>
+    <string name="no">No</string>
 </resources>

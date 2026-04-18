@@ -22,7 +22,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.rotein.ebookreader.R
 import com.rotein.ebookreader.Memo
 import com.rotein.ebookreader.MemoSortStore
 import com.rotein.ebookreader.ui.theme.EreaderColors
@@ -39,13 +41,13 @@ internal fun MemoListPopup(
     onDismiss: () -> Unit
 ) {
     AnnotationListPopup(
-        title = "메모",
+        title = stringResource(R.string.memo),
         items = memos,
         spinePageOffsets = spinePageOffsets,
         cfiPageMap = cfiPageMap,
         sortStore = MemoSortStore,
         itemHeightDp = 112,
-        emptyText = "메모가 없습니다.",
+        emptyText = stringResource(R.string.no_memos),
         onDismiss = onDismiss
     ) { memo, page, dateStr ->
         Row(
@@ -93,7 +95,7 @@ internal fun MemoListPopup(
                 Text(dateStr, style = MaterialTheme.typography.labelSmall, color = EreaderColors.DarkGray)
             }
             IconButton(onClick = { onDelete(memo) }) {
-                Icon(Icons.Default.Close, contentDescription = "삭제", modifier = Modifier.size(18.dp))
+                Icon(Icons.Default.Close, contentDescription = stringResource(R.string.delete), modifier = Modifier.size(18.dp))
             }
         }
     }

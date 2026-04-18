@@ -33,7 +33,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.rotein.ebookreader.R
 import com.rotein.ebookreader.FONT_EPUB_ORIGINAL
 import com.rotein.ebookreader.FONT_SYSTEM
 import com.rotein.ebookreader.FontSortOrder
@@ -109,8 +111,8 @@ internal fun FontLayerPopup(
     confirmImportFont?.let { (fontName, filePath) ->
         AlertDialog(
             onDismissRequest = { confirmImportFont = null },
-            title = { Text("글꼴 가져오기") },
-            text = { Text("${fontName} 글꼴을 가져올까요?") },
+            title = { Text(stringResource(R.string.font_import_title)) },
+            text = { Text(stringResource(R.string.font_import_message, fontName)) },
             confirmButton = {
                 TextButton(onClick = {
                     try {
@@ -122,10 +124,10 @@ internal fun FontLayerPopup(
                         onFontImported()
                     } catch (e: Exception) { /* ignore */ }
                     confirmImportFont = null
-                }) { Text("예") }
+                }) { Text(stringResource(R.string.yes)) }
             },
             dismissButton = {
-                TextButton(onClick = { confirmImportFont = null }) { Text("아니오") }
+                TextButton(onClick = { confirmImportFont = null }) { Text(stringResource(R.string.no)) }
             }
         )
     }
@@ -133,8 +135,8 @@ internal fun FontLayerPopup(
     confirmDeleteFont?.let { fontName ->
         AlertDialog(
             onDismissRequest = { confirmDeleteFont = null },
-            title = { Text("글꼴 삭제") },
-            text = { Text("${fontName} 글꼴을 삭제할까요?") },
+            title = { Text(stringResource(R.string.font_delete_title)) },
+            text = { Text(stringResource(R.string.font_delete_message, fontName)) },
             confirmButton = {
                 TextButton(onClick = {
                     ImportedFontStore.remove(context, fontName)
@@ -142,10 +144,10 @@ internal fun FontLayerPopup(
                     onFontImported()
                     if (fontName == currentFontName) onFontChanged(FONT_EPUB_ORIGINAL)
                     confirmDeleteFont = null
-                }) { Text("예") }
+                }) { Text(stringResource(R.string.yes)) }
             },
             dismissButton = {
-                TextButton(onClick = { confirmDeleteFont = null }) { Text("아니오") }
+                TextButton(onClick = { confirmDeleteFont = null }) { Text(stringResource(R.string.no)) }
             }
         )
     }
@@ -157,27 +159,27 @@ internal fun FontLayerPopup(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = onDismiss) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "닫기")
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.close))
                 }
-                Text("글꼴", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                Text(stringResource(R.string.font_label), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
                 if (selectedTab == 0) {
                     EreaderDropdownMenu(
                         items = FontSortOrder.entries.toList(),
                         selectedItem = fontSortOrder,
                         onSelect = { fontSortOrder = it },
-                        label = { it.label },
+                        label = { stringResource(it.labelRes) },
                     )
                 } else {
                     EreaderDropdownMenu(
                         items = SystemFontSortOrder.entries.toList(),
                         selectedItem = systemFontSortOrder,
                         onSelect = { systemFontSortOrder = it },
-                        label = { it.label },
+                        label = { stringResource(it.labelRes) },
                     )
                 }
             }
             EreaderTabBar(
-                tabs = listOf("글꼴", "글꼴 가져오기"),
+                tabs = listOf(stringResource(R.string.font_tab_fonts), stringResource(R.string.font_tab_import)),
                 selectedIndex = selectedTab,
                 onSelect = { selectedTab = it },
             )
@@ -188,7 +190,7 @@ internal fun FontLayerPopup(
                 if (currentItems.isEmpty()) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Text(
-                            if (selectedTab == 0) "글꼴이 없습니다." else "기기에 글꼴이 없습니다.",
+                            stringResource(if (selectedTab == 0) R.string.font_none else R.string.font_none_device),
                             style = MaterialTheme.typography.bodyMedium
                         )
                     }
@@ -225,7 +227,7 @@ internal fun FontLayerPopup(
                                         onClick = { confirmDeleteFont = fontName },
                                         modifier = Modifier.size(40.dp)
                                     ) {
-                                        Icon(Icons.Default.Close, contentDescription = "삭제", modifier = Modifier.size(16.dp))
+                                        Icon(Icons.Default.Close, contentDescription = stringResource(R.string.delete), modifier = Modifier.size(16.dp))
                                     }
                                 }
                             }
@@ -240,7 +242,7 @@ internal fun FontLayerPopup(
                     PaginationBar(
                         currentPage = currentPage,
                         totalPages = totalPages,
-                        centerText = "${currentPage + 1}/$totalPages (${currentItems.size}개)",
+                        centerText = stringResource(R.string.pagination_format, currentPage + 1, totalPages, currentItems.size),
                         onPrevious = { currentPage-- },
                         onNext = { currentPage++ },
                         modifier = Modifier.padding(bottom = EreaderSpacing.L),

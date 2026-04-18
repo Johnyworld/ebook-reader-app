@@ -24,7 +24,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.rotein.ebookreader.R
 import com.rotein.ebookreader.ui.components.FullScreenPopup
 import com.rotein.ebookreader.ui.components.PopupHeaderBar
 import com.rotein.ebookreader.ui.theme.EreaderColors
@@ -42,9 +44,9 @@ internal fun MemoEditorScreen(
     var note by remember { mutableStateOf(initialNote) }
 
     FullScreenPopup {
-            PopupHeaderBar(title = "메모", onBack = onCancel) {
+            PopupHeaderBar(title = stringResource(R.string.memo), onBack = onCancel) {
                 TextButton(onClick = { onSave(note) }) {
-                    Text("저장", color = EreaderColors.Black)
+                    Text(stringResource(R.string.save), color = EreaderColors.Black)
                 }
             }
             Column(
@@ -77,7 +79,7 @@ internal fun MemoEditorScreen(
                     decorationBox = { inner ->
                         Box {
                             if (note.isEmpty()) {
-                                Text("메모를 입력하세요.", style = MaterialTheme.typography.bodyMedium, color = EreaderColors.Gray)
+                                Text(stringResource(R.string.memo_placeholder), style = MaterialTheme.typography.bodyMedium, color = EreaderColors.Gray)
                             }
                             inner()
                         }
@@ -93,7 +95,7 @@ internal fun MemoEditorScreen(
                 ) {
                     if (onDelete != null) {
                         TextButton(onClick = onDelete, modifier = Modifier.weight(1f)) {
-                            Text("삭제", color = EreaderColors.Black)
+                            Text(stringResource(R.string.delete), color = EreaderColors.Black)
                         }
                     }
                     if (onDelete != null && onNavigate != null) {
@@ -101,7 +103,7 @@ internal fun MemoEditorScreen(
                     }
                     if (onNavigate != null) {
                         TextButton(onClick = onNavigate, modifier = Modifier.weight(1f)) {
-                            Text("페이지로 이동", color = EreaderColors.Black)
+                            Text(stringResource(R.string.go_to_page), color = EreaderColors.Black)
                         }
                     }
                 }

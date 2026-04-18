@@ -51,6 +51,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.rotein.ebookreader.reader.BookmarkPopup
@@ -271,7 +272,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                 onWebViewCreated = { webView -> viewerWebView.value = webView }
             )
             "mobi" -> MobiViewer(book.path, onCenterTap)
-            else   -> CenteredMessage("지원하지 않는 형식입니다.")
+            else   -> CenteredMessage(stringResource(R.string.unsupported_format))
         }
 
         // 북마크 리본은 WebView 내부 HTML로 렌더링 (글자 하위 레이어)
@@ -331,7 +332,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                                 .padding(horizontal = EreaderSpacing.L, vertical = EreaderSpacing.L),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text("도서 정보를 읽고 있습니다.", style = MaterialTheme.typography.bodyMedium)
+                            Text(stringResource(R.string.loading_book_info), style = MaterialTheme.typography.bodyMedium)
                         }
                     } else {
                     Column(modifier = Modifier.fillMaxWidth()) {
@@ -343,7 +344,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    "${(readingState.readingProgress * 100).toInt()}% 읽음",
+                                    stringResource(R.string.read_percentage, (readingState.readingProgress * 100).toInt()),
                                     style = MaterialTheme.typography.bodyMedium
                                 )
                                 Text(
@@ -380,7 +381,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                                     tint = EreaderColors.Black
                                 )
                                 Text(
-                                    readingState.chapterTitle.ifEmpty { "목차" },
+                                    readingState.chapterTitle.ifEmpty { stringResource(R.string.toc) },
                                     style = MaterialTheme.typography.bodySmall.copy(fontSize = 14.sp),
                                     color = EreaderColors.Black,
                                     maxLines = 1,
@@ -391,25 +392,25 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
 
                         HorizontalDivider(color = EreaderColors.Black)
 
-                        ReaderMenuItem(Icons.Default.Search, "본문 검색", onClick = {
+                        ReaderMenuItem(Icons.Default.Search, stringResource(R.string.search_content), onClick = {
                             vm.setShowSearchPopup(true)
                         })
                         HorizontalDivider(color = EreaderColors.Gray)
                         if (!isPdf) {
-                        ReaderMenuItem(Icons.Default.Star, "하이라이트", onClick = {
+                        ReaderMenuItem(Icons.Default.Star, stringResource(R.string.highlight), onClick = {
                             vm.setShowHighlightPopup(true)
                         })
                         HorizontalDivider(color = EreaderColors.Gray)
-                        ReaderMenuItem(Icons.Default.Edit, "메모", onClick = {
+                        ReaderMenuItem(Icons.Default.Edit, stringResource(R.string.memo), onClick = {
                             vm.setShowMemoListPopup(true)
                         })
                         HorizontalDivider(color = EreaderColors.Gray)
                         }
-                        ReaderMenuItem(Icons.Default.Bookmark, "북마크", onClick = {
+                        ReaderMenuItem(Icons.Default.Bookmark, stringResource(R.string.bookmark), onClick = {
                             vm.setShowBookmarkPopup(true)
                         })
                         HorizontalDivider(color = EreaderColors.Gray)
-                        ReaderMenuItem(Icons.Default.Settings, "설정", onClick = {
+                        ReaderMenuItem(Icons.Default.Settings, stringResource(R.string.settings), onClick = {
                             vm.setShowSettingsPopup(true)
                             vm.setShowMenu(false)
                         })
@@ -469,7 +470,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                                         bookPath = book.path,
                                         cfi = readingState.currentCfi,
                                         chapterTitle = "",
-                                        excerpt = "${pageNum}페이지",
+                                        excerpt = context.getString(R.string.page_number, pageNum),
                                         page = pageNum,
                                         createdAt = System.currentTimeMillis()
                                     )
@@ -514,7 +515,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                         }) {
                             Icon(
                                 if (annotationState.isCurrentPageBookmarked) Icons.Filled.Bookmark else Icons.Filled.BookmarkBorder,
-                                contentDescription = "북마크",
+                                contentDescription = stringResource(R.string.bookmark),
                                 tint = EreaderColors.Black
                             )
                         }
@@ -620,18 +621,18 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                 selectionBottom = state.bottom,
                 selectionCx = state.x,
                 actions = listOf(
-                    ActionItem("하이라이트 삭제") {
+                    ActionItem(stringResource(R.string.delete_highlight)) {
                         val id = state.id
                         vm.setHighlightAction(null)
                         vm.removeHighlight(id)
                         viewerWebView.value?.evaluateJavascript("window._removeHighlight($id)", null)
                     },
-                    ActionItem("메모") {
+                    ActionItem(stringResource(R.string.memo)) {
                         val hl = annotationState.highlights.find { it.id == state.id }
                         vm.openMemoEditor(hl?.text ?: "", hl?.cfi ?: "", annotationState.memos.find { it.cfi == hl?.cfi })
                         vm.setHighlightAction(null)
                     },
-                    ActionItem("공유") {
+                    ActionItem(stringResource(R.string.share)) {
                         val text = annotationState.highlights.find { it.id == state.id }?.text ?: ""
                         val intent = Intent(Intent.ACTION_SEND).apply {
                             type = "text/plain"
@@ -651,26 +652,26 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                 selectionBottom = state.bottom,
                 selectionCx = state.x,
                 actions = listOf(
-                    ActionItem("하이라이트 삭제") {
+                    ActionItem(stringResource(R.string.delete_highlight)) {
                         val hid = state.highlightId
                         vm.setCombinedAnnotation(null)
                         vm.removeHighlight(hid)
                         viewerWebView.value?.evaluateJavascript("window._removeHighlight($hid)", null)
                     },
-                    ActionItem("메모 편집") {
+                    ActionItem(stringResource(R.string.edit_memo)) {
                         val memo = annotationState.memos.find { it.id == state.memoId }
                         vm.setCombinedAnnotation(null)
                         if (memo != null) {
                             vm.openMemoEditor(memo.text, memo.cfi, memo)
                         }
                     },
-                    ActionItem("메모 삭제") {
+                    ActionItem(stringResource(R.string.delete_memo)) {
                         val mid = state.memoId
                         vm.setCombinedAnnotation(null)
                         vm.removeMemo(mid)
                         viewerWebView.value?.evaluateJavascript("window._removeMemo($mid)", null)
                     },
-                    ActionItem("공유") {
+                    ActionItem(stringResource(R.string.share)) {
                         val hl = annotationState.highlights.find { it.id == state.highlightId }
                         val memo = annotationState.memos.find { it.id == state.memoId }
                         val text = buildString {
@@ -696,7 +697,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                 selectionBottom = state.bottom,
                 selectionCx = state.x,
                 actions = listOf(
-                    ActionItem("하이라이트") {
+                    ActionItem(stringResource(R.string.highlight)) {
                         vm.setMemoAction(null)
                         if (memo != null) {
                             scope.launch {
@@ -706,19 +707,19 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                             }
                         }
                     },
-                    ActionItem("메모 편집") {
+                    ActionItem(stringResource(R.string.edit_memo)) {
                         vm.setMemoAction(null)
                         if (memo != null) {
                             vm.openMemoEditor(memo.text, memo.cfi, memo)
                         }
                     },
-                    ActionItem("메모 삭제") {
+                    ActionItem(stringResource(R.string.delete_memo)) {
                         val id = state.id
                         vm.setMemoAction(null)
                         vm.removeMemo(id)
                         viewerWebView.value?.evaluateJavascript("window._removeMemo($id)", null)
                     },
-                    ActionItem("공유") {
+                    ActionItem(stringResource(R.string.share)) {
                         val text = memo?.let { "${it.text}\n\n${it.note}" } ?: ""
                         val intent = Intent(Intent.ACTION_SEND).apply {
                             type = "text/plain"

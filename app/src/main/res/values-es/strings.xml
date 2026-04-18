@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- AllBooksScreen -->
+    <string name="permission_description">Para buscar archivos en tu dispositivo,\nse necesita permiso de acceso al almacenamiento.</string>
+    <string name="grant_permission">Conceder permiso</string>
+    <string name="loading_files">Buscando archivos…</string>
+    <string name="empty">Vacío</string>
+    <string name="search">Buscar</string>
+    <string name="search_books_hint">Buscar por título, autor…</string>
+    <string name="close_search">Cerrar búsqueda</string>
+    <string name="remove_favorite">Quitar favorito</string>
+    <string name="add_favorite">Favorito</string>
+    <string name="unhide">Mostrar</string>
+    <string name="hide">Ocultar</string>
+    <string name="menu">Menú</string>
+    <string name="pagination_format">%1$d/%2$d (%3$d elementos)</string>
+    <string name="pagination_books_format">%1$d/%2$d (%3$d libros)</string>
+    <string name="read_percentage">%d%% leído</string>
+    <string name="page_number">Página %d</string>
+
+    <!-- Language -->
+    <string name="language">Idioma</string>
+
+    <!-- SortPreference enums -->
+    <string name="sort_created_asc">Fecha de adición</string>
+    <string name="sort_created_desc">Más recientes</string>
+    <string name="sort_page_asc">Por páginas</string>
+    <string name="sort_title">Por título</string>
+    <string name="sort_author">Por autor</string>
+    <string name="sort_date_added">Fecha de adición</string>
+    <string name="sort_last_read">Últimos leídos</string>
+    <string name="filter_all">Todos</string>
+    <string name="filter_favorite">Favoritos</string>
+    <string name="filter_hidden">Ocultos</string>
+
+    <!-- Font -->
+    <string name="font_epub_original">Fuente del libro</string>
+    <string name="font_system">Fuente del sistema</string>
+    <string name="font_system_fonts">Fuentes del sistema</string>
+    <string name="font_sort_name_asc">Nombre A–Z</string>
+    <string name="font_sort_name_desc">Nombre Z–A</string>
+    <string name="font_sort_latest">Más recientes</string>
+    <string name="font_sort_imported">Importadas</string>
+    <string name="font_label">Fuente</string>
+    <string name="font_tab_fonts">Fuentes</string>
+    <string name="font_tab_import">Importar fuente</string>
+    <string name="font_import_title">Importar fuente</string>
+    <string name="font_import_message">¿Importar la fuente %s?</string>
+    <string name="font_delete_title">Eliminar fuente</string>
+    <string name="font_delete_message">¿Eliminar la fuente %s?</string>
+    <string name="font_none">No hay fuentes.</string>
+    <string name="font_none_device">No hay fuentes en el dispositivo.</string>
+
+    <!-- ReaderTextAlign -->
+    <string name="align_justify">Justificar</string>
+    <string name="align_left">Izquierda</string>
+    <string name="align_right">Derecha</string>
+    <string name="align_center">Centro</string>
+
+    <!-- ReaderPageFlip -->
+    <string name="page_flip_lr_prev_next">Izq/Der\nAnterior/Siguiente</string>
+    <string name="page_flip_lr_next_prev">Izq/Der\nSiguiente/Anterior</string>
+    <string name="page_flip_tb_prev_next">Arr/Abj\nAnterior/Siguiente</string>
+    <string name="page_flip_tb_next_prev">Arr/Abj\nSiguiente/Anterior</string>
+
+    <!-- ReaderBottomInfo -->
+    <string name="bottom_info_none">Ninguno</string>
+    <string name="bottom_info_book_title">Título del libro</string>
+    <string name="bottom_info_chapter_title">Capítulo</string>
+    <string name="bottom_info_page">Página</string>
+    <string name="bottom_info_clock">Reloj</string>
+    <string name="bottom_info_progress">Progreso</string>
+
+    <!-- ReaderSettingsSheet -->
+    <string name="tab_glyph">Texto</string>
+    <string name="tab_margin">Margen</string>
+    <string name="tab_viewer">Visor</string>
+    <string name="close">Cerrar</string>
+    <string name="setting_font_size">Tamaño de fuente</string>
+    <string name="setting_line_height">Interlineado</string>
+    <string name="setting_paragraph_spacing">Espaciado de párrafo</string>
+    <string name="setting_padding_vertical">Margen vertical</string>
+    <string name="setting_padding_horizontal">Margen horizontal</string>
+    <string name="setting_page_flip">Paso de página</string>
+    <string name="setting_left_info">Info inferior izquierda</string>
+    <string name="setting_right_info">Info inferior derecha</string>
+    <string name="setting_dual_page">Doble página en horizontal</string>
+
+    <!-- BookReaderScreen -->
+    <string name="unsupported_format">Formato no compatible.</string>
+    <string name="loading_book_info">Cargando información del libro.</string>
+    <string name="toc">Índice</string>
+    <string name="search_content">Buscar en el libro</string>
+    <string name="highlight">Resaltado</string>
+    <string name="memo">Nota</string>
+    <string name="bookmark">Marcador</string>
+    <string name="settings">Ajustes</string>
+    <string name="delete_highlight">Eliminar resaltado</string>
+    <string name="edit_memo">Editar nota</string>
+    <string name="delete_memo">Eliminar nota</string>
+    <string name="share">Compartir</string>
+    <string name="continue_selection">Continuar selección</string>
+
+    <!-- MemoEditorScreen -->
+    <string name="save">Guardar</string>
+    <string name="memo_placeholder">Escribir nota…</string>
+    <string name="delete">Eliminar</string>
+    <string name="go_to_page">Ir a la página</string>
+
+    <!-- SearchPopup -->
+    <string name="enter_search_query">Introduce un término de búsqueda.</string>
+    <string name="no_search_results">No se encontraron resultados.</string>
+    <string name="search_min_chars">Introduce al menos 2 caracteres.</string>
+    <string name="clear_search">Borrar búsqueda</string>
+
+    <!-- TocPopup -->
+    <string name="toc_title_format">Índice: %s</string>
+    <string name="loading_toc">Cargando índice.</string>
+
+    <!-- Annotation popups -->
+    <string name="no_highlights">No hay resaltados.</string>
+    <string name="no_bookmarks">No hay marcadores.</string>
+    <string name="no_memos">No hay notas.</string>
+
+    <!-- TxtViewer -->
+    <string name="error_cannot_read">No se puede leer el archivo.</string>
+
+    <!-- PaginationBar -->
+    <string name="previous">Anterior</string>
+    <string name="next">Siguiente</string>
+
+    <!-- PopupHeaderBar -->
+    <string name="back">Atrás</string>
+
+    <!-- Common -->
+    <string name="yes">Sí</string>
+    <string name="no">No</string>
+</resources>

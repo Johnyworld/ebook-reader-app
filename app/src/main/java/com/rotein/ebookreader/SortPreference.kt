@@ -3,14 +3,17 @@ package com.rotein.ebookreader
 import android.content.Context
 import android.graphics.fonts.SystemFonts
 import android.os.Build
+import androidx.annotation.StringRes
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.res.stringResource
 import java.io.File
 import org.json.JSONArray
 import org.json.JSONObject
 
-enum class BookmarkSortOrder(val label: String) {
-    CREATED_ASC("등록순"),
-    CREATED_DESC("최신순"),
-    PAGE_ASC("페이지순")
+enum class BookmarkSortOrder(@StringRes val labelRes: Int) {
+    CREATED_ASC(R.string.sort_created_asc),
+    CREATED_DESC(R.string.sort_created_desc),
+    PAGE_ASC(R.string.sort_page_asc)
 }
 
 class AnnotationSortStore(private val prefName: String) {
@@ -33,20 +36,20 @@ val BookmarkSortStore = AnnotationSortStore("bookmark_sort_pref")
 val MemoSortStore = AnnotationSortStore("memo_sort_pref")
 val HighlightSortStore = AnnotationSortStore("highlight_sort_pref")
 
-enum class SortField(val label: String) {
-    TITLE("제목순"),
-    AUTHOR("작가순"),
-    DATE_ADDED("담은순"),
-    LAST_READ("읽은순");
+enum class SortField(@StringRes val labelRes: Int) {
+    TITLE(R.string.sort_title),
+    AUTHOR(R.string.sort_author),
+    DATE_ADDED(R.string.sort_date_added),
+    LAST_READ(R.string.sort_last_read);
 
     /** 각 필드의 기본 정렬 방향 */
     val defaultDescending: Boolean get() = this == DATE_ADDED || this == LAST_READ
 }
 
-enum class FilterMode(val label: String) {
-    ALL("전체보기"),
-    FAVORITE("즐겨찾기"),
-    HIDDEN("숨김보기")
+enum class FilterMode(@StringRes val labelRes: Int) {
+    ALL(R.string.filter_all),
+    FAVORITE(R.string.filter_favorite),
+    HIDDEN(R.string.filter_hidden)
 }
 
 data class SortPreference(
@@ -76,22 +79,23 @@ val READER_BUILTIN_FONT_NAMES = emptyList<String>()
 const val FONT_EPUB_ORIGINAL = "epub_original"
 const val FONT_SYSTEM = "시스템 글꼴"
 
+@Composable
 fun fontDisplayName(fontName: String): String = when (fontName) {
-    FONT_EPUB_ORIGINAL -> "전자책 글꼴"
-    FONT_SYSTEM -> "시스템 글꼴"
+    FONT_EPUB_ORIGINAL -> stringResource(R.string.font_epub_original)
+    FONT_SYSTEM -> stringResource(R.string.font_system)
     else -> fontName
 }
 
-enum class FontSortOrder(val label: String) {
-    NAME_ASC("이름순 A-Z"),
-    NAME_DESC("이름순 Z-A"),
-    CREATED_DESC("최신순"),
-    IMPORTED("가져온순")
+enum class FontSortOrder(@StringRes val labelRes: Int) {
+    NAME_ASC(R.string.font_sort_name_asc),
+    NAME_DESC(R.string.font_sort_name_desc),
+    CREATED_DESC(R.string.font_sort_latest),
+    IMPORTED(R.string.font_sort_imported)
 }
 
-enum class SystemFontSortOrder(val label: String) {
-    NAME_ASC("이름순 A-Z"),
-    NAME_DESC("이름순 Z-A")
+enum class SystemFontSortOrder(@StringRes val labelRes: Int) {
+    NAME_ASC(R.string.font_sort_name_asc),
+    NAME_DESC(R.string.font_sort_name_desc)
 }
 
 object ImportedFontStore {
@@ -134,8 +138,8 @@ object ImportedFontStore {
     fun getDir(context: Context): File = File(context.filesDir, "fonts").also { it.mkdirs() }
 }
 
-fun getSystemFontFamilies(): List<String> {
-    val families = mutableListOf("시스템 폰트", FONT_EPUB_ORIGINAL)
+fun getSystemFontFamilies(context: Context): List<String> {
+    val families = mutableListOf(context.getString(R.string.font_system_fonts), FONT_EPUB_ORIGINAL)
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
         SystemFonts.getAvailableFonts()
             .mapNotNull { it.file?.nameWithoutExtension }
@@ -179,24 +183,24 @@ private fun extractFontFamilyName(fileName: String): String {
     return name.replace(Regex("(?<=[a-z])(?=[A-Z])"), " ").trim()
 }
 
-enum class ReaderTextAlign(val label: String) {
-    JUSTIFY("양쪽"), LEFT("왼쪽"), RIGHT("오른쪽"), CENTER("가운데")
+enum class ReaderTextAlign(@StringRes val labelRes: Int) {
+    JUSTIFY(R.string.align_justify), LEFT(R.string.align_left), RIGHT(R.string.align_right), CENTER(R.string.align_center)
 }
 
-enum class ReaderPageFlip(val label: String) {
-    LR_PREV_NEXT("좌우\n이전/다음"),
-    LR_NEXT_PREV("좌우\n다음/이전"),
-    TB_PREV_NEXT("상하\n이전/다음"),
-    TB_NEXT_PREV("상하\n다음/이전")
+enum class ReaderPageFlip(@StringRes val labelRes: Int) {
+    LR_PREV_NEXT(R.string.page_flip_lr_prev_next),
+    LR_NEXT_PREV(R.string.page_flip_lr_next_prev),
+    TB_PREV_NEXT(R.string.page_flip_tb_prev_next),
+    TB_NEXT_PREV(R.string.page_flip_tb_next_prev)
 }
 
-enum class ReaderBottomInfo(val label: String) {
-    NONE("없음"),
-    BOOK_TITLE("책 제목"),
-    CHAPTER_TITLE("챕터 제목"),
-    PAGE("페이지 수"),
-    CLOCK("시계"),
-    PROGRESS("진행률")
+enum class ReaderBottomInfo(@StringRes val labelRes: Int) {
+    NONE(R.string.bottom_info_none),
+    BOOK_TITLE(R.string.bottom_info_book_title),
+    CHAPTER_TITLE(R.string.bottom_info_chapter_title),
+    PAGE(R.string.bottom_info_page),
+    CLOCK(R.string.bottom_info_clock),
+    PROGRESS(R.string.bottom_info_progress)
 }
 
 data class ReaderSettings(

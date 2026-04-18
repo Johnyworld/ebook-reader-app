@@ -29,7 +29,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.rotein.ebookreader.R
 import com.rotein.ebookreader.TocItem
 import com.rotein.ebookreader.flattenToc
 import com.rotein.ebookreader.ui.components.FullScreenPopup
@@ -81,11 +83,11 @@ internal fun TocPopup(
 
     val measured = listHeightPx > 0
     FullScreenPopup(modifier = Modifier.alpha(if (measured) 1f else 0f)) {
-            PopupHeaderBar(title = "목차: $bookTitle", onBack = onDismiss)
+            PopupHeaderBar(title = stringResource(R.string.toc_title_format, bookTitle), onBack = onDismiss)
             Column(modifier = Modifier.weight(1f).onSizeChanged { listHeightPx = it.height }) {
                 if (flatItems.isEmpty()) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text("목차를 불러오는 중입니다.", style = MaterialTheme.typography.bodyMedium)
+                        Text(stringResource(R.string.loading_toc), style = MaterialTheme.typography.bodyMedium)
                     }
                 } else {
                     val pageNumberWidth = 40.dp
@@ -157,7 +159,7 @@ internal fun TocPopup(
             PaginationBar(
                 currentPage = tocPage,
                 totalPages = totalPages,
-                centerText = "${tocPage + 1}/$totalPages (${flatItems.size}건)",
+                centerText = stringResource(R.string.pagination_format, tocPage + 1, totalPages, flatItems.size),
                 onPrevious = { tocPage-- },
                 onNext = { tocPage++ },
                 modifier = Modifier.padding(bottom = EreaderSpacing.L),

@@ -21,7 +21,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.rotein.ebookreader.R
 import com.rotein.ebookreader.Highlight
 import com.rotein.ebookreader.HighlightSortStore
 import com.rotein.ebookreader.ui.theme.EreaderColors
@@ -37,13 +39,13 @@ internal fun HighlightPopup(
     onDismiss: () -> Unit
 ) {
     AnnotationListPopup(
-        title = "하이라이트",
+        title = stringResource(R.string.highlight),
         items = highlights,
         spinePageOffsets = spinePageOffsets,
         cfiPageMap = cfiPageMap,
         sortStore = HighlightSortStore,
         itemHeightDp = 88,
-        emptyText = "하이라이트가 없습니다.",
+        emptyText = stringResource(R.string.no_highlights),
         onDismiss = onDismiss
     ) { highlight, page, dateStr ->
         Row(
@@ -81,7 +83,7 @@ internal fun HighlightPopup(
                 Text(dateStr, style = MaterialTheme.typography.labelSmall, color = EreaderColors.DarkGray)
             }
             IconButton(onClick = { onDelete(highlight) }) {
-                Icon(Icons.Default.Close, contentDescription = "삭제", modifier = Modifier.size(18.dp))
+                Icon(Icons.Default.Close, contentDescription = stringResource(R.string.delete), modifier = Modifier.size(18.dp))
             }
         }
     }
