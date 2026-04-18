@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- AllBooksScreen -->
+    <string name="permission_description">기기 내 파일을 검색하려면\n저장소 접근 권한이 필요합니다.</string>
+    <string name="grant_permission">권한 허용</string>
+    <string name="loading_files">파일 검색 중…</string>
+    <string name="empty">비어있음</string>
+    <string name="search">검색</string>
+    <string name="search_books_hint">책 제목, 저자 검색…</string>
+    <string name="close_search">검색 닫기</string>
+    <string name="remove_favorite">즐겨찾기 해제</string>
+    <string name="add_favorite">즐겨찾기</string>
+    <string name="unhide">숨김 해제</string>
+    <string name="hide">숨기기</string>
+    <string name="menu">메뉴</string>
+    <string name="pagination_format">%1$d/%2$d (%3$d건)</string>
+    <string name="pagination_books_format">%1$d/%2$d (%3$d건)</string>
+    <string name="read_percentage">%d%% 읽음</string>
+    <string name="page_number">%d페이지</string>
+
+    <!-- Language -->
+    <string name="language">언어</string>
+
+    <!-- SortPreference enums -->
+    <string name="sort_created_asc">등록순</string>
+    <string name="sort_created_desc">최신순</string>
+    <string name="sort_page_asc">페이지순</string>
+    <string name="sort_title">제목순</string>
+    <string name="sort_author">작가순</string>
+    <string name="sort_date_added">담은순</string>
+    <string name="sort_last_read">읽은순</string>
+    <string name="filter_all">전체보기</string>
+    <string name="filter_favorite">즐겨찾기</string>
+    <string name="filter_hidden">숨김보기</string>
+
+    <!-- Font -->
+    <string name="font_epub_original">전자책 글꼴</string>
+    <string name="font_system">시스템 글꼴</string>
+    <string name="font_system_fonts">시스템 폰트</string>
+    <string name="font_sort_name_asc">이름순 A-Z</string>
+    <string name="font_sort_name_desc">이름순 Z-A</string>
+    <string name="font_sort_latest">최신순</string>
+    <string name="font_sort_imported">가져온순</string>
+    <string name="font_label">글꼴</string>
+    <string name="font_tab_fonts">글꼴</string>
+    <string name="font_tab_import">글꼴 가져오기</string>
+    <string name="font_import_title">글꼴 가져오기</string>
+    <string name="font_import_message">%s 글꼴을 가져올까요?</string>
+    <string name="font_delete_title">글꼴 삭제</string>
+    <string name="font_delete_message">%s 글꼴을 삭제할까요?</string>
+    <string name="font_none">글꼴이 없습니다.</string>
+    <string name="font_none_device">기기에 글꼴이 없습니다.</string>
+
+    <!-- ReaderTextAlign -->
+    <string name="align_justify">양쪽</string>
+    <string name="align_left">왼쪽</string>
+    <string name="align_right">오른쪽</string>
+    <string name="align_center">가운데</string>
+
+    <!-- ReaderPageFlip -->
+    <string name="page_flip_lr_prev_next">좌우\n이전/다음</string>
+    <string name="page_flip_lr_next_prev">좌우\n다음/이전</string>
+    <string name="page_flip_tb_prev_next">상하\n이전/다음</string>
+    <string name="page_flip_tb_next_prev">상하\n다음/이전</string>
+
+    <!-- ReaderBottomInfo -->
+    <string name="bottom_info_none">없음</string>
+    <string name="bottom_info_book_title">책 제목</string>
+    <string name="bottom_info_chapter_title">챕터 제목</string>
+    <string name="bottom_info_page">페이지 수</string>
+    <string name="bottom_info_clock">시계</string>
+    <string name="bottom_info_progress">진행률</string>
+
+    <!-- ReaderSettingsSheet -->
+    <string name="tab_glyph">글자</string>
+    <string name="tab_margin">여백</string>
+    <string name="tab_viewer">뷰어</string>
+    <string name="close">닫기</string>
+    <string name="setting_font_size">글자 크기</string>
+    <string name="setting_line_height">줄 간격</string>
+    <string name="setting_paragraph_spacing">문단 간격</string>
+    <string name="setting_padding_vertical">상하 여백</string>
+    <string name="setting_padding_horizontal">좌우 여백</string>
+    <string name="setting_page_flip">페이지 넘김</string>
+    <string name="setting_left_info">왼쪽 하단 정보</string>
+    <string name="setting_right_info">오른쪽 하단 정보</string>
+    <string name="setting_dual_page">가로모드 두 쪽 보기</string>
+
+    <!-- BookReaderScreen -->
+    <string name="unsupported_format">지원하지 않는 형식입니다.</string>
+    <string name="loading_book_info">도서 정보를 읽고 있습니다.</string>
+    <string name="toc">목차</string>
+    <string name="search_content">본문 검색</string>
+    <string name="highlight">하이라이트</string>
+    <string name="memo">메모</string>
+    <string name="bookmark">북마크</string>
+    <string name="settings">설정</string>
+    <string name="delete_highlight">하이라이트 삭제</string>
+    <string name="edit_memo">메모 편집</string>
+    <string name="delete_memo">메모 삭제</string>
+    <string name="share">공유</string>
+    <string name="continue_selection">이어서 선택</string>
+
+    <!-- MemoEditorScreen -->
+    <string name="save">저장</string>
+    <string name="memo_placeholder">메모를 입력하세요.</string>
+    <string name="delete">삭제</string>
+    <string name="go_to_page">페이지로 이동</string>
+
+    <!-- SearchPopup -->
+    <string name="enter_search_query">검색어를 입력하세요.</string>
+    <string name="no_search_results">검색 결과가 없습니다.</string>
+    <string name="search_min_chars">검색어를 두 글자 이상 입력하세요.</string>
+    <string name="clear_search">검색어 지우기</string>
+
+    <!-- TocPopup -->
+    <string name="toc_title_format">목차: %s</string>
+    <string name="loading_toc">목차를 불러오는 중입니다.</string>
+
+    <!-- Annotation popups -->
+    <string name="no_highlights">하이라이트가 없습니다.</string>
+    <string name="no_bookmarks">북마크가 없습니다.</string>
+    <string name="no_memos">메모가 없습니다.</string>
+
+    <!-- TxtViewer -->
+    <string name="error_cannot_read">파일을 읽을 수 없습니다.</string>
+
+    <!-- PaginationBar -->
+    <string name="previous">이전</string>
+    <string name="next">다음</string>
+
+    <!-- PopupHeaderBar -->
+    <string name="back">뒤로가기</string>
+
+    <!-- Common -->
+    <string name="yes">예</string>
+    <string name="no">아니오</string>
+</resources>
