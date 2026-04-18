@@ -44,7 +44,7 @@ internal fun <T : AnnotationItem> AnnotationListPopup(
     cfiPageMap: Map<String, Int>,
     sortStore: AnnotationSortStore,
     itemHeightDp: Int = 88,
-    emptyText: String = "${title}이(가) 없습니다.",
+    emptyText: String = "",
     onDismiss: () -> Unit,
     itemContent: @Composable (item: T, page: Int, dateStr: String) -> Unit
 ) {

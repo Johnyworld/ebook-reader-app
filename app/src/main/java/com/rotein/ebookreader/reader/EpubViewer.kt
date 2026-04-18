@@ -147,7 +147,7 @@ internal fun EpubViewer(
 
     Box(Modifier.fillMaxSize()) {
     when {
-        error -> CenteredMessage("EPUB 파일을 읽을 수 없습니다.")
+        error -> CenteredMessage(stringResource(R.string.error_cannot_read))
         bookDir == null || savedCfi == null -> LoadingIndicator()
         else -> AndroidView(
             factory = { ctx ->

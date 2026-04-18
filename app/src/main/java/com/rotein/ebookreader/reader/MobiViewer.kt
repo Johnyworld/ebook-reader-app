@@ -7,6 +7,8 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.res.stringResource
+import com.rotein.ebookreader.R
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -36,7 +38,7 @@ internal fun MobiViewer(path: String, onCenterTap: () -> Unit) {
     }
 
     when {
-        error -> CenteredMessage("MOBI 파일을 읽을 수 없습니다.")
+        error -> CenteredMessage(stringResource(R.string.error_cannot_read))
         html == null -> LoadingIndicator()
         else -> AndroidView(
             factory = { ctx ->
