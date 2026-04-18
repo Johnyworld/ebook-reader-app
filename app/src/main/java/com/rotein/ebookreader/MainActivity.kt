@@ -3,9 +3,9 @@ package com.rotein.ebookreader
 import android.os.Bundle
 import android.view.KeyEvent
 import android.webkit.WebView
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.appcompat.app.AppCompatActivity
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -27,7 +27,7 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 import com.rotein.ebookreader.ui.theme.EbookReaderAppTheme
 
-class MainActivity : ComponentActivity() {
+class MainActivity : AppCompatActivity() {
     var currentEpubWebView: WebView? = null
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
