@@ -71,7 +71,7 @@ val Typography = Typography(
     titleLarge = defaultTextStyle,
     titleMedium = defaultTextStyle,
     titleSmall = defaultTextStyle,
-    bodyLarge = defaultTextStyle.copy(fontSize = 16.sp, lineHeight = 24.sp, letterSpacing = 0.5.sp),
+    bodyLarge = defaultTextStyle.copy(fontSize = EreaderFontSize.L, lineHeight = 24.sp, letterSpacing = 0.5.sp),
     bodyMedium = defaultTextStyle,
     bodySmall = defaultTextStyle,
     labelLarge = defaultTextStyle,

@@ -34,7 +34,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.rotein.ebookreader.R
 import com.rotein.ebookreader.FONT_EPUB_ORIGINAL
 import com.rotein.ebookreader.FONT_SYSTEM
@@ -49,6 +48,7 @@ import com.rotein.ebookreader.ui.components.ReaderCycleSelectorField
 import com.rotein.ebookreader.ui.components.ReaderSettingRow
 import com.rotein.ebookreader.ui.components.ReaderStepperField
 import com.rotein.ebookreader.ui.theme.EreaderColors
+import com.rotein.ebookreader.ui.theme.EreaderFontSize
 import com.rotein.ebookreader.ui.theme.EreaderSpacing
 
 @Composable
@@ -63,7 +63,7 @@ internal fun ReaderMenuItem(icon: ImageVector, label: String, onClick: () -> Uni
         horizontalArrangement = Arrangement.spacedBy(EreaderSpacing.M)
     ) {
         Icon(icon, contentDescription = null)
-        Text(label, style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp))
+        Text(label, style = MaterialTheme.typography.bodyMedium.copy(fontSize = EreaderFontSize.M))
     }
 }
 

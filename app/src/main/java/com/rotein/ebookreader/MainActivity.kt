@@ -22,8 +22,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import com.rotein.ebookreader.ui.theme.EreaderColors
+import com.rotein.ebookreader.ui.theme.EreaderFontSize
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 import com.rotein.ebookreader.ui.theme.EbookReaderAppTheme
 
@@ -106,7 +106,7 @@ fun HomeScreen(modifier: Modifier = Modifier) {
             ) {
                 Text(
                     text = "ebook-reader",
-                    fontSize = 24.sp,
+                    fontSize = EreaderFontSize.XL,
                     fontWeight = FontWeight.Bold,
                     color = EreaderColors.Black
                 )

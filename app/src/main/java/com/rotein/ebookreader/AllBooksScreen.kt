@@ -54,6 +54,7 @@ import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.foundation.Canvas
 import com.rotein.ebookreader.ui.theme.EreaderColors
+import com.rotein.ebookreader.ui.theme.EreaderFontSize
 import com.rotein.ebookreader.ui.theme.EreaderSpacing
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.asImageBitmap
@@ -64,7 +65,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.sp
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.os.LocaleListCompat
 import com.rotein.ebookreader.ui.components.EreaderDropdownMenu
@@ -523,8 +523,8 @@ private fun BookItem(
                     Text(
                         text = "PDF",
                         color = EreaderColors.White,
-                        fontSize = 12.sp,
-                        lineHeight = 12.sp,
+                        fontSize = EreaderFontSize.S,
+                        lineHeight = EreaderFontSize.S,
                         fontWeight = FontWeight.Bold,
                            modifier = Modifier
                             .align(Alignment.TopEnd)
@@ -608,8 +608,8 @@ private fun BookItem(
                 }
                 Text(
                     text = "${(readingProgress * 100).toInt()}%",
-                    fontSize = 10.sp,
-                    lineHeight = 10.sp,
+                    fontSize = EreaderFontSize.XS,
+                    lineHeight = EreaderFontSize.XS,
                     color = EreaderColors.DarkGray
                 )
             }

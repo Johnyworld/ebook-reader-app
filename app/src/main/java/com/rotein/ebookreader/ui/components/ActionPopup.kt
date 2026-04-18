@@ -26,10 +26,10 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.zIndex
 import com.rotein.ebookreader.ui.theme.EreaderColors
+import com.rotein.ebookreader.ui.theme.EreaderFontSize
 import com.rotein.ebookreader.ui.theme.EreaderSpacing
 
 data class ActionItem(
@@ -82,7 +82,7 @@ fun ActionPopup(
             ) {
                 actions.forEachIndexed { index, action ->
                     TextButton(onClick = action.onClick) {
-                        Text(action.label, color = EreaderColors.Black, fontSize = 14.sp)
+                        Text(action.label, color = EreaderColors.Black, fontSize = EreaderFontSize.M)
                     }
                     if (index < actions.lastIndex) {
                         Box(Modifier.width(1.dp).height(20.dp).background(EreaderColors.Black))
