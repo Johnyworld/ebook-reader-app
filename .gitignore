@@ -36,5 +36,7 @@ replay_pid*
 /build
 /app/build
 /captures
+keystore.properties
+*.jks
 .externalNativeBuild
 .cxx
