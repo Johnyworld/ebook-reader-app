@@ -81,6 +81,15 @@ internal fun SearchPopup(
     val focusManager = LocalFocusManager.current
     var currentPage by remember { mutableStateOf(0) }
 
+    val executeSearch = {
+        if (query.length >= 2) {
+            val q = query.trim().replace(Regex("\\s+"), " ")
+            searchedQuery = q
+            onSearch(q)
+            focusManager.clearFocus()
+        }
+    }
+
     val density = LocalDensity.current
     val screenHeightDp = LocalConfiguration.current.screenHeightDp
     val statusBarHeightDp = with(density) { WindowInsets.statusBars.getTop(this).toDp().value.toInt() }
@@ -213,9 +222,7 @@ internal fun SearchPopup(
                         singleLine = true,
                         textStyle = EreaderFontSize.L.copy(color = EreaderColors.Black),
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                        keyboardActions = KeyboardActions(onSearch = {
-                            if (query.length >= 2) { val q = query.trim().replace(Regex("\\s+"), " "); searchedQuery = q; onSearch(q); focusManager.clearFocus() }
-                        }),
+                        keyboardActions = KeyboardActions(onSearch = { executeSearch() }),
                         decorationBox = { innerTextField ->
                             Box {
                                 if (query.isEmpty()) {
@@ -245,7 +252,7 @@ internal fun SearchPopup(
                     Box(
                         modifier = Modifier
                             .border(1.dp, EreaderColors.Black, RoundedCornerShape(4.dp))
-                            .clickable { if (query.length >= 2) { val q = query.trim().replace(Regex("\\s+"), " "); searchedQuery = q; onSearch(q); focusManager.clearFocus() } }
+                            .clickable { executeSearch() }
                             .padding(horizontal = EreaderSpacing.L, vertical = 10.dp),
                         contentAlignment = Alignment.Center
                     ) {
