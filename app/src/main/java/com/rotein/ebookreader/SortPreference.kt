@@ -153,13 +153,21 @@ fun getSystemFontFamilies(context: Context): List<String> {
 }
 
 fun getSystemFontFileMap(): Map<String, String> {
-    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return emptyMap()
     val result = mutableMapOf<String, String>()
-    SystemFonts.getAvailableFonts().forEach { font ->
-        val file = font.file ?: return@forEach
-        val name = extractFontFamilyName(file.nameWithoutExtension)
-        if (name.isNotBlank() && !result.containsKey(name)) {
-            result[name] = file.absolutePath
+    // 시스템 폰트 (Android 10+)
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+        SystemFonts.getAvailableFonts().forEach { font ->
+            val file = font.file ?: return@forEach
+            val name = extractFontFamilyName(file.nameWithoutExtension)
+            if (name.isNotBlank() && !result.containsKey(name)) {
+                result[name] = file.absolutePath
+            }
+        }
+    }
+    // 기기 저장소 폰트 (시스템 폰트와 이름 충돌 시 시스템 폰트 우선)
+    FontScanner.scanDeviceFonts().forEach { (name, path) ->
+        if (!result.containsKey(name)) {
+            result[name] = path
         }
     }
     return result
