@@ -165,7 +165,7 @@ fun getSystemFontFileMap(): Map<String, String> {
     return result
 }
 
-private fun extractFontFamilyName(fileName: String): String {
+internal fun extractFontFamilyName(fileName: String): String {
     val weightStyleSuffixes = listOf(
         "-Regular", "-Bold", "-Italic", "-Light", "-Medium", "-SemiBold",
         "-ExtraBold", "-Black", "-Thin", "-Condensed", "-Expanded",
