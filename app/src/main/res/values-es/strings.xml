@@ -41,6 +41,9 @@
     <string name="font_sort_name_desc">Nombre Z–A</string>
     <string name="font_sort_latest">Más recientes</string>
     <string name="font_sort_imported">Importadas</string>
+    <string name="font_filter_device">Archivos de fuente</string>
+    <string name="font_filter_system">Fuentes del sistema</string>
+    <string name="font_filter_all">Todas</string>
     <string name="font_label">Fuente</string>
     <string name="font_tab_fonts">Fuentes</string>
     <string name="font_tab_import">Importar fuente</string>

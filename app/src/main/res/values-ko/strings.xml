@@ -41,6 +41,9 @@
     <string name="font_sort_name_desc">이름순 Z-A</string>
     <string name="font_sort_latest">최신순</string>
     <string name="font_sort_imported">가져온순</string>
+    <string name="font_filter_device">글꼴파일 보기</string>
+    <string name="font_filter_system">시스템글꼴 보기</string>
+    <string name="font_filter_all">전체보기</string>
     <string name="font_label">글꼴</string>
     <string name="font_tab_fonts">글꼴</string>
     <string name="font_tab_import">글꼴 가져오기</string>

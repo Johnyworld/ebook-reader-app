@@ -40,9 +40,10 @@ import com.rotein.ebookreader.FONT_SYSTEM
 import com.rotein.ebookreader.FontSortOrder
 import com.rotein.ebookreader.ImportedFontStore
 import com.rotein.ebookreader.READER_BUILTIN_FONT_NAMES
+import com.rotein.ebookreader.SystemFontFilter
 import com.rotein.ebookreader.SystemFontSortOrder
 import com.rotein.ebookreader.fontDisplayName
-import com.rotein.ebookreader.getSystemFontFileMap
+import com.rotein.ebookreader.getFontFileMaps
 import com.rotein.ebookreader.ui.components.EreaderDropdownMenu
 import com.rotein.ebookreader.ui.components.EreaderTabBar
 import com.rotein.ebookreader.ui.components.FullScreenPopup
@@ -67,6 +68,7 @@ internal fun FontLayerPopup(
     var selectedTab by remember { mutableStateOf(0) }
     var fontSortOrder by remember { mutableStateOf(FontSortOrder.NAME_ASC) }
     var systemFontSortOrder by remember { mutableStateOf(SystemFontSortOrder.NAME_ASC) }
+    var systemFontFilter by remember { mutableStateOf(SystemFontFilter.DEVICE) }
     var currentPage by remember { mutableStateOf(0) }
     var confirmImportFont by remember { mutableStateOf<Pair<String, String>?>(null) }
     var confirmDeleteFont by remember { mutableStateOf<String?>(null) }
@@ -88,10 +90,15 @@ internal fun FontLayerPopup(
         }
     }
 
-    val systemFontFileMap = remember { getSystemFontFileMap() }
-    val systemFonts = remember(systemFontSortOrder, importedFonts) {
+    val fontMaps = remember { getFontFileMaps() }
+    val systemFonts = remember(systemFontSortOrder, systemFontFilter, importedFonts) {
         val importedNames = importedFonts.map { it.name }.toSet()
-        systemFontFileMap.keys.filter { it !in importedNames }.let { keys ->
+        val sourceMap = when (systemFontFilter) {
+            SystemFontFilter.DEVICE -> fontMaps.device
+            SystemFontFilter.SYSTEM -> fontMaps.system
+            SystemFontFilter.ALL -> fontMaps.all
+        }
+        sourceMap.keys.filter { it !in importedNames }.let { keys ->
             when (systemFontSortOrder) {
                 SystemFontSortOrder.NAME_ASC -> keys.sortedBy { it }
                 SystemFontSortOrder.NAME_DESC -> keys.sortedByDescending { it }
@@ -103,7 +110,7 @@ internal fun FontLayerPopup(
     val totalPages = maxOf(1, (currentItems.size + itemsPerPage - 1) / itemsPerPage)
     val pageItems = currentItems.drop(currentPage * itemsPerPage).take(itemsPerPage)
 
-    LaunchedEffect(selectedTab) { currentPage = 0 }
+    LaunchedEffect(selectedTab, systemFontFilter) { currentPage = 0 }
     LaunchedEffect(currentItems.size) {
         if (currentPage >= totalPages) currentPage = maxOf(0, totalPages - 1)
     }
@@ -171,6 +178,12 @@ internal fun FontLayerPopup(
                     )
                 } else {
                     EreaderDropdownMenu(
+                        items = SystemFontFilter.entries.toList(),
+                        selectedItem = systemFontFilter,
+                        onSelect = { systemFontFilter = it },
+                        label = { stringResource(it.labelRes) },
+                    )
+                    EreaderDropdownMenu(
                         items = SystemFontSortOrder.entries.toList(),
                         selectedItem = systemFontSortOrder,
                         onSelect = { systemFontSortOrder = it },
@@ -207,7 +220,7 @@ internal fun FontLayerPopup(
                                         if (selectedTab == 0) {
                                             onSelect(fontName)
                                         } else {
-                                            val filePath = systemFontFileMap[fontName] ?: ""
+                                            val filePath = fontMaps.all[fontName] ?: ""
                                             if (filePath.isNotEmpty()) confirmImportFont = Pair(fontName, filePath)
                                         }
                                     }

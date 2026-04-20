@@ -98,6 +98,12 @@ enum class SystemFontSortOrder(@StringRes val labelRes: Int) {
     NAME_DESC(R.string.font_sort_name_desc)
 }
 
+enum class SystemFontFilter(@StringRes val labelRes: Int) {
+    DEVICE(R.string.font_filter_device),
+    SYSTEM(R.string.font_filter_system),
+    ALL(R.string.font_filter_all)
+}
+
 object ImportedFontStore {
     private const val PREF_NAME = "imported_fonts"
     private const val KEY_FONTS = "font_entries"
@@ -152,25 +158,31 @@ fun getSystemFontFamilies(context: Context): List<String> {
     return families
 }
 
-fun getSystemFontFileMap(): Map<String, String> {
-    val result = mutableMapOf<String, String>()
-    // 시스템 폰트 (Android 10+)
+data class FontFileMaps(
+    val system: Map<String, String>,
+    val device: Map<String, String>,
+    val all: Map<String, String>
+)
+
+fun getFontFileMaps(): FontFileMaps {
+    val system = mutableMapOf<String, String>()
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
         SystemFonts.getAvailableFonts().forEach { font ->
             val file = font.file ?: return@forEach
             val name = extractFontFamilyName(file.nameWithoutExtension)
-            if (name.isNotBlank() && !result.containsKey(name)) {
-                result[name] = file.absolutePath
+            if (name.isNotBlank() && !system.containsKey(name)) {
+                system[name] = file.absolutePath
             }
         }
     }
-    // 기기 저장소 폰트 (시스템 폰트와 이름 충돌 시 시스템 폰트 우선)
+    val device = mutableMapOf<String, String>()
     FontScanner.scanDeviceFonts().forEach { (name, path) ->
-        if (!result.containsKey(name)) {
-            result[name] = path
+        if (!system.containsKey(name) && !device.containsKey(name)) {
+            device[name] = path
         }
     }
-    return result
+    val all = system + device
+    return FontFileMaps(system, device, all)
 }
 
 internal fun extractFontFamilyName(fileName: String): String {

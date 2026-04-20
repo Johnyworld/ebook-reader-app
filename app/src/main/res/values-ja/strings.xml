@@ -41,6 +41,9 @@
     <string name="font_sort_name_desc">名前順 Z–A</string>
     <string name="font_sort_latest">新着順</string>
     <string name="font_sort_imported">インポート順</string>
+    <string name="font_filter_device">フォントファイル</string>
+    <string name="font_filter_system">システムフォント</string>
+    <string name="font_filter_all">すべて</string>
     <string name="font_label">フォント</string>
     <string name="font_tab_fonts">フォント</string>
     <string name="font_tab_import">フォントを追加</string>
