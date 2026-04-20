@@ -2,11 +2,11 @@ package com.rotein.ebookreader
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import com.rotein.ebookreader.ui.theme.EreaderFontSize
 
 internal fun cfiToPage(cfi: String, spinePageOffsets: Map<Int, Int>, cfiPageMap: Map<String, Int> = emptyMap()): Int {
     if (cfi.isEmpty()) return 0
@@ -53,6 +53,6 @@ internal fun CenteredMessage(text: String) {
 @Composable
 internal fun LoadingIndicator() {
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        CircularProgressIndicator()
+        Text(text = "읽는 중...", style = EreaderFontSize.L)
     }
 }

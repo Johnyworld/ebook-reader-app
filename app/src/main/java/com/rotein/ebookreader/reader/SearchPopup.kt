@@ -20,7 +20,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -110,7 +109,7 @@ internal fun SearchPopup(
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center
                     ) {
-                        CircularProgressIndicator(color = EreaderColors.Black)
+                        Text(text = "검색 중...", style = EreaderFontSize.L)
                     }
                     searchResults.isEmpty() -> Box(
                         modifier = Modifier.fillMaxSize(),

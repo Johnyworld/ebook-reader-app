@@ -27,7 +27,6 @@ import androidx.compose.material.icons.filled.FormatListBulleted
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -301,7 +300,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                 modifier = Modifier.fillMaxSize().background(EreaderColors.White).clickable(enabled = false) {}.testTag("readerLoading"),
                 contentAlignment = Alignment.Center
             ) {
-                CircularProgressIndicator(color = EreaderColors.Black)
+                Text(text = "읽는 중...", style = EreaderFontSize.L)
             }
         }
 
