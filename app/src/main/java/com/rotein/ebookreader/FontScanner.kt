@@ -27,7 +27,7 @@ object FontScanner {
             } else {
                 val ext = file.extension.lowercase()
                 if (ext in FONT_EXTENSIONS) {
-                    val name = extractFontFamilyName(file.nameWithoutExtension)
+                    val name = extractFontDisplayName(file.nameWithoutExtension)
                     if (name.isNotBlank() && !result.containsKey(name)) {
                         result[name] = file.absolutePath
                     }

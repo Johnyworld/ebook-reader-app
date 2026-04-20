@@ -24,7 +24,7 @@ class FontScannerTest {
         File(root, "MyFont-Regular.ttf").createNewFile()
         val result = FontScanner.scanFontFiles(root)
         assertEquals(1, result.size)
-        assertTrue(result.containsKey("My Font"))
+        assertTrue(result.containsKey("My Font Regular"))
     }
 
     @Test
@@ -32,17 +32,19 @@ class FontScannerTest {
         File(root, "NotoSans-Bold.otf").createNewFile()
         val result = FontScanner.scanFontFiles(root)
         assertEquals(1, result.size)
-        assertTrue(result.containsKey("Noto Sans"))
+        assertTrue(result.containsKey("Noto Sans Bold"))
     }
 
     @Test
-    fun `같은 패밀리의 여러 weight는 하나만 포함한다`() {
+    fun `같은 패밀리의 여러 weight는 각각 포함한다`() {
         File(root, "MyFont-Regular.ttf").createNewFile()
         File(root, "MyFont-Bold.ttf").createNewFile()
         File(root, "MyFont-Italic.ttf").createNewFile()
         val result = FontScanner.scanFontFiles(root)
-        assertEquals(1, result.size)
-        assertTrue(result.containsKey("My Font"))
+        assertEquals(3, result.size)
+        assertTrue(result.containsKey("My Font Regular"))
+        assertTrue(result.containsKey("My Font Bold"))
+        assertTrue(result.containsKey("My Font Italic"))
     }
 
     @Test
@@ -51,7 +53,7 @@ class FontScannerTest {
         File(subDir, "DeepFont-Regular.ttf").createNewFile()
         val result = FontScanner.scanFontFiles(root)
         assertEquals(1, result.size)
-        assertTrue(result.containsKey("Deep Font"))
+        assertTrue(result.containsKey("Deep Font Regular"))
     }
 
     @Test

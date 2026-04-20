@@ -169,7 +169,7 @@ fun getFontFileMaps(): FontFileMaps {
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
         SystemFonts.getAvailableFonts().forEach { font ->
             val file = font.file ?: return@forEach
-            val name = extractFontFamilyName(file.nameWithoutExtension)
+            val name = extractFontDisplayName(file.nameWithoutExtension)
             if (name.isNotBlank() && !system.containsKey(name)) {
                 system[name] = file.absolutePath
             }
@@ -201,6 +201,14 @@ internal fun extractFontFamilyName(fileName: String): String {
     }
     // CamelCase → "Camel Case"
     return name.replace(Regex("(?<=[a-z])(?=[A-Z])"), " ").trim()
+}
+
+internal fun extractFontDisplayName(fileName: String): String {
+    // CamelCase → "Camel Case", 하이픈을 공백으로
+    return fileName
+        .replace(Regex("(?<=[a-z])(?=[A-Z])"), " ")
+        .replace("-", " ")
+        .trim()
 }
 
 enum class ReaderTextAlign(@StringRes val labelRes: Int) {
