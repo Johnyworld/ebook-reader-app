@@ -358,6 +358,7 @@ private fun TopBar(
     Box(
         modifier = Modifier
             .fillMaxWidth()
+            .padding(top = 4.dp)
             .height(56.dp)
     ) {
         // 베이스 레이어: 돋보기 아이콘 + 정렬 컨트롤

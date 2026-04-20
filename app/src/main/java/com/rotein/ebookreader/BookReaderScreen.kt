@@ -285,11 +285,11 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .fillMaxWidth()
-                        .padding(horizontal = maxOf(readerSettings.paddingHorizontal, 4).dp, vertical = EreaderSpacing.XS),
+                        .padding(horizontal = 16.dp, vertical = EreaderSpacing.XS).padding(bottom = 4.dp),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text(leftText ?: "", style = EreaderFontSize.S, color = EreaderColors.DarkGray)
-                    Text(rightText ?: "", style = EreaderFontSize.S, color = EreaderColors.DarkGray)
+                    Text(leftText ?: "", style = EreaderFontSize.M, color = EreaderColors.Black)
+                    Text(rightText ?: "", style = EreaderFontSize.M, color = EreaderColors.Black)
                 }
             }
         }

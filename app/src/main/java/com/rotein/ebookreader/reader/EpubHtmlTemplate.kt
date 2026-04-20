@@ -3,6 +3,9 @@ package com.rotein.ebookreader.reader
 import com.rotein.ebookreader.ReaderSettings
 import com.rotein.ebookreader.fontFamilyForJs
 
+/** 하단 정보 영역을 위한 추가 여백 (px) */
+internal const val BOTTOM_INFO_HEIGHT = 32
+
 internal fun buildEpubJsHtml(opfPath: String, savedCfi: String, settings: ReaderSettings, fontFilePath: String = "") = """<!DOCTYPE html>
 <html>
 <head>
@@ -11,7 +14,7 @@ internal fun buildEpubJsHtml(opfPath: String, savedCfi: String, settings: Reader
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 html, body { width: 100%; height: 100%; overflow: hidden; background: #fff; }
-#viewer { position: absolute; top: ${settings.paddingVertical}px; left: ${settings.paddingHorizontal}px; right: ${settings.paddingHorizontal}px; bottom: ${settings.paddingVertical + 16}px; }
+#viewer { position: absolute; top: ${settings.paddingVertical}px; left: ${settings.paddingHorizontal}px; right: ${settings.paddingHorizontal}px; bottom: ${settings.paddingVertical + BOTTOM_INFO_HEIGHT}px; }
 .epub-view svg { mix-blend-mode: multiply; }
 </style>
 </head>
@@ -35,7 +38,8 @@ var _config = {
     paddingVertical: ${settings.paddingVertical},
     paddingHorizontal: ${settings.paddingHorizontal},
     fontFilePath: "$fontFilePath",
-    fontFamilyForJs: "${fontFamilyForJs(settings.fontName)}"
+    fontFamilyForJs: "${fontFamilyForJs(settings.fontName)}",
+    bottomInfoHeight: $BOTTOM_INFO_HEIGHT
 };
 </script>
 <script src="epub.min.js"></script>

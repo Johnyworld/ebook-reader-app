@@ -47,9 +47,9 @@ window._applyReaderSettings = function(fontFamily, fontFilePath, fontSize, textA
         viewer.style.top = paddingVertical + 'px';
         viewer.style.left = paddingHorizontal + 'px';
         viewer.style.right = paddingHorizontal + 'px';
-        viewer.style.bottom = (paddingVertical + 16) + 'px';
+        viewer.style.bottom = (paddingVertical + _config.bottomInfoHeight) + 'px';
         _epub.rendition.spread(_getSpreadMode(), 0);
-        _epub.rendition.resize(window.innerWidth - paddingHorizontal * 2, window.innerHeight - paddingVertical * 2 - 16);
+        _epub.rendition.resize(window.innerWidth - paddingHorizontal * 2, window.innerHeight - paddingVertical * 2 - _config.bottomInfoHeight);
     } catch(e) {}
     try {
         _epub.rendition.getContents().forEach(function(c) { _injectReaderStyle(c.document); });
