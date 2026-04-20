@@ -34,6 +34,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.SpanStyle
@@ -77,6 +78,7 @@ internal fun SearchPopup(
     var query by remember { mutableStateOf(initialQuery) }
     var searchedQuery by remember { mutableStateOf(initialQuery) }
     val focusRequester = remember { FocusRequester() }
+    val focusManager = LocalFocusManager.current
     var currentPage by remember { mutableStateOf(0) }
 
     val density = LocalDensity.current
@@ -212,7 +214,7 @@ internal fun SearchPopup(
                         textStyle = EreaderFontSize.L.copy(color = EreaderColors.Black),
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                         keyboardActions = KeyboardActions(onSearch = {
-                            if (query.length >= 2) { val q = query.trim().replace(Regex("\\s+"), " "); searchedQuery = q; onSearch(q) }
+                            if (query.length >= 2) { val q = query.trim().replace(Regex("\\s+"), " "); searchedQuery = q; onSearch(q); focusManager.clearFocus() }
                         }),
                         decorationBox = { innerTextField ->
                             Box {
@@ -243,7 +245,7 @@ internal fun SearchPopup(
                     Box(
                         modifier = Modifier
                             .border(1.dp, EreaderColors.Black, RoundedCornerShape(4.dp))
-                            .clickable { if (query.length >= 2) { val q = query.trim().replace(Regex("\\s+"), " "); searchedQuery = q; onSearch(q) } }
+                            .clickable { if (query.length >= 2) { val q = query.trim().replace(Regex("\\s+"), " "); searchedQuery = q; onSearch(q); focusManager.clearFocus() } }
                             .padding(horizontal = EreaderSpacing.L, vertical = 10.dp),
                         contentAlignment = Alignment.Center
                     ) {
