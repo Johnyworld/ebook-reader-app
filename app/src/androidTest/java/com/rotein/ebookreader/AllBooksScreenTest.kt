@@ -90,11 +90,11 @@ class AllBooksScreenTest {
 
     @Test
     fun splashScreenTransitionsToBookList() {
-        // Splash shows "ebook-reader" for 800ms min, then disappears when fileScanComplete
+        // Splash shows "eera" for 800ms min, then disappears when fileScanComplete
         // With BookCache pre-set, onLoadComplete fires immediately, so splash goes away ~800ms
         composeTestRule.waitUntil(timeoutMillis = 3000) {
             composeTestRule
-                .onAllNodesWithText("ebook-reader")
+                .onAllNodesWithText("eera")
                 .fetchSemanticsNodes()
                 .isEmpty()
         }

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Ebook Reader</string>
+    <string name="app_name">eera</string>
 
     <!-- AllBooksScreen -->
     <string name="permission_description">To search files on your device,\nstorage access permission is required.</string>
