@@ -41,6 +41,9 @@
     <string name="font_sort_name_desc">名称 Z–A</string>
     <string name="font_sort_latest">最新</string>
     <string name="font_sort_imported">导入时间</string>
+    <string name="font_filter_device">字体文件</string>
+    <string name="font_filter_system">系统字体</string>
+    <string name="font_filter_all">全部</string>
     <string name="font_label">字体</string>
     <string name="font_tab_fonts">字体</string>
     <string name="font_tab_import">导入字体</string>

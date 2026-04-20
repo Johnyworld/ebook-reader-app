@@ -33,6 +33,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.rotein.ebookreader.R
 import com.rotein.ebookreader.FONT_EPUB_ORIGINAL
@@ -40,9 +41,10 @@ import com.rotein.ebookreader.FONT_SYSTEM
 import com.rotein.ebookreader.FontSortOrder
 import com.rotein.ebookreader.ImportedFontStore
 import com.rotein.ebookreader.READER_BUILTIN_FONT_NAMES
+import com.rotein.ebookreader.SystemFontFilter
 import com.rotein.ebookreader.SystemFontSortOrder
 import com.rotein.ebookreader.fontDisplayName
-import com.rotein.ebookreader.getSystemFontFileMap
+import com.rotein.ebookreader.getFontFileMaps
 import com.rotein.ebookreader.ui.components.EreaderDropdownMenu
 import com.rotein.ebookreader.ui.components.EreaderTabBar
 import com.rotein.ebookreader.ui.components.FullScreenPopup
@@ -67,15 +69,19 @@ internal fun FontLayerPopup(
     var selectedTab by remember { mutableStateOf(0) }
     var fontSortOrder by remember { mutableStateOf(FontSortOrder.NAME_ASC) }
     var systemFontSortOrder by remember { mutableStateOf(SystemFontSortOrder.NAME_ASC) }
+    var systemFontFilter by remember { mutableStateOf(SystemFontFilter.DEVICE) }
     var currentPage by remember { mutableStateOf(0) }
     var confirmImportFont by remember { mutableStateOf<Pair<String, String>?>(null) }
     var confirmDeleteFont by remember { mutableStateOf<String?>(null) }
     var importedFonts by remember { mutableStateOf(ImportedFontStore.load(context)) }
 
-    val itemHeightDp = 56
+    val itemHeightDp = 64
+    val dividerHeightDp = 1
     val headerHeightDp = 56 + 48 + 2 // header(56) + tabs(48) + tab underline(2)
     val paginationHeightDp = 72
-    val itemsPerPage = maxOf(1, (screenHeightDp - statusBarHeightDp - headerHeightDp - paginationHeightDp) / itemHeightDp)
+    val contentHeightDp = screenHeightDp - statusBarHeightDp - headerHeightDp - paginationHeightDp
+    // N개 아이템 + (N-1)개 구분선: N * 64 + (N-1) * 1 = N * 65 - 1
+    val itemsPerPage = maxOf(1, (contentHeightDp + dividerHeightDp) / (itemHeightDp + dividerHeightDp))
 
     val pinnedFonts = listOf(FONT_EPUB_ORIGINAL, FONT_SYSTEM)
     val appFonts = remember(fontSortOrder, importedFonts) {
@@ -88,10 +94,15 @@ internal fun FontLayerPopup(
         }
     }
 
-    val systemFontFileMap = remember { getSystemFontFileMap() }
-    val systemFonts = remember(systemFontSortOrder, importedFonts) {
+    val fontMaps = remember { getFontFileMaps() }
+    val systemFonts = remember(systemFontSortOrder, systemFontFilter, importedFonts) {
         val importedNames = importedFonts.map { it.name }.toSet()
-        systemFontFileMap.keys.filter { it !in importedNames }.let { keys ->
+        val sourceMap = when (systemFontFilter) {
+            SystemFontFilter.DEVICE -> fontMaps.device
+            SystemFontFilter.SYSTEM -> fontMaps.system
+            SystemFontFilter.ALL -> fontMaps.all
+        }
+        sourceMap.keys.filter { it !in importedNames }.let { keys ->
             when (systemFontSortOrder) {
                 SystemFontSortOrder.NAME_ASC -> keys.sortedBy { it }
                 SystemFontSortOrder.NAME_DESC -> keys.sortedByDescending { it }
@@ -103,7 +114,7 @@ internal fun FontLayerPopup(
     val totalPages = maxOf(1, (currentItems.size + itemsPerPage - 1) / itemsPerPage)
     val pageItems = currentItems.drop(currentPage * itemsPerPage).take(itemsPerPage)
 
-    LaunchedEffect(selectedTab) { currentPage = 0 }
+    LaunchedEffect(selectedTab, systemFontFilter) { currentPage = 0 }
     LaunchedEffect(currentItems.size) {
         if (currentPage >= totalPages) currentPage = maxOf(0, totalPages - 1)
     }
@@ -171,6 +182,12 @@ internal fun FontLayerPopup(
                     )
                 } else {
                     EreaderDropdownMenu(
+                        items = SystemFontFilter.entries.toList(),
+                        selectedItem = systemFontFilter,
+                        onSelect = { systemFontFilter = it },
+                        label = { stringResource(it.labelRes) },
+                    )
+                    EreaderDropdownMenu(
                         items = SystemFontSortOrder.entries.toList(),
                         selectedItem = systemFontSortOrder,
                         onSelect = { systemFontSortOrder = it },
@@ -199,26 +216,41 @@ internal fun FontLayerPopup(
                         pageItems.forEachIndexed { index, fontName ->
                             if (index > 0) HorizontalDivider(color = EreaderColors.Gray)
                             val isImported = selectedTab == 0 && importedFonts.any { it.name == fontName }
+                            val filePath = if (selectedTab == 0) {
+                                importedFonts.firstOrNull { it.name == fontName }?.filePath
+                            } else {
+                                fontMaps.all[fontName]
+                            }
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .height(56.dp)
+                                    .height(64.dp)
                                     .clickable {
                                         if (selectedTab == 0) {
                                             onSelect(fontName)
                                         } else {
-                                            val filePath = systemFontFileMap[fontName] ?: ""
-                                            if (filePath.isNotEmpty()) confirmImportFont = Pair(fontName, filePath)
+                                            val path = fontMaps.all[fontName] ?: ""
+                                            if (path.isNotEmpty()) confirmImportFont = Pair(fontName, path)
                                         }
                                     }
                                     .padding(start = EreaderSpacing.L, end = if (isImported) EreaderSpacing.XS else EreaderSpacing.L),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text(
-                                    fontDisplayName(fontName),
-                                    style = EreaderFontSize.M,
-                                    modifier = Modifier.weight(1f)
-                                )
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        fontDisplayName(fontName),
+                                        style = EreaderFontSize.M,
+                                    )
+                                    if (filePath != null) {
+                                        Text(
+                                            filePath.substringBeforeLast("/"),
+                                            style = EreaderFontSize.XS,
+                                            color = EreaderColors.Gray,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                        )
+                                    }
+                                }
                                 if (selectedTab == 0 && fontName == currentFontName) {
                                     Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
                                 }

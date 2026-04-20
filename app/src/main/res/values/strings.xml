@@ -53,6 +53,9 @@
     <string name="font_sort_name_desc">Name Z–A</string>
     <string name="font_sort_latest">Latest</string>
     <string name="font_sort_imported">Imported</string>
+    <string name="font_filter_device">Font files</string>
+    <string name="font_filter_system">System fonts</string>
+    <string name="font_filter_all">All</string>
     <string name="font_label">Font</string>
     <string name="font_tab_fonts">Fonts</string>
     <string name="font_tab_import">Import font</string>

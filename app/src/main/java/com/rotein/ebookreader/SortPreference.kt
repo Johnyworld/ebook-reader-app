@@ -98,6 +98,12 @@ enum class SystemFontSortOrder(@StringRes val labelRes: Int) {
     NAME_DESC(R.string.font_sort_name_desc)
 }
 
+enum class SystemFontFilter(@StringRes val labelRes: Int) {
+    DEVICE(R.string.font_filter_device),
+    SYSTEM(R.string.font_filter_system),
+    ALL(R.string.font_filter_all)
+}
+
 object ImportedFontStore {
     private const val PREF_NAME = "imported_fonts"
     private const val KEY_FONTS = "font_entries"
@@ -152,20 +158,34 @@ fun getSystemFontFamilies(context: Context): List<String> {
     return families
 }
 
-fun getSystemFontFileMap(): Map<String, String> {
-    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return emptyMap()
-    val result = mutableMapOf<String, String>()
-    SystemFonts.getAvailableFonts().forEach { font ->
-        val file = font.file ?: return@forEach
-        val name = extractFontFamilyName(file.nameWithoutExtension)
-        if (name.isNotBlank() && !result.containsKey(name)) {
-            result[name] = file.absolutePath
+data class FontFileMaps(
+    val system: Map<String, String>,
+    val device: Map<String, String>,
+    val all: Map<String, String>
+)
+
+fun getFontFileMaps(): FontFileMaps {
+    val system = mutableMapOf<String, String>()
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+        SystemFonts.getAvailableFonts().forEach { font ->
+            val file = font.file ?: return@forEach
+            val name = extractFontDisplayName(file.nameWithoutExtension)
+            if (name.isNotBlank() && !system.containsKey(name)) {
+                system[name] = file.absolutePath
+            }
         }
     }
-    return result
+    val device = mutableMapOf<String, String>()
+    FontScanner.scanDeviceFonts().forEach { (name, path) ->
+        if (!system.containsKey(name) && !device.containsKey(name)) {
+            device[name] = path
+        }
+    }
+    val all = system + device
+    return FontFileMaps(system, device, all)
 }
 
-private fun extractFontFamilyName(fileName: String): String {
+internal fun extractFontFamilyName(fileName: String): String {
     val weightStyleSuffixes = listOf(
         "-Regular", "-Bold", "-Italic", "-Light", "-Medium", "-SemiBold",
         "-ExtraBold", "-Black", "-Thin", "-Condensed", "-Expanded",
@@ -181,6 +201,14 @@ private fun extractFontFamilyName(fileName: String): String {
     }
     // CamelCase → "Camel Case"
     return name.replace(Regex("(?<=[a-z])(?=[A-Z])"), " ").trim()
+}
+
+internal fun extractFontDisplayName(fileName: String): String {
+    // CamelCase → "Camel Case", 하이픈을 공백으로
+    return fileName
+        .replace(Regex("(?<=[a-z])(?=[A-Z])"), " ")
+        .replace("-", " ")
+        .trim()
 }
 
 enum class ReaderTextAlign(@StringRes val labelRes: Int) {
