@@ -33,6 +33,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.rotein.ebookreader.R
 import com.rotein.ebookreader.FONT_EPUB_ORIGINAL
@@ -74,10 +75,13 @@ internal fun FontLayerPopup(
     var confirmDeleteFont by remember { mutableStateOf<String?>(null) }
     var importedFonts by remember { mutableStateOf(ImportedFontStore.load(context)) }
 
-    val itemHeightDp = 56
+    val itemHeightDp = 64
+    val dividerHeightDp = 1
     val headerHeightDp = 56 + 48 + 2 // header(56) + tabs(48) + tab underline(2)
     val paginationHeightDp = 72
-    val itemsPerPage = maxOf(1, (screenHeightDp - statusBarHeightDp - headerHeightDp - paginationHeightDp) / itemHeightDp)
+    val contentHeightDp = screenHeightDp - statusBarHeightDp - headerHeightDp - paginationHeightDp
+    // N개 아이템 + (N-1)개 구분선: N * 64 + (N-1) * 1 = N * 65 - 1
+    val itemsPerPage = maxOf(1, (contentHeightDp + dividerHeightDp) / (itemHeightDp + dividerHeightDp))
 
     val pinnedFonts = listOf(FONT_EPUB_ORIGINAL, FONT_SYSTEM)
     val appFonts = remember(fontSortOrder, importedFonts) {
@@ -212,26 +216,41 @@ internal fun FontLayerPopup(
                         pageItems.forEachIndexed { index, fontName ->
                             if (index > 0) HorizontalDivider(color = EreaderColors.Gray)
                             val isImported = selectedTab == 0 && importedFonts.any { it.name == fontName }
+                            val filePath = if (selectedTab == 0) {
+                                importedFonts.firstOrNull { it.name == fontName }?.filePath
+                            } else {
+                                fontMaps.all[fontName]
+                            }
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .height(56.dp)
+                                    .height(64.dp)
                                     .clickable {
                                         if (selectedTab == 0) {
                                             onSelect(fontName)
                                         } else {
-                                            val filePath = fontMaps.all[fontName] ?: ""
-                                            if (filePath.isNotEmpty()) confirmImportFont = Pair(fontName, filePath)
+                                            val path = fontMaps.all[fontName] ?: ""
+                                            if (path.isNotEmpty()) confirmImportFont = Pair(fontName, path)
                                         }
                                     }
                                     .padding(start = EreaderSpacing.L, end = if (isImported) EreaderSpacing.XS else EreaderSpacing.L),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text(
-                                    fontDisplayName(fontName),
-                                    style = EreaderFontSize.M,
-                                    modifier = Modifier.weight(1f)
-                                )
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        fontDisplayName(fontName),
+                                        style = EreaderFontSize.M,
+                                    )
+                                    if (filePath != null) {
+                                        Text(
+                                            filePath.substringBeforeLast("/"),
+                                            style = EreaderFontSize.XS,
+                                            color = EreaderColors.Gray,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                        )
+                                    }
+                                }
                                 if (selectedTab == 0 && fontName == currentFontName) {
                                     Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
                                 }
