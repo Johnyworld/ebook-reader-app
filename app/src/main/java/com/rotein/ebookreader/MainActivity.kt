@@ -7,28 +7,21 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import com.rotein.ebookreader.ui.theme.EreaderColors
-import com.rotein.ebookreader.ui.theme.EreaderFontSize
-import androidx.compose.ui.text.font.FontWeight
-import kotlinx.coroutines.delay
 import com.rotein.ebookreader.ui.theme.EbookReaderAppTheme
 
 class MainActivity : AppCompatActivity() {
     var currentEpubWebView: WebView? = null
+    private var isReady = false
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         if (event.action == KeyEvent.ACTION_DOWN) {
@@ -52,12 +45,16 @@ class MainActivity : AppCompatActivity() {
         WebView.setWebContentsDebuggingEnabled(
             0 != applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE
         )
+        splashScreen.setKeepOnScreenCondition { !isReady }
         splashScreen.setOnExitAnimationListener { it.remove() }
         enableEdgeToEdge()
         setContent {
             EbookReaderAppTheme {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    HomeScreen(modifier = Modifier.padding(innerPadding))
+                    HomeScreen(
+                        modifier = Modifier.padding(innerPadding),
+                        onLoadComplete = { isReady = true }
+                    )
                 }
             }
         }
@@ -65,55 +62,22 @@ class MainActivity : AppCompatActivity() {
 }
 
 @Composable
-fun HomeScreen(modifier: Modifier = Modifier) {
+fun HomeScreen(modifier: Modifier = Modifier, onLoadComplete: () -> Unit = {}) {
     var currentBook by remember { mutableStateOf<BookFile?>(null) }
-    var showSplash by remember { mutableStateOf(true) }
-    var splashMinTimeElapsed by remember { mutableStateOf(false) }
-    var fileScanComplete by remember { mutableStateOf(false) }
-
-    LaunchedEffect(Unit) {
-        delay(800)
-        splashMinTimeElapsed = true
-    }
-
-    LaunchedEffect(splashMinTimeElapsed, fileScanComplete) {
-        if (splashMinTimeElapsed && fileScanComplete) {
-            showSplash = false
-        }
-    }
 
     Box(modifier = modifier.fillMaxSize()) {
-        // 실제 콘텐츠 (스플래시 뒤에서 로딩 진행)
         AllBooksScreen(
             onBookClick = { currentBook = it },
-            onLoadComplete = { fileScanComplete = true },
+            onLoadComplete = onLoadComplete,
             refreshKey = currentBook
         )
 
-        // 뷰어 오버레이
         if (currentBook != null) {
             BookReaderScreen(
                 book = currentBook!!,
                 onClose = { currentBook = null },
                 modifier = Modifier.fillMaxSize()
             )
-        }
-
-        // 스플래시 오버레이
-        if (showSplash) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(EreaderColors.White),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "ebook-reader",
-                    style = EreaderFontSize.XL,
-                    fontWeight = FontWeight.Bold,
-                    color = EreaderColors.Black
-                )
-            }
         }
     }
 }
