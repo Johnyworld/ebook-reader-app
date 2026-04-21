@@ -17,6 +17,9 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
+private fun testString(resId: Int): String =
+    InstrumentationRegistry.getInstrumentation().targetContext.getString(resId)
+
 @RunWith(AndroidJUnit4::class)
 class AllBooksScreenTest {
 
@@ -107,7 +110,7 @@ class AllBooksScreenTest {
         waitForText("테스트 책 1")
 
         // 검색 아이콘 클릭
-        composeTestRule.onNodeWithContentDescription("검색").performClick()
+        composeTestRule.onNodeWithContentDescription(testString(R.string.search)).performClick()
 
         // 검색어 입력
         composeTestRule.onNodeWithTag("searchInput").performTextInput("책 1")
@@ -122,10 +125,10 @@ class AllBooksScreenTest {
         waitForText("테스트 책 1")
 
         // 정렬 드롭다운 클릭 (기본값은 "읽은순")
-        composeTestRule.onNodeWithText("읽은순").performClick()
+        composeTestRule.onNodeWithText(testString(R.string.sort_last_read)).performClick()
 
         // "작가순" 선택
-        composeTestRule.onNodeWithText("작가순").performClick()
+        composeTestRule.onNodeWithText(testString(R.string.sort_author)).performClick()
 
         // 정렬 후 저자가 표시되는지 확인
         composeTestRule.onNodeWithText("가나다 저자").assertIsDisplayed()
@@ -136,14 +139,14 @@ class AllBooksScreenTest {
         waitForText("테스트 책 1")
 
         // 첫 번째 책의 3-dot 메뉴 클릭
-        composeTestRule.onAllNodesWithContentDescription("메뉴")[0].performClick()
+        composeTestRule.onAllNodesWithContentDescription(testString(R.string.menu))[0].performClick()
 
         // "즐겨찾기" 메뉴 아이템 클릭
-        composeTestRule.onNodeWithText("즐겨찾기").performClick()
+        composeTestRule.onNodeWithText(testString(R.string.add_favorite)).performClick()
 
         // 필터를 "즐겨찾기"로 변경
-        composeTestRule.onNodeWithText("전체보기").performClick()
-        composeTestRule.onNodeWithText("즐겨찾기").performClick()
+        composeTestRule.onNodeWithText(testString(R.string.filter_all)).performClick()
+        composeTestRule.onNodeWithText(testString(R.string.filter_favorite)).performClick()
 
         // 즐겨찾기한 책만 표시
         composeTestRule.waitUntil(timeoutMillis = 3000) {
@@ -180,10 +183,10 @@ class AllBooksScreenEmptyTest {
     fun emptyBookListShowsEmptyMessage() {
         composeTestRule.waitUntil(5000) {
             composeTestRule
-                .onAllNodesWithText("비어있음")
+                .onAllNodesWithText(testString(R.string.empty))
                 .fetchSemanticsNodes()
                 .isNotEmpty()
         }
-        composeTestRule.onNodeWithText("비어있음").assertIsDisplayed()
+        composeTestRule.onNodeWithText(testString(R.string.empty)).assertIsDisplayed()
     }
 }
