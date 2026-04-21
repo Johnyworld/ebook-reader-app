@@ -244,8 +244,8 @@ internal fun FontLayerPopup(
                                     if (filePath != null) {
                                         Text(
                                             filePath.substringBeforeLast("/"),
-                                            style = EreaderFontSize.XS,
-                                            color = EreaderColors.Gray,
+                                            style = EreaderFontSize.M,
+                                            color = EreaderColors.DarkGray,
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis,
                                         )

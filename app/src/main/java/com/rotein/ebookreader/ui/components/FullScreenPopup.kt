@@ -12,10 +12,11 @@ import com.rotein.ebookreader.ui.theme.EreaderColors
 @Composable
 fun FullScreenPopup(
     modifier: Modifier = Modifier,
+    applyImePadding: Boolean = true,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     Surface(modifier = modifier.fillMaxSize(), color = EreaderColors.White) {
-        Column(modifier = Modifier.fillMaxSize().imePadding()) {
+        Column(modifier = Modifier.fillMaxSize().then(if (applyImePadding) Modifier.imePadding() else Modifier)) {
             content()
         }
     }

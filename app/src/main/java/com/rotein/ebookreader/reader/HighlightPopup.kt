@@ -64,11 +64,11 @@ internal fun HighlightPopup(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     if (page > 0) {
-                        Text("p.$page", style = EreaderFontSize.S.copy(fontWeight = FontWeight.Bold), color = EreaderColors.Black)
+                        Text("p.$page", style = EreaderFontSize.M.copy(fontWeight = FontWeight.Bold), color = EreaderColors.Black)
                     }
                     Text(
                         highlight.chapterTitle,
-                        style = EreaderFontSize.S,
+                        style = EreaderFontSize.M,
                         color = EreaderColors.DarkGray,
                         modifier = Modifier.weight(1f).padding(start = if (page > 0) EreaderSpacing.S else 0.dp),
                         maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.End
@@ -80,7 +80,7 @@ internal fun HighlightPopup(
                     maxLines = 1, overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.padding(bottom = EreaderSpacing.XS)
                 )
-                Text(dateStr, style = EreaderFontSize.S, color = EreaderColors.DarkGray)
+                Text(dateStr, style = EreaderFontSize.M, color = EreaderColors.DarkGray)
             }
             IconButton(onClick = { onDelete(highlight) }) {
                 Icon(Icons.Default.Close, contentDescription = stringResource(R.string.delete), modifier = Modifier.size(18.dp))

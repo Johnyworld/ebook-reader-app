@@ -6,8 +6,9 @@ window._addHighlight = function(cfi, id) {
     try {
         _highlightCfiMap[id] = cfi;
         _epub.rendition.annotations.add("highlight", cfi, {id: id}, null, "epub-hl-" + id, {
-            "background": "#d0d0d0",
-            "border": "none"
+            "fill": "#baffc6",
+            "fill-opacity": "1",
+            "mix-blend-mode": "multiply"
         });
     } catch(e) {}
 };

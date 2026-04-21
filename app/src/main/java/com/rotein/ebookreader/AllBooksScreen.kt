@@ -480,7 +480,7 @@ private fun TopBar(
         }
     }
 
-    HorizontalDivider(color = EreaderColors.Gray)
+    HorizontalDivider(color = EreaderColors.Black)
 }
 
 @Composable

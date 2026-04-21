@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
@@ -105,7 +106,7 @@ internal fun SearchPopup(
     LaunchedEffect(Unit) { focusRequester.requestFocus() }
     LaunchedEffect(searchedQuery) { currentPage = 0 }
 
-    FullScreenPopup {
+    FullScreenPopup(applyImePadding = false) {
             PopupHeaderBar(title = stringResource(R.string.search_content), onBack = onDismiss)
 
             Box(modifier = Modifier.weight(1f)) {
@@ -147,7 +148,7 @@ internal fun SearchPopup(
                                     ) {
                                         Text(
                                             result.chapter,
-                                            style = EreaderFontSize.S,
+                                            style = EreaderFontSize.M,
                                             color = EreaderColors.DarkGray,
                                             modifier = Modifier.weight(1f),
                                             maxLines = 1,
@@ -156,7 +157,7 @@ internal fun SearchPopup(
                                         if (result.page > 0) {
                                             Text(
                                                 "p.$effectivePage",
-                                                style = EreaderFontSize.S,
+                                                style = EreaderFontSize.M,
                                                 color = EreaderColors.DarkGray
                                             )
                                         }
@@ -191,7 +192,7 @@ internal fun SearchPopup(
                 }
             }
 
-            Column {
+            Column(modifier = Modifier.imePadding()) {
                 if (!searchResults.isNullOrEmpty()) {
                     PaginationBar(
                         currentPage = currentPage,

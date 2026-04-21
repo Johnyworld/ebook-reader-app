@@ -7,5 +7,5 @@ object EreaderColors {
     val White = Color.White
     val DarkGray = Color(0xFF999999)
     val Gray = Color(0xFFCCCCCC)
-    val Highlight = Color(0xFFFFFF00)
+    val Highlight = Color(0xFFBAFFC6)
 }
