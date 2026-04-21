@@ -395,7 +395,8 @@ private fun TopBar(
             )
 
             // 언어 선택 드롭다운
-            val currentLocale = AppCompatDelegate.getApplicationLocales().get(0)?.language ?: "en"
+            val appLocale = AppCompatDelegate.getApplicationLocales().get(0)?.language
+            val currentLocale = appLocale ?: java.util.Locale.getDefault().language
             val languageOptions = listOf(
                 "en" to "English",
                 "ko" to "한국어",
@@ -403,7 +404,7 @@ private fun TopBar(
                 "zh" to "中文",
                 "es" to "Español",
             )
-            val currentLanguageCode = languageOptions.firstOrNull { it.first == currentLocale }?.first ?: "en"
+            val currentLanguageCode = languageOptions.firstOrNull { it.first == currentLocale }?.first ?: languageOptions.first().first
 
             EreaderDropdownMenu(
                 items = languageOptions,
