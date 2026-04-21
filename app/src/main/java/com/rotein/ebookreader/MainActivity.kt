@@ -1,5 +1,6 @@
 package com.rotein.ebookreader
 
+import android.os.Build
 import android.os.Bundle
 import android.view.KeyEvent
 import android.webkit.WebView
@@ -7,6 +8,10 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -39,6 +44,27 @@ class MainActivity : AppCompatActivity() {
         return super.dispatchKeyEvent(event)
     }
 
+    private fun hideStatusBarIfNoCutout() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            ViewCompat.setOnApplyWindowInsetsListener(window.decorView) { view, insets ->
+                val hasCutout = insets.displayCutout != null
+                if (!hasCutout) {
+                    WindowCompat.getInsetsController(window, view).apply {
+                        hide(WindowInsetsCompat.Type.statusBars())
+                        systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                    }
+                }
+                ViewCompat.onApplyWindowInsets(view, insets)
+            }
+        } else {
+            @Suppress("DEPRECATION")
+            window.setFlags(
+                android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN,
+                android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN
+            )
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         val splashScreen = installSplashScreen()
         super.onCreate(savedInstanceState)
@@ -48,6 +74,7 @@ class MainActivity : AppCompatActivity() {
         splashScreen.setKeepOnScreenCondition { !isReady }
         splashScreen.setOnExitAnimationListener { it.remove() }
         enableEdgeToEdge()
+        hideStatusBarIfNoCutout()
         setContent {
             EbookReaderAppTheme {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->

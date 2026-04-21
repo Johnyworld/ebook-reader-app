@@ -2,7 +2,6 @@
 <resources>
     <style name="Theme.EbookReaderApp" parent="Theme.AppCompat.Light.NoActionBar">
         <item name="android:windowAnimationStyle">@null</item>
-        <item name="android:windowFullscreen">true</item>
     </style>
 
     <style name="Theme.EbookReaderApp.Splash" parent="Theme.SplashScreen">
