@@ -25,6 +25,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -71,7 +72,8 @@ internal fun EpubViewer(
     onHighlightLongPress: (id: Long, x: Float, y: Float, bottom: Float) -> Unit = { _, _, _, _ -> },
     onMemoLongPress: (id: Long, x: Float, y: Float, bottom: Float) -> Unit = { _, _, _, _ -> },
     onNavigationComplete: () -> Unit = {},
-    readerSettings: ReaderSettings = ReaderSettings()
+    readerSettings: ReaderSettings = ReaderSettings(),
+    annotationCfis: List<String> = emptyList()
 ) {
     val context = LocalContext.current
     var bookDir by remember(path) { mutableStateOf<String?>(null) }
@@ -120,10 +122,18 @@ internal fun EpubViewer(
         if (text.isNotEmpty()) selectionState = SelectionState(text, x, y, bottom, cfi, isAtPageEnd)
     }
 
+    // annotationCfis의 최신 값을 참조하되, readerSettings 변경 시에만 실행
+    val latestAnnotationCfis = rememberUpdatedState(annotationCfis)
     LaunchedEffect(readerSettings) {
         val fontFamily = fontFamilyForJs(readerSettings.fontName)
         val fontFilePath = ImportedFontStore.load(context).find { it.name == readerSettings.fontName }?.filePath ?: ""
-        val js = """window._applyReaderSettings(
+        // 재스캔 전에 최신 annotation CFI 목록을 전달하여 정확한 페이지 계산 보장
+        val cfis = latestAnnotationCfis.value
+        val cfiListJs = if (cfis.isNotEmpty()) {
+            val cfiArray = org.json.JSONArray(cfis)
+            "window._setCfiList('${cfiArray.toString().replace("'", "\\'")}');"
+        } else ""
+        val js = """${cfiListJs}window._applyReaderSettings(
             "$fontFamily",
             "$fontFilePath",
             ${readerSettings.fontSize},

@@ -244,7 +244,11 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                     onNavigationCompleteRef.value?.invoke()
                     onNavigationCompleteRef.value = null
                 },
-                readerSettings = readerSettings
+                readerSettings = readerSettings,
+                annotationCfis = remember(annotationState.bookmarks, annotationState.highlights, annotationState.memos) {
+                    (annotationState.bookmarks.map { it.cfi } + annotationState.highlights.map { it.cfi } + annotationState.memos.map { it.cfi })
+                        .filter { it.isNotEmpty() }.distinct()
+                }
             )
             "pdf"  -> if (readingState.savedCfi == null) LoadingIndicator() else PdfViewer(
                 path = book.path,
