@@ -9,7 +9,7 @@ function computeVisualPages() {
     var s = window._readerSettings;
     if (!s) { _scanFallback(); return; }
     var scanW = window.innerWidth - s.paddingHorizontal * 2;
-    var scanH = window.innerHeight - s.paddingVertical * 2 - 16;
+    var scanH = window.innerHeight - s.paddingVertical * 2 - _config.bottomInfoHeight;
     var scanDiv = document.createElement('div');
     scanDiv.style.cssText = 'position:fixed;left:-' + (scanW + 10) + 'px;top:0;width:' + scanW + 'px;height:' + scanH + 'px;overflow:hidden;';
     document.body.appendChild(scanDiv);
