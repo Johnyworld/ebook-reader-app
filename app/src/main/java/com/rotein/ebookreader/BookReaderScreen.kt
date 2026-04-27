@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -176,6 +177,8 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
     }
 
     Box(modifier = modifier.fillMaxSize().clipToBounds().testTag("bookReaderScreen")) {
+        // 뷰어 콘텐츠 영역 — 상태바가 있는 기기에서 콘텐츠가 가려지지 않도록 패딩 적용
+        Box(modifier = Modifier.fillMaxSize().statusBarsPadding()) {
         when (book.extension.lowercase()) {
             "txt"  -> TxtViewer(book.path, onCenterTap)
             "epub" -> EpubViewer(
@@ -272,6 +275,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
             )
             "mobi" -> MobiViewer(book.path, onCenterTap)
             else   -> CenteredMessage(stringResource(R.string.unsupported_format))
+        }
         }
 
         // 북마크 리본은 WebView 내부 HTML로 렌더링 (글자 하위 레이어)
@@ -428,12 +432,13 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
             }
         }
 
-        // 헤더 (최상위 레이어)
+        // 헤더 (최상위 레이어) — 시스템 상태바와 겹치지 않도록 인셋 패딩 적용
         if (popupState.showMenu) {
             Column(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .fillMaxWidth()
+                    .statusBarsPadding()
             ) {
                 Surface(
                     modifier = Modifier.fillMaxWidth(),

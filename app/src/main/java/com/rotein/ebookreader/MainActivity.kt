@@ -92,13 +92,17 @@ class MainActivity : AppCompatActivity() {
 fun HomeScreen(modifier: Modifier = Modifier, onLoadComplete: () -> Unit = {}) {
     var currentBook by remember { mutableStateOf<BookFile?>(null) }
 
-    Box(modifier = modifier.fillMaxSize()) {
-        AllBooksScreen(
-            onBookClick = { currentBook = it },
-            onLoadComplete = onLoadComplete,
-            refreshKey = currentBook
-        )
+    Box(modifier = Modifier.fillMaxSize()) {
+        // 홈 화면은 시스템 인셋 패딩 적용
+        Box(modifier = modifier.fillMaxSize()) {
+            AllBooksScreen(
+                onBookClick = { currentBook = it },
+                onLoadComplete = onLoadComplete,
+                refreshKey = currentBook
+            )
+        }
 
+        // 리더 화면은 전체화면 (시스템 인셋 패딩 미적용)
         if (currentBook != null) {
             BookReaderScreen(
                 book = currentBook!!,

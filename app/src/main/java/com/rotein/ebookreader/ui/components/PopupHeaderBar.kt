@@ -29,7 +29,7 @@ fun PopupHeaderBar(
     maxLines: Int = 1,
     actions: @Composable () -> Unit = {},
 ) {
-    Column(modifier = Modifier.fillMaxWidth().padding(top = 4.dp)) {
+    Column(modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
