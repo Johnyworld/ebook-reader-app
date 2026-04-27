@@ -278,5 +278,96 @@ class EpubViewerNavigationTest {
     fun epubTocNavigationAndPrevPage() {
         runTocNavigationTest(composeTestRule, "테스트 도서")
     }
+
+    @Test
+    fun tocNavigateToPreviousChapterShowsFirstPage() {
+        val bookTitle = "테스트 도서"
+
+        fun waitForTag(tag: String, timeoutMillis: Long = 10000) {
+            composeTestRule.waitUntil(timeoutMillis) {
+                composeTestRule.onAllNodesWithTag(tag).fetchSemanticsNodes().isNotEmpty()
+            }
+        }
+
+        fun waitForTagToDisappear(tag: String, timeoutMillis: Long = 10000) {
+            composeTestRule.waitUntil(timeoutMillis) {
+                composeTestRule.onAllNodesWithTag(tag).fetchSemanticsNodes().isEmpty()
+            }
+        }
+
+        fun tapCenter() {
+            composeTestRule.onNodeWithTag("bookReaderScreen").performTouchInput {
+                down(androidx.compose.ui.geometry.Offset(centerX, height * 0.3f))
+                up()
+            }
+            Thread.sleep(500)
+        }
+
+        fun getCurrentPage(): Int {
+            val node = composeTestRule.onNodeWithTag("pageInfoText").fetchSemanticsNode()
+            val text = node.config[SemanticsProperties.Text].firstOrNull()?.text ?: ""
+            return text.split("/")[0].trim().toInt()
+        }
+
+        // Enter reader
+        composeTestRule.waitUntil(10000) {
+            composeTestRule.onAllNodesWithText(bookTitle).fetchSemanticsNodes().isNotEmpty()
+        }
+        composeTestRule.onNodeWithText(bookTitle).performClick()
+        waitForTag("bookReaderScreen")
+        waitForTagToDisappear("readerLoading")
+
+        // Wait for TOC button (page scanning complete)
+        var tocFound = false
+        for (attempt in 1..15) {
+            tapCenter()
+            Thread.sleep(1000)
+            val nodes = composeTestRule.onAllNodesWithTag("tocButton").fetchSemanticsNodes()
+            if (nodes.isNotEmpty()) {
+                tocFound = true
+                break
+            }
+            tapCenter()
+            Thread.sleep(2000)
+        }
+        org.junit.Assert.assertTrue("tocButton not found", tocFound)
+
+        // Navigate to chapter 3 via TOC
+        composeTestRule.onNodeWithTag("tocButton").performClick()
+        waitForTag("tocItem_2")
+        composeTestRule.onNodeWithTag("tocItem_2").performClick()
+        Thread.sleep(2000)
+
+        // Record page after navigating to chapter 3
+        tapCenter()
+        waitForTag("pageInfoText")
+        val pageAtChapter3 = getCurrentPage()
+
+        // Now navigate back to chapter 1 via TOC (earlier chapter)
+        waitForTag("tocButton")
+        composeTestRule.onNodeWithTag("tocButton").performClick()
+        waitForTag("tocItem_0")
+        composeTestRule.onNodeWithTag("tocItem_0").performClick()
+        Thread.sleep(2000)
+
+        // Read page — should be first page of chapter 1
+        tapCenter()
+        waitForTag("pageInfoText")
+        val pageAtChapter1 = getCurrentPage()
+
+        // Chapter 1 first page should be page 1
+        org.junit.Assert.assertEquals(
+            "TOC에서 이전 챕터 선택 시 첫 페이지(1)로 이동해야 하지만 $pageAtChapter1 페이지로 이동함",
+            1,
+            pageAtChapter1
+        )
+
+        // Also verify we actually moved (chapter 3 page should be different from page 1)
+        org.junit.Assert.assertNotEquals(
+            "챕터 3($pageAtChapter3)과 챕터 1($pageAtChapter1)의 페이지가 달라야 함",
+            pageAtChapter3,
+            pageAtChapter1
+        )
+    }
 }
 
