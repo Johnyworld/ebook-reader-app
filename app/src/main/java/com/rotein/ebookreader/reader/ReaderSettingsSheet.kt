@@ -28,6 +28,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
@@ -164,6 +165,10 @@ private fun ReaderGlyphTab(
 
 @Composable
 private fun ReaderMarginTab(settings: ReaderSettings, onSettingsChange: (ReaderSettings) -> Unit) {
+    // 기기 너비 기반 좌우 여백 최소값 계산 (2단위, 0 방향 올림)
+    val screenWidthDp = LocalConfiguration.current.screenWidthDp
+    val minHorizontalPadding = (-(screenWidthDp / 12 / 2) / 2) * 2
+
     Column(modifier = Modifier.fillMaxWidth()) {
         ReaderSettingRow(stringResource(R.string.setting_line_height)) {
             ReaderStepperField(
@@ -184,7 +189,7 @@ private fun ReaderMarginTab(settings: ReaderSettings, onSettingsChange: (ReaderS
         ReaderSettingRow(stringResource(R.string.setting_padding_vertical)) {
             ReaderStepperField(
                 value = settings.paddingVertical.toString(),
-                onDecrement = { if (settings.paddingVertical > -16) onSettingsChange(settings.copy(paddingVertical = settings.paddingVertical - 2)) },
+                onDecrement = { if (settings.paddingVertical > -20) onSettingsChange(settings.copy(paddingVertical = settings.paddingVertical - 2)) },
                 onIncrement = { if (settings.paddingVertical < 80) onSettingsChange(settings.copy(paddingVertical = settings.paddingVertical + 2)) }
             )
         }
@@ -192,7 +197,7 @@ private fun ReaderMarginTab(settings: ReaderSettings, onSettingsChange: (ReaderS
         ReaderSettingRow(stringResource(R.string.setting_padding_horizontal)) {
             ReaderStepperField(
                 value = settings.paddingHorizontal.toString(),
-                onDecrement = { if (settings.paddingHorizontal > -16) onSettingsChange(settings.copy(paddingHorizontal = settings.paddingHorizontal - 2)) },
+                onDecrement = { if (settings.paddingHorizontal > minHorizontalPadding) onSettingsChange(settings.copy(paddingHorizontal = settings.paddingHorizontal - 2)) },
                 onIncrement = { if (settings.paddingHorizontal < 80) onSettingsChange(settings.copy(paddingHorizontal = settings.paddingHorizontal + 2)) }
             )
         }
