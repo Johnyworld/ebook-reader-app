@@ -11,8 +11,8 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 enum class BookmarkSortOrder(@StringRes val labelRes: Int) {
-    CREATED_ASC(R.string.sort_created_asc),
     CREATED_DESC(R.string.sort_created_desc),
+    CREATED_ASC(R.string.sort_created_asc),
     PAGE_ASC(R.string.sort_page_asc)
 }
 
@@ -22,7 +22,7 @@ class AnnotationSortStore(private val prefName: String) {
     fun load(context: Context): BookmarkSortOrder {
         val prefs = context.getSharedPreferences(prefName, Context.MODE_PRIVATE)
         return BookmarkSortOrder.entries.firstOrNull { it.name == prefs.getString(keyOrder, null) }
-            ?: BookmarkSortOrder.CREATED_ASC
+            ?: BookmarkSortOrder.CREATED_DESC
     }
 
     fun save(context: Context, order: BookmarkSortOrder) {
