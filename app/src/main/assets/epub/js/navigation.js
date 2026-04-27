@@ -66,6 +66,22 @@ _epub.navigating = false;
 _epub.pendingAutoSelect = false;
 
 function _finishNavigation() {
+    // 레이아웃 유효성 검증: scrollWidth가 delta보다 작으면 비정상 → 1회 재시도
+    var m = _epub.rendition.manager;
+    if (m && m.container && m.layout) {
+        var sw = m.container.scrollWidth;
+        var delta = m.layout.delta;
+        if (sw < delta && !_epub.retried) {
+            _epub.retried = true;
+            var loc = _epub.rendition.currentLocation();
+            var cfi = (loc && loc.start && loc.start.cfi) ? loc.start.cfi : null;
+            if (cfi) {
+                _epub.rendition.display(cfi).then(_finishNavigation).catch(_finishNavigation);
+                return;
+            }
+        }
+    }
+    _epub.retried = false;
     _epub.navigating = false;
     try {
         var loc = _epub.rendition.currentLocation();
@@ -89,17 +105,15 @@ function _finishNavigation() {
 // Initial display
 if (_config.savedCfi.length > 0) {
     _epub.navigating = true;
-    _epub.rendition.display(_config.savedCfi).then(function() {
-        setTimeout(function() {
-            _epub.rendition.display(_config.savedCfi).then(_finishNavigation).catch(_finishNavigation);
-        }, 0);
-    }).catch(_finishNavigation);
+    _epub.rendition.display(_config.savedCfi).then(_finishNavigation).catch(_finishNavigation);
 } else {
     _epub.rendition.display().then(_finishNavigation).catch(_finishNavigation);
 }
 
 _epub.pendingPrevChapter = false;
 _epub.prevTransition = false;
+_epub.nextTransition = false;
+_epub.retried = false;
 
 window._isAtChapterStart = function() {
     var manager = _epub.rendition.manager;
@@ -137,6 +151,24 @@ window._prev = function() {
     return _epub.rendition.prev();
 };
 
+window._isAtChapterEnd = function() {
+    var manager = _epub.rendition.manager;
+    if (manager && manager.container && manager.layout) {
+        var scrollLeft = manager.container.scrollLeft;
+        var offsetWidth = manager.container.offsetWidth;
+        var scrollWidth = manager.container.scrollWidth;
+        var delta = manager.layout.delta;
+        // 마지막 페이지: scrollLeft + offsetWidth + delta > scrollWidth
+        if (scrollLeft + offsetWidth + delta > scrollWidth + delta * 0.5) {
+            var loc = _epub.rendition.currentLocation();
+            var currentIdx = (loc && loc.start) ? loc.start.index : -1;
+            var totalItems = _epub.book.spine ? (_epub.book.spine.items || []).length : 0;
+            return currentIdx < totalItems - 1;
+        }
+    }
+    return false;
+};
+
 window._next = function() {
     // epub.js는 scrollLeft + offsetWidth + delta <= scrollWidth 로 같은 챕터 내 다음 페이지 존재 여부를 판단한다.
     // 브라우저가 scrollLeft를 물리 픽셀에 스냅하면서 서브픽셀 오차가 누적되어,
@@ -168,9 +200,15 @@ window._displayHref = function(href) {
     _epub.navigating = true;
     _removeSearchHighlights();
     _epub.rendition.display(href).then(function() {
-        setTimeout(function() {
-            _epub.rendition.display(href).then(_finishNavigation).catch(_finishNavigation);
-        }, 0);
+        // epub.js가 새 챕터를 로드할 때 이전 scrollLeft를 유지하는 문제 보정
+        // fragment(#)가 없는 href는 챕터 시작이므로 scrollLeft를 0으로 리셋
+        if (href.indexOf('#') < 0) {
+            var m = _epub.rendition.manager;
+            if (m && m.container) {
+                m.container.scrollLeft = 0;
+            }
+        }
+        _finishNavigation();
     }).catch(_finishNavigation);
 };
 
@@ -183,11 +221,7 @@ window._displayCfi = function(cfi) {
     }
     _epub.navigating = true;
     _removeSearchHighlights();
-    _epub.rendition.display(navCfi).then(function() {
-        setTimeout(function() {
-            _epub.rendition.display(navCfi).then(_finishNavigation).catch(_finishNavigation);
-        }, 0);
-    }).catch(_finishNavigation);
+    _epub.rendition.display(navCfi).then(_finishNavigation).catch(_finishNavigation);
 };
 
 window._displayPageNum = function(pageNum) {

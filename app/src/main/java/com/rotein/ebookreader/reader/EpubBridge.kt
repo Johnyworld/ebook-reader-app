@@ -16,7 +16,8 @@ internal class EpubBridge(
     private val onSelectionTappedCallback: (text: String, x: Float, y: Float, bottom: Float, cfi: String, isAtPageEnd: Boolean) -> Unit = { _, _, _, _, _, _ -> },
     private val onAutoSelectReadyCallback: (cssX: Float, cssY: Float) -> Unit = { _, _ -> },
     private val onNavigationCompleteCallback: () -> Unit = {},
-    private val onPrevTransitionDoneCallback: () -> Unit = {}
+    private val onPrevTransitionDoneCallback: () -> Unit = {},
+    private val onNextTransitionDoneCallback: () -> Unit = {}
 ) {
     private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
 
@@ -96,6 +97,11 @@ internal class EpubBridge(
     @android.webkit.JavascriptInterface
     fun onNavigationComplete() {
         mainHandler.post { onNavigationCompleteCallback() }
+    }
+
+    @android.webkit.JavascriptInterface
+    fun onNextTransitionDone() {
+        mainHandler.post { onNextTransitionDoneCallback() }
     }
 
     @android.webkit.JavascriptInterface

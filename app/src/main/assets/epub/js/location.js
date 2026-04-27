@@ -44,7 +44,7 @@ function reportLocation(location) {
                     // epub.js의 prev()가 iframe 레이아웃 완료 전에 scrollTo를 호출하여
                     // 마지막 페이지가 아닌 중간 위치에 머무는 문제를 보정한다.
                     // spine index가 감소했고, 마지막 페이지가 아니면 보정한다.
-                    if (_epub.lastReportedSpineIndex >= 0 && idx < _epub.lastReportedSpineIndex) {
+                    if (_epub.lastReportedSpineIndex >= 0 && idx < _epub.lastReportedSpineIndex && _epub.pendingPrevChapter) {
                         var target = scrollWidth - delta;
                         if (target > delta * 0.5 && scrollLeft < target - delta * 0.1) {
                             _epub.rendition.manager.container.scrollLeft = target;
@@ -148,11 +148,7 @@ _epub.rendition.on("relocated", function(location) {
                     _epub.waitingForFonts = true;
                     _epub.navigating = true;
                     iDoc.fonts.ready.then(function() {
-                        _epub.rendition.display(_config.savedCfi).then(function() {
-                            setTimeout(function() {
-                                _epub.rendition.display(_config.savedCfi).then(_finishNavigation).catch(_finishNavigation);
-                            }, 0);
-                        }).catch(_finishNavigation);
+                        _epub.rendition.display(_config.savedCfi).then(_finishNavigation).catch(_finishNavigation);
                     });
                     return;
                 }
@@ -198,6 +194,10 @@ _epub.rendition.on("relocated", function(location) {
     if (_epub.prevTransition) {
         _epub.prevTransition = false;
         try { Android.onPrevTransitionDone(); } catch(e) {}
+    }
+    if (_epub.nextTransition) {
+        _epub.nextTransition = false;
+        try { Android.onNextTransitionDone(); } catch(e) {}
     }
 });
 

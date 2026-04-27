@@ -86,6 +86,7 @@ internal fun EpubViewer(
     val webViewRef = remember { java.util.concurrent.atomic.AtomicReference<android.webkit.WebView?>(null) }
     val overlayRef = remember { java.util.concurrent.atomic.AtomicReference<android.view.View?>(null) }
     val prevSafetyRef = remember { java.util.concurrent.atomic.AtomicReference<Runnable?>(null) }
+    val nextSafetyRef = remember { java.util.concurrent.atomic.AtomicReference<Runnable?>(null) }
     val onHighlightLongPressRef = remember { java.util.concurrent.atomic.AtomicReference<((Long, Float, Float, Float) -> Unit)?>(null) }
     onHighlightLongPressRef.set(onHighlightLongPress)
     val onMemoLongPressRef = remember { java.util.concurrent.atomic.AtomicReference<((Long, Float, Float, Float) -> Unit)?>(null) }
@@ -213,6 +214,13 @@ internal fun EpubViewer(
                                 prevSafetyRef.getAndSet(null)?.let { wv?.removeCallbacks(it) }
                                 (ov?.background as? BitmapDrawable)?.bitmap?.recycle()
                                 ov?.background = null
+                            },
+                            onNextTransitionDoneCallback = {
+                                val wv = webViewRef.get()
+                                val ov = overlayRef.get()
+                                nextSafetyRef.getAndSet(null)?.let { wv?.removeCallbacks(it) }
+                                (ov?.background as? BitmapDrawable)?.bitmap?.recycle()
+                                ov?.background = null
                             }
                         ), "Android")
                     }
@@ -226,8 +234,8 @@ internal fun EpubViewer(
                             if (isChapterStart && wv.width > 0 && wv.height > 0 && ov != null) {
                                 val bmp = Bitmap.createBitmap(wv.width, wv.height, Bitmap.Config.RGB_565)
                                 wv.draw(Canvas(bmp))
+                                nextSafetyRef.getAndSet(null)?.let { wv.removeCallbacks(it) }
                                 ov.background = BitmapDrawable(ctx.resources, bmp)
-                                // 안전장치: 콜백이 오지 않을 경우 500ms 후 오버레이 제거
                                 val runnable = Runnable {
                                     prevSafetyRef.set(null)
                                     (ov.background as? BitmapDrawable)?.bitmap?.recycle()
@@ -237,6 +245,29 @@ internal fun EpubViewer(
                                 wv.postDelayed(runnable, 500)
                             }
                             wv.evaluateJavascript("window._prev()", null)
+                        }
+                    }
+                    val doNext = {
+                        val wv = webViewRef.get()
+                        val ov = overlayRef.get()
+                        wv?.evaluateJavascript("window._isAtChapterEnd()") { result ->
+                            val isChapterEnd = result?.trim() == "true"
+                            if (isChapterEnd && wv.width > 0 && wv.height > 0 && ov != null) {
+                                val bmp = Bitmap.createBitmap(wv.width, wv.height, Bitmap.Config.RGB_565)
+                                wv.draw(Canvas(bmp))
+                                prevSafetyRef.getAndSet(null)?.let { wv.removeCallbacks(it) }
+                                ov.background = BitmapDrawable(ctx.resources, bmp)
+                                val runnable = Runnable {
+                                    nextSafetyRef.set(null)
+                                    (ov.background as? BitmapDrawable)?.bitmap?.recycle()
+                                    ov.background = null
+                                }
+                                nextSafetyRef.getAndSet(runnable)?.let { wv.removeCallbacks(it) }
+                                wv.postDelayed(runnable, 500)
+                                wv.evaluateJavascript("_epub.nextTransition = true; window._next()", null)
+                            } else {
+                                wv.evaluateJavascript("window._next()", null)
+                            }
                         }
                     }
                     val overlay = android.view.View(ctx).apply {
@@ -292,21 +323,21 @@ internal fun EpubViewer(
                                 when (pageFlipRef.get()) {
                                     ReaderPageFlip.LR_PREV_NEXT -> when {
                                         x < w / 3f -> doPrev()
-                                        x > w * 2f / 3f -> webView.evaluateJavascript("window._next()", null)
+                                        x > w * 2f / 3f -> doNext()
                                         else -> onCenterTap()
                                     }
                                     ReaderPageFlip.LR_NEXT_PREV -> when {
-                                        x < w / 3f -> webView.evaluateJavascript("window._next()", null)
+                                        x < w / 3f -> doNext()
                                         x > w * 2f / 3f -> doPrev()
                                         else -> onCenterTap()
                                     }
                                     ReaderPageFlip.TB_PREV_NEXT -> when {
                                         y < h / 3f -> doPrev()
-                                        y > h * 2f / 3f -> webView.evaluateJavascript("window._next()", null)
+                                        y > h * 2f / 3f -> doNext()
                                         else -> onCenterTap()
                                     }
                                     ReaderPageFlip.TB_NEXT_PREV -> when {
-                                        y < h / 3f -> webView.evaluateJavascript("window._next()", null)
+                                        y < h / 3f -> doNext()
                                         y > h * 2f / 3f -> doPrev()
                                         else -> onCenterTap()
                                     }
