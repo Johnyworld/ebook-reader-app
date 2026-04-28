@@ -7,6 +7,7 @@
     <string name="empty">비어있음</string>
     <string name="search">검색</string>
     <string name="search_books_hint">책 제목, 저자 검색…</string>
+    <string name="search_font_hint">글꼴 이름 검색…</string>
     <string name="close_search">검색 닫기</string>
     <string name="remove_favorite">즐겨찾기 해제</string>
     <string name="add_favorite">즐겨찾기</string>

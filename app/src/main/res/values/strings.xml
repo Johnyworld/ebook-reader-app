@@ -9,6 +9,7 @@
     <string name="empty">Empty</string>
     <string name="search">Search</string>
     <string name="search_books_hint">Search by title, author…</string>
+    <string name="search_font_hint">Search font name…</string>
     <string name="close_search">Close search</string>
     <string name="remove_favorite">Remove favorite</string>
     <string name="add_favorite">Favorite</string>

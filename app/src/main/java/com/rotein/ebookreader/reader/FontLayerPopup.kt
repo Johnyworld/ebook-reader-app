@@ -1,5 +1,6 @@
 package com.rotein.ebookreader.reader
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -12,10 +13,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -30,6 +33,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -72,6 +78,8 @@ internal fun FontLayerPopup(
     var systemFontSortOrder by remember { mutableStateOf(SystemFontSortOrder.NAME_ASC) }
     var systemFontFilter by remember { mutableStateOf(SystemFontFilter.DEVICE) }
     var currentPage by remember { mutableStateOf(0) }
+    var isSearchActive by remember { mutableStateOf(false) }
+    var searchQuery by remember { mutableStateOf("") }
     var confirmImportFont by remember { mutableStateOf<Pair<String, String>?>(null) }
     var confirmDeleteFont by remember { mutableStateOf<String?>(null) }
     var importedFonts by remember { mutableStateOf(ImportedFontStore.load(context)) }
@@ -112,11 +120,23 @@ internal fun FontLayerPopup(
         }
     }
 
-    val currentItems: List<String> = if (selectedTab == 0) pinnedFonts + appFonts else systemFonts
+    val currentItems: List<String> = run {
+        val items = if (selectedTab == 0) pinnedFonts + appFonts else systemFonts
+        if (searchQuery.isBlank()) items
+        else {
+            val q = searchQuery.trim().lowercase()
+            items.filter { fontDisplayName(it).lowercase().contains(q) }
+        }
+    }
     val totalPages = maxOf(1, (currentItems.size + itemsPerPage - 1) / itemsPerPage)
     val pageItems = currentItems.drop(currentPage * itemsPerPage).take(itemsPerPage)
 
-    LaunchedEffect(selectedTab, systemFontFilter) { currentPage = 0 }
+    LaunchedEffect(selectedTab) {
+        currentPage = 0
+        searchQuery = ""
+        isSearchActive = false
+    }
+    LaunchedEffect(systemFontFilter, searchQuery) { currentPage = 0 }
     LaunchedEffect(currentItems.size) {
         if (currentPage >= totalPages) currentPage = maxOf(0, totalPages - 1)
     }
@@ -188,32 +208,96 @@ internal fun FontLayerPopup(
                 )
             }
             HorizontalDivider(color = EreaderColors.Black)
-            // 필터/정렬 바
-            Row(
-                modifier = Modifier.fillMaxWidth().height(filterBarHeightDp.dp).padding(horizontal = EreaderSpacing.XS),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.End
+            // 필터/정렬 바 (검색 활성 시 검색 블록으로 전환)
+            Box(
+                modifier = Modifier.fillMaxWidth().height(filterBarHeightDp.dp)
             ) {
-                if (selectedTab == 0) {
-                    EreaderDropdownMenu(
-                        items = FontSortOrder.entries.toList(),
-                        selectedItem = fontSortOrder,
-                        onSelect = { fontSortOrder = it },
-                        label = { stringResource(it.labelRes) },
-                    )
-                } else {
-                    EreaderDropdownMenu(
-                        items = SystemFontFilter.entries.toList(),
-                        selectedItem = systemFontFilter,
-                        onSelect = { systemFontFilter = it },
-                        label = { stringResource(it.labelRes) },
-                    )
-                    EreaderDropdownMenu(
-                        items = SystemFontSortOrder.entries.toList(),
-                        selectedItem = systemFontSortOrder,
-                        onSelect = { systemFontSortOrder = it },
-                        label = { stringResource(it.labelRes) },
-                    )
+                // 베이스 레이어: 돋보기 + 정렬/필터
+                Row(
+                    modifier = Modifier.fillMaxSize().padding(horizontal = EreaderSpacing.XS),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    IconButton(onClick = { isSearchActive = true }) {
+                        Icon(
+                            imageVector = Icons.Default.Search,
+                            contentDescription = stringResource(R.string.search),
+                            tint = EreaderColors.DarkGray
+                        )
+                    }
+                    Box(modifier = Modifier.weight(1f))
+                    if (selectedTab == 0) {
+                        EreaderDropdownMenu(
+                            items = FontSortOrder.entries.toList(),
+                            selectedItem = fontSortOrder,
+                            onSelect = { fontSortOrder = it },
+                            label = { stringResource(it.labelRes) },
+                        )
+                    } else {
+                        EreaderDropdownMenu(
+                            items = SystemFontFilter.entries.toList(),
+                            selectedItem = systemFontFilter,
+                            onSelect = { systemFontFilter = it },
+                            label = { stringResource(it.labelRes) },
+                        )
+                        EreaderDropdownMenu(
+                            items = SystemFontSortOrder.entries.toList(),
+                            selectedItem = systemFontSortOrder,
+                            onSelect = { systemFontSortOrder = it },
+                            label = { stringResource(it.labelRes) },
+                        )
+                    }
+                }
+                // 오버레이 레이어: 검색 활성 시 전체를 덮음
+                if (isSearchActive) {
+                    val focusRequester = remember { FocusRequester() }
+                    LaunchedEffect(Unit) { focusRequester.requestFocus() }
+                    Row(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(EreaderColors.White)
+                            .padding(horizontal = EreaderSpacing.XS),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(onClick = {}) {
+                            Icon(
+                                imageVector = Icons.Default.Search,
+                                contentDescription = null,
+                                tint = EreaderColors.Black
+                            )
+                        }
+                        BasicTextField(
+                            value = searchQuery,
+                            onValueChange = { searchQuery = it },
+                            modifier = Modifier
+                                .weight(1f)
+                                .focusRequester(focusRequester),
+                            singleLine = true,
+                            textStyle = EreaderFontSize.L.copy(color = EreaderColors.Black),
+                            cursorBrush = SolidColor(EreaderColors.Black),
+                            decorationBox = { innerTextField ->
+                                Box {
+                                    if (searchQuery.isEmpty()) {
+                                        Text(
+                                            text = stringResource(R.string.search_font_hint),
+                                            style = EreaderFontSize.L,
+                                            color = EreaderColors.DarkGray
+                                        )
+                                    }
+                                    innerTextField()
+                                }
+                            }
+                        )
+                        IconButton(onClick = {
+                            searchQuery = ""
+                            isSearchActive = false
+                        }) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = stringResource(R.string.close_search),
+                                tint = EreaderColors.DarkGray
+                            )
+                        }
+                    }
                 }
             }
             HorizontalDivider(color = EreaderColors.Gray)
