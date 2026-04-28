@@ -1,6 +1,7 @@
 package com.rotein.ebookreader.reader
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -77,7 +78,8 @@ internal fun FontLayerPopup(
 
     val itemHeightDp = 64
     val dividerHeightDp = 1
-    val headerHeightDp = 56 + 48 + 2 // header(56) + tabs(48) + tab underline(2)
+    val filterBarHeightDp = 48
+    val headerHeightDp = 56 + 1 + filterBarHeightDp + 1 // header with tabs(56) + divider(1) + filter bar(48) + divider(1)
     val paginationHeightDp = 72
     val contentHeightDp = screenHeightDp - statusBarHeightDp - headerHeightDp - paginationHeightDp
     // N개 아이템 + (N-1)개 구분선: N * 64 + (N-1) * 1 = N * 65 - 1
@@ -167,15 +169,31 @@ internal fun FontLayerPopup(
     }
 
     FullScreenPopup {
-            // Header
+            // Header: 뒤로가기 + 탭
             Row(
-                modifier = Modifier.fillMaxWidth().height(56.dp).padding(horizontal = EreaderSpacing.XS),
+                modifier = Modifier.fillMaxWidth().height(56.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(onClick = onDismiss) {
+                IconButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.padding(start = EreaderSpacing.XS)
+                ) {
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.close))
                 }
-                Text(stringResource(R.string.font_label), style = EreaderFontSize.L, modifier = Modifier.weight(1f))
+                EreaderTabBar(
+                    tabs = listOf(stringResource(R.string.font_tab_fonts), stringResource(R.string.font_tab_import)),
+                    selectedIndex = selectedTab,
+                    onSelect = { selectedTab = it },
+                    height = 56.dp,
+                )
+            }
+            HorizontalDivider(color = EreaderColors.Black)
+            // 필터/정렬 바
+            Row(
+                modifier = Modifier.fillMaxWidth().height(filterBarHeightDp.dp).padding(horizontal = EreaderSpacing.XS),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.End
+            ) {
                 if (selectedTab == 0) {
                     EreaderDropdownMenu(
                         items = FontSortOrder.entries.toList(),
@@ -198,12 +216,7 @@ internal fun FontLayerPopup(
                     )
                 }
             }
-            EreaderTabBar(
-                tabs = listOf(stringResource(R.string.font_tab_fonts), stringResource(R.string.font_tab_import)),
-                selectedIndex = selectedTab,
-                onSelect = { selectedTab = it },
-            )
-            HorizontalDivider(color = EreaderColors.Black)
+            HorizontalDivider(color = EreaderColors.Gray)
 
             // Content
             Box(modifier = Modifier.weight(1f)) {
