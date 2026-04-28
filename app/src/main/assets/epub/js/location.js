@@ -137,6 +137,9 @@ _epub.rendition.on("relocated", function(location) {
                 if (target > 0) m.container.scrollLeft = target;
             }
         } catch(e) {}
+        // 스크롤 보정 후 location을 갱신하여 올바른 CFI가 저장되도록 한다.
+        // (relocated 이벤트의 location 파라미터는 보정 전 위치 기준이므로 stale)
+        try { location = _epub.rendition.currentLocation(); } catch(e) {}
     }
     if (!_epub.rendered || _epub.waitingForFonts) {
         _epub.rendered = true;
