@@ -18,6 +18,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.res.stringResource
@@ -49,7 +50,7 @@ internal fun BookmarkPopup(
         onDismiss = onDismiss
     ) { bookmark, page, dateStr ->
         Row(
-            modifier = Modifier.fillMaxWidth().height(88.dp),
+            modifier = Modifier.fillMaxWidth().height(88.dp).testTag("bookmarkItem"),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(
@@ -68,7 +69,8 @@ internal fun BookmarkPopup(
                         Text(
                             "p.$page",
                             style = EreaderFontSize.M.copy(fontWeight = FontWeight.Bold),
-                            color = EreaderColors.Black
+                            color = EreaderColors.Black,
+                            modifier = Modifier.testTag("bookmarkPageText")
                         )
                     }
                     Text(

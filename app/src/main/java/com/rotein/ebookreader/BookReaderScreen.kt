@@ -414,11 +414,11 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                         }
                         // Row 2: 북마크 | 설정
                         Row(modifier = Modifier.fillMaxWidth()) {
-                            ReaderMenuItem(Icons.Default.Bookmark, stringResource(R.string.bookmark), modifier = Modifier.weight(1f), onClick = {
+                            ReaderMenuItem(Icons.Default.Bookmark, stringResource(R.string.bookmark), modifier = Modifier.weight(1f).testTag("bookmarkListButton"), onClick = {
                                 vm.setShowBookmarkPopup(true)
                             })
                             Box(Modifier.width(1.dp).height(52.dp).background(EreaderColors.Gray))
-                            ReaderMenuItem(Icons.Default.Settings, stringResource(R.string.settings), modifier = Modifier.weight(1f), onClick = {
+                            ReaderMenuItem(Icons.Default.Settings, stringResource(R.string.settings), modifier = Modifier.weight(1f).testTag("settingsButton"), onClick = {
                                 vm.setShowSettingsPopup(true)
                                 vm.setShowMenu(false)
                             })
@@ -455,7 +455,9 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                             onClose()
                         }
                     ) {
-                        IconButton(onClick = {
+                        IconButton(
+                            modifier = Modifier.testTag("bookmarkToggleButton"),
+                            onClick = {
                             if (readingState.currentCfi.isEmpty()) return@IconButton
                             if (annotationState.isCurrentPageBookmarked) {
                                 if (isPdf) {

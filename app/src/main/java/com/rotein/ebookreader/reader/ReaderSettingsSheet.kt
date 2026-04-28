@@ -157,7 +157,8 @@ private fun ReaderGlyphTab(
             ReaderStepperField(
                 value = settings.fontSize.toString(),
                 onDecrement = { if (settings.fontSize > 8) onSettingsChange(settings.copy(fontSize = settings.fontSize - 1)) },
-                onIncrement = { if (settings.fontSize < 32) onSettingsChange(settings.copy(fontSize = settings.fontSize + 1)) }
+                onIncrement = { if (settings.fontSize < 32) onSettingsChange(settings.copy(fontSize = settings.fontSize + 1)) },
+                tag = "fontSize"
             )
         }
     }

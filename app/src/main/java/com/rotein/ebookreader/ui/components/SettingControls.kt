@@ -16,6 +16,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -40,13 +41,14 @@ fun ReaderSettingRow(label: String, field: @Composable () -> Unit) {
 fun ReaderStepperField(
     value: String,
     onDecrement: () -> Unit,
-    onIncrement: () -> Unit
+    onIncrement: () -> Unit,
+    tag: String? = null
 ) {
     Row(
         modifier = Modifier.width(160.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        IconButton(onClick = onDecrement, modifier = Modifier.size(40.dp)) {
+        IconButton(onClick = onDecrement, modifier = Modifier.size(40.dp).let { if (tag != null) it.testTag("${tag}Decrement") else it }) {
             Icon(
                 Icons.AutoMirrored.Filled.ArrowBack,
                 contentDescription = null,
@@ -61,7 +63,7 @@ fun ReaderStepperField(
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
-        IconButton(onClick = onIncrement, modifier = Modifier.size(40.dp)) {
+        IconButton(onClick = onIncrement, modifier = Modifier.size(40.dp).let { if (tag != null) it.testTag("${tag}Increment") else it }) {
             Icon(
                 Icons.AutoMirrored.Filled.ArrowForward,
                 contentDescription = null,
