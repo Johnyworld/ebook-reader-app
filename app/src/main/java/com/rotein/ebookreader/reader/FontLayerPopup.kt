@@ -133,6 +133,9 @@ internal fun FontLayerPopup(
                         ImportedFontStore.add(context, fontName, destFile.absolutePath)
                         importedFonts = ImportedFontStore.load(context)
                         onFontImported()
+                        // 가져오기 완료 후 글꼴 탭으로 전환하고 해당 글꼴 선택
+                        selectedTab = 0
+                        onFontChanged(fontName)
                     } catch (e: Exception) { /* ignore */ }
                     confirmImportFont = null
                 }) { Text(stringResource(R.string.yes)) }
