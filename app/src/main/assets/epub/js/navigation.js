@@ -132,6 +132,25 @@ function _finishNavigation() {
             if (_epub._resumeMode) {
                 _epub._resumeMode = false;
                 try { Android.onResumeRestoreComplete(); } catch(e) {}
+                // resume 중 스킵된 resize가 실제 크기 변경(회전, 분할 화면 등)이었을 수 있으므로
+                // 현재 dimensions가 _lastResize와 다르면 resize를 실행한다.
+                var s = window._readerSettings;
+                if (s) {
+                    var curW = window.innerWidth - s.paddingHorizontal * 2;
+                    var curH = window.innerHeight - s.paddingVertical * 2 - _config.bottomInfoHeight;
+                    if (curW !== _epub._lastResizeW || curH !== _epub._lastResizeH) {
+                        _epub._lastResizeW = curW;
+                        _epub._lastResizeH = curH;
+                        _epub._preResizeCfi = window._currentCfi || '';
+                        _epub.rendition.spread(_getSpreadMode(), 0);
+                        _epub.rendition.resize(curW, curH);
+                        if (_epub._preResizeCfi) {
+                            var cfi = _epub._preResizeCfi;
+                            _epub._preResizeCfi = undefined;
+                            _epub.rendition.display(cfi);
+                        }
+                    }
+                }
             }
         });
     });
