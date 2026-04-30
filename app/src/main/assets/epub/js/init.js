@@ -104,6 +104,11 @@ window.addEventListener('resize', function() {
             _epub._resizeRestoring = true;
             _epub.rendition.display(cfi).then(function() {
                 _epub._resizeRestoring = false;
+                // 크기가 변경되었으므로 페이지 스캔을 다시 실행한다.
+                if (typeof computeVisualPages === 'function') {
+                    clearTimeout(_epub.rescanTimer);
+                    _epub.rescanTimer = setTimeout(function() { computeVisualPages(); }, 500);
+                }
             }).catch(function() {
                 _epub._resizeRestoring = false;
             });
