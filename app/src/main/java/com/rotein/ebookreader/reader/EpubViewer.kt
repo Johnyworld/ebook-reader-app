@@ -217,6 +217,10 @@ internal fun EpubViewer(
                                 }, 100)
                             },
                             onNavigationCompleteCallback = {
+                                // 내부 링크 네비게이션 완료 시 오버레이 비트맵 제거
+                                val ov = overlayRef.get()
+                                (ov?.background as? BitmapDrawable)?.bitmap?.recycle()
+                                ov?.background = null
                                 onNavigationComplete()
                             },
                             onPrevTransitionDoneCallback = {
@@ -334,26 +338,67 @@ internal fun EpubViewer(
                                 val y = e.y
                                 val w = this@apply.width.toFloat()
                                 val h = this@apply.height.toFloat()
-                                when (pageFlipRef.get()) {
-                                    ReaderPageFlip.LR_PREV_NEXT -> when {
-                                        x < w / 3f -> doPrev()
-                                        x > w * 2f / 3f -> doNext()
-                                        else -> onCenterTap()
-                                    }
-                                    ReaderPageFlip.LR_NEXT_PREV -> when {
-                                        x < w / 3f -> doNext()
-                                        x > w * 2f / 3f -> doPrev()
-                                        else -> onCenterTap()
-                                    }
-                                    ReaderPageFlip.TB_PREV_NEXT -> when {
-                                        y < h / 3f -> doPrev()
-                                        y > h * 2f / 3f -> doNext()
-                                        else -> onCenterTap()
-                                    }
-                                    ReaderPageFlip.TB_NEXT_PREV -> when {
-                                        y < h / 3f -> doNext()
-                                        y > h * 2f / 3f -> doPrev()
-                                        else -> onCenterTap()
+                                val density = ctx.resources.displayMetrics.density
+                                val cssX = x / density
+                                val cssY = y / density
+                                // 링크 감지 후 처리 (네비게이션은 별도 호출)
+                                webView.evaluateJavascript("window._getLinkAtPoint($cssX,$cssY)") { result ->
+                                    val json = result?.trim()?.removeSurrounding("\"")?.replace("\\\"", "\"")
+                                    if (json != null && json != "null" && json.isNotEmpty()) {
+                                        try {
+                                            val obj = org.json.JSONObject(json)
+                                            val type = obj.getString("type")
+                                            if (type == "external") {
+                                                // 외부 링크: 브라우저에서 열기
+                                                val href = obj.getString("href")
+                                                val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse(href))
+                                                ctx.startActivity(intent)
+                                            } else if (type == "internal") {
+                                                // 내부 링크: 현재 페이지 비트맵을 오버레이에 캡처한 뒤 네비게이션
+                                                val ov = overlayRef.get()
+                                                if (webView.width > 0 && webView.height > 0 && ov != null) {
+                                                    val bmp = Bitmap.createBitmap(webView.width, webView.height, Bitmap.Config.RGB_565)
+                                                    webView.draw(Canvas(bmp))
+                                                    prevSafetyRef.getAndSet(null)?.let { webView.removeCallbacks(it) }
+                                                    nextSafetyRef.getAndSet(null)?.let { webView.removeCallbacks(it) }
+                                                    ov.background = BitmapDrawable(ctx.resources, bmp)
+                                                    // safety timeout: JS 네비게이션 실패 시 오버레이가 영구적으로 남는 것을 방지
+                                                    val safetyRunnable = Runnable {
+                                                        nextSafetyRef.set(null)
+                                                        (ov.background as? BitmapDrawable)?.bitmap?.recycle()
+                                                        ov.background = null
+                                                    }
+                                                    nextSafetyRef.getAndSet(safetyRunnable)?.let { webView.removeCallbacks(it) }
+                                                    webView.postDelayed(safetyRunnable, 5000)
+                                                }
+                                                val href = obj.getString("href").replace("'", "\\'")
+                                                webView.evaluateJavascript("window._navigateInternalLink('$href')", null)
+                                            }
+                                        } catch (_: Exception) {}
+                                    } else {
+                                        // 링크가 아니면 기존 페이지 플립 처리
+                                        when (pageFlipRef.get()) {
+                                            ReaderPageFlip.LR_PREV_NEXT -> when {
+                                                x < w / 3f -> doPrev()
+                                                x > w * 2f / 3f -> doNext()
+                                                else -> onCenterTap()
+                                            }
+                                            ReaderPageFlip.LR_NEXT_PREV -> when {
+                                                x < w / 3f -> doNext()
+                                                x > w * 2f / 3f -> doPrev()
+                                                else -> onCenterTap()
+                                            }
+                                            ReaderPageFlip.TB_PREV_NEXT -> when {
+                                                y < h / 3f -> doPrev()
+                                                y > h * 2f / 3f -> doNext()
+                                                else -> onCenterTap()
+                                            }
+                                            ReaderPageFlip.TB_NEXT_PREV -> when {
+                                                y < h / 3f -> doNext()
+                                                y > h * 2f / 3f -> doPrev()
+                                                else -> onCenterTap()
+                                            }
+                                        }
                                     }
                                 }
                                 this@apply.performClick()

@@ -260,6 +260,158 @@ window._displayCfi = function(cfi) {
     _epub.rendition.display(navCfi).then(_finishNavigation).catch(_finishNavigation);
 };
 
+// 지정된 좌표에 링크가 있으면 링크 정보를 반환한다 (네비게이션은 하지 않음).
+// 내부 링크: {type:'internal', href:'resolved/path#fragment'} 반환.
+// 외부 링크: {type:'external', href:'https://...'} 반환.
+// 링크 없음: 'null' 반환.
+window._getLinkAtPoint = function(cssX, cssY) {
+    try {
+        var iframe = document.querySelector('iframe');
+        if (!iframe || !iframe.contentDocument) return 'null';
+        var iframeRect = iframe.getBoundingClientRect();
+        var docX = cssX - iframeRect.left;
+        var docY = cssY - iframeRect.top;
+        var iDoc = iframe.contentDocument;
+        var el = iDoc.elementFromPoint(docX, docY);
+        while (el && el.tagName !== 'A') {
+            el = el.parentElement;
+        }
+        if (!el || !el.href) return 'null';
+        var href = el.getAttribute('href') || '';
+        // 외부 링크 (http://, https://, mailto: 등)
+        if (/^https?:\/\/|^mailto:/i.test(href)) {
+            return JSON.stringify({type: 'external', href: href});
+        }
+        // 내부 링크: 상대 경로를 EPUB 루트 기준으로 해석
+        var resolved = href;
+        try {
+            var loc = _epub.rendition.currentLocation();
+            if (loc && loc.start && loc.start.href) {
+                var baseDir = loc.start.href.substring(0, loc.start.href.lastIndexOf('/') + 1);
+                var parts = (baseDir + href).split('/');
+                var rp = [];
+                for (var pi = 0; pi < parts.length; pi++) {
+                    if (parts[pi] === '..') rp.pop();
+                    else if (parts[pi] !== '.') rp.push(parts[pi]);
+                }
+                resolved = rp.join('/');
+            }
+        } catch(e2) {}
+        return JSON.stringify({type: 'internal', href: resolved});
+    } catch(e) { return 'null'; }
+};
+
+// 내부 링크로 네비게이션한다. resolved는 EPUB 루트 기준 경로 (fragment 포함 가능).
+// Kotlin에서 비트맵 오버레이를 캡처한 뒤 호출한다.
+window._navigateInternalLink = function(resolved) {
+    var fragment = '';
+    var hashIdx = resolved.indexOf('#');
+    if (hashIdx >= 0) {
+        fragment = resolved.substring(hashIdx + 1);
+    }
+    _epub.navigating = true;
+    _removeSearchHighlights();
+    // 내부 링크 네비게이션:
+    // WebView의 CSS column 레이아웃은 초기 로드 시 전체 컬럼을 렌더링하지 않는다.
+    // scrollWidth가 실제보다 작게 나오며, getBoundingClientRect()도 부정확하다.
+    // 해결: 스캔 시 구한 정확한 페이지 수와 문자 비율로 타겟 페이지를 추정한 뒤,
+    // 점진적 스크롤로 브라우저가 컬럼을 렌더링하도록 강제한다.
+    var hrefBase = resolved.split('#')[0];
+    _epub.rendition.display(hrefBase).then(function() {
+        var m = _epub.rendition.manager;
+        if (m && m.container) m.container.scrollLeft = 0;
+        if (fragment) {
+            try {
+                var navIframe = document.querySelector('iframe');
+                if (!navIframe || !navIframe.contentDocument) { _finishNavigation(); return; }
+                var targetEl = navIframe.contentDocument.getElementById(fragment);
+                if (!targetEl) { _finishNavigation(); return; }
+                // spine index를 찾아 스캔에서 구한 정확한 페이지 수를 사용
+                var spineIndex = -1;
+                var items = _epub.book.spine ? (_epub.book.spine.items || []) : [];
+                for (var si = 0; si < items.length; si++) {
+                    var siHref = (items[si].href || '').split('?')[0];
+                    if (siHref === hrefBase || siHref.endsWith('/' + hrefBase) || hrefBase.endsWith('/' + siHref)) {
+                        spineIndex = si; break;
+                    }
+                }
+                // 스캔에서 구한 페이지 수, 없으면 현재 렌더링의 displayed.total 사용
+                var scanPageCount = spineIndex >= 0 ? (_epub.spinePageCounts[spineIndex] || 0) : 0;
+                if (scanPageCount === 0) {
+                    var curLoc = _epub.rendition.currentLocation();
+                    scanPageCount = (curLoc && curLoc.start && curLoc.start.displayed) ? curLoc.start.displayed.total : 0;
+                }
+                // 타겟 앞 문자수와 전체 문자수를 세서 비율로 페이지 추정
+                var body = navIframe.contentDocument.body;
+                var walker = navIframe.contentDocument.createTreeWalker(body, NodeFilter.SHOW_TEXT, null, false);
+                var node, charsBefore = 0, totalChars = 0;
+                var foundTarget = false;
+                while ((node = walker.nextNode())) {
+                    var len = node.textContent.length;
+                    if (len === 0) continue;
+                    if (!foundTarget) {
+                        if (targetEl.contains(node) || (targetEl.compareDocumentPosition(node) & 4)) {
+                            foundTarget = true;
+                        } else {
+                            charsBefore += len;
+                        }
+                    }
+                    totalChars += len;
+                }
+                if (totalChars > 0 && m && m.container && m.layout) {
+                    var delta = m.layout.delta;
+                    // 초기 페이지 추정 (scanPageCount가 0이면 scrollWidth 기반으로 시작)
+                    var curTotal = scanPageCount > 0 ? scanPageCount : Math.max(1, Math.ceil(m.container.scrollWidth / delta));
+                    var page = Math.min(Math.floor(charsBefore / totalChars * curTotal), curTotal - 1);
+                    // 비동기 배치 강제 레이아웃: 20페이지씩 scrollLeft를 증가시킨 뒤
+                    // rAF로 브라우저에게 실제 렌더링 시간을 준다.
+                    // 동기 루프는 반복 사용 시 브라우저 최적화로 레이아웃 확장이 중단될 수 있다.
+                    // 배치 스크롤 중 중간 페이지가 보이지 않도록 숨김
+                    m.container.style.visibility = 'hidden';
+                    var batchSize = 20;
+                    function advanceBatch(from) {
+                        var end = Math.min(from + batchSize, page);
+                        for (var p = from; p <= end; p++) {
+                            m.container.scrollLeft = p * delta;
+                        }
+                        // scrollWidth 확장 시 타겟 페이지 재계산
+                        var sw = m.container.scrollWidth;
+                        var newTotal = Math.ceil(sw / delta);
+                        if (newTotal > curTotal) {
+                            curTotal = newTotal;
+                            var newPage = Math.min(Math.floor(charsBefore / totalChars * newTotal), newTotal - 1);
+                            if (newPage > page) page = newPage;
+                        }
+                        if (end >= page) {
+                            // 레이아웃 확장 완료 → 정확한 위치로 보정
+                            requestAnimationFrame(function() {
+                                try {
+                                    var rect = targetEl.getBoundingClientRect();
+                                    var exactPage = Math.floor(rect.left / delta);
+                                    if (exactPage >= 0) {
+                                        m.container.scrollLeft = exactPage * delta;
+                                    }
+                                } catch(e4) {}
+                                m.container.style.visibility = '';
+                                _finishNavigation();
+                            });
+                        } else {
+                            requestAnimationFrame(function() {
+                                advanceBatch(end + 1);
+                            });
+                        }
+                    }
+                    advanceBatch(0);
+                    return;
+                }
+            } catch(e3) {}
+            _finishNavigation();
+        } else {
+            _finishNavigation();
+        }
+    }).catch(_finishNavigation);
+};
+
 window._displayPageNum = function(pageNum) {
     try {
         var items = _epub.book.spine ? (_epub.book.spine.items || []) : [];
