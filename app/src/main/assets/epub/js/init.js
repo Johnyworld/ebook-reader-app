@@ -70,6 +70,13 @@ window.addEventListener('resize', function() {
         return;
     }
 
+    // 백그라운드 복귀 중이면 resize를 무시한다.
+    // 복귀 시 dimensions가 681→658→681처럼 바운스하여 원래대로 돌아오므로
+    // resize를 실행할 필요가 없다.
+    if (_epub._resumeMode) {
+        return;
+    }
+
     _epub._lastResizeW = newW;
     _epub._lastResizeH = newH;
 

@@ -72,6 +72,7 @@ internal fun EpubViewer(
     onHighlightLongPress: (id: Long, x: Float, y: Float, bottom: Float) -> Unit = { _, _, _, _ -> },
     onMemoLongPress: (id: Long, x: Float, y: Float, bottom: Float) -> Unit = { _, _, _, _ -> },
     onNavigationComplete: () -> Unit = {},
+    onResumeRestoreComplete: () -> Unit = {},
     readerSettings: ReaderSettings = ReaderSettings(),
     annotationCfis: List<String> = emptyList()
 ) {
@@ -231,6 +232,9 @@ internal fun EpubViewer(
                                 nextSafetyRef.getAndSet(null)?.let { wv?.removeCallbacks(it) }
                                 (ov?.background as? BitmapDrawable)?.bitmap?.recycle()
                                 ov?.background = null
+                            },
+                            onResumeRestoreCompleteCallback = {
+                                onResumeRestoreComplete()
                             }
                         ), "Android")
                     }

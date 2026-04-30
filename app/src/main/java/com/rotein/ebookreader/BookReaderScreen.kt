@@ -108,9 +108,8 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
         onDispose { activity?.currentEpubWebView = null }
     }
 
-    // 백그라운드 전환 시 위치 복원: ON_PAUSE에서 CFI를 저장하고 ON_RESUME에서 복원한다.
-    // ON_PAUSE는 resize 이벤트보다 먼저 발생하므로 이 시점의 CFI는 항상 정확하다.
-    // 복원 중 잘못된 페이지가 보이지 않도록 흰색 오버레이로 가린다.
+    // 백그라운드 전환 시 위치 복원: ON_PAUSE에서 CFI를 저장하고 ON_RESUME에서 즉시 복원한다.
+    // resize로 인해 잘못된 페이지가 보이는 것을 방지하기 위해 오버레이를 사용한다.
     val pausedCfi = remember { mutableStateOf("") }
     val showResumeOverlay = remember { mutableStateOf(false) }
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -131,12 +130,17 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                         val cfi = pausedCfi.value
                         val wv = viewerWebView.value ?: return@LifecycleEventObserver
                         val escaped = cfi.escapeCfiForJs()
-                        wv.postDelayed({
-                            wv.evaluateJavascript(
-                                "if(typeof _epub!=='undefined'&&_epub.rendered){_epub.rendition.display('$escaped')}") {
-                                wv.postDelayed({ showResumeOverlay.value = false }, 100)
-                            }
-                        }, 500)
+                        // navigating=true로 설정하여 resize를 차단하고, display 완료 후 _finishNavigation에서
+                        // pendingResize를 처리한다. resumeMode이면 resize를 스킵한다.
+                        wv.evaluateJavascript(
+                            "if(typeof _epub!=='undefined'&&_epub.rendered){" +
+                            "_epub.navigating=true;" +
+                            "_epub._resumeMode=true;" +
+                            "_epub.rendition.display('$escaped').then(_finishNavigation).catch(_finishNavigation);" +
+                            "}", null)
+                        // _epub.rendered가 false일 때 onResumeRestoreComplete가 호출되지 않아
+                        // overlay가 영구히 남는 것을 방지하는 안전장치
+                        wv.postDelayed({ showResumeOverlay.value = false }, 2000)
                     } else {
                         showResumeOverlay.value = false
                     }
@@ -288,6 +292,9 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                     onNavigationCompleteRef.value?.invoke()
                     onNavigationCompleteRef.value = null
                 },
+                onResumeRestoreComplete = {
+                    showResumeOverlay.value = false
+                },
                 readerSettings = readerSettings,
                 annotationCfis = remember(annotationState.bookmarks, annotationState.highlights, annotationState.memos) {
                     (annotationState.bookmarks.map { it.cfi } + annotationState.highlights.map { it.cfi } + annotationState.memos.map { it.cfi })
@@ -346,11 +353,6 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
             }
         }
 
-        // 백그라운드 복귀 오버레이: 잘못된 페이지가 보이지 않도록 가린다
-        if (showResumeOverlay.value) {
-            Box(modifier = Modifier.fillMaxSize().background(EreaderColors.White))
-        }
-
         // 로딩 오버레이
         if (contentState.isLoading) {
             Box(
@@ -361,6 +363,15 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
             }
         }
 
+        // 백그라운드 복귀 시 깜빡임 방지 오버레이
+        if (showResumeOverlay.value) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(EreaderColors.White)
+                    .clickable(enabled = false) {}
+            )
+        }
 
         // 투명 스크림 - 클릭 이벤트는 아래 레이어로 통과 (가운데 탭으로 닫기)
         if (popupState.showMenu) {

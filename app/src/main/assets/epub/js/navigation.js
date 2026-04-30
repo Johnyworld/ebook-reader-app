@@ -87,25 +87,29 @@ function _finishNavigation() {
     // resize()가 scrollLeft를 초기화하므로 현재 CFI로 복원한다.
     if (_epub._pendingResize) {
         _epub._pendingResize = false;
-        var s = window._readerSettings;
-        if (s) {
-            var newW = window.innerWidth - s.paddingHorizontal * 2;
-            var newH = window.innerHeight - s.paddingVertical * 2 - _config.bottomInfoHeight;
-            if (newW !== _epub._lastResizeW || newH !== _epub._lastResizeH) {
-                var cfiBeforeResize = window._currentCfi || _config.savedCfi || '';
-                _epub._lastResizeW = newW;
-                _epub._lastResizeH = newH;
-                _epub.rendition.spread(_getSpreadMode(), 0);
-                _epub.rendition.resize(newW, newH);
-                var viewer = document.getElementById('viewer');
-                if (viewer) {
-                    viewer.style.top = s.paddingVertical + 'px';
-                    viewer.style.left = s.paddingHorizontal + 'px';
-                    viewer.style.right = s.paddingHorizontal + 'px';
-                    viewer.style.bottom = (s.paddingVertical + _config.bottomInfoHeight) + 'px';
-                }
-                if (cfiBeforeResize) {
-                    _epub.rendition.display(cfiBeforeResize);
+        // 백그라운드 복귀 중이면 pendingResize를 무시한다.
+        // dimensions가 바운스(681→658→681)하므로 중간 크기로 resize하면 안 된다.
+        if (!_epub._resumeMode) {
+            var s = window._readerSettings;
+            if (s) {
+                var newW = window.innerWidth - s.paddingHorizontal * 2;
+                var newH = window.innerHeight - s.paddingVertical * 2 - _config.bottomInfoHeight;
+                if (newW !== _epub._lastResizeW || newH !== _epub._lastResizeH) {
+                    var cfiBeforeResize = window._currentCfi || _config.savedCfi || '';
+                    _epub._lastResizeW = newW;
+                    _epub._lastResizeH = newH;
+                    _epub.rendition.spread(_getSpreadMode(), 0);
+                    _epub.rendition.resize(newW, newH);
+                    var viewer = document.getElementById('viewer');
+                    if (viewer) {
+                        viewer.style.top = s.paddingVertical + 'px';
+                        viewer.style.left = s.paddingHorizontal + 'px';
+                        viewer.style.right = s.paddingHorizontal + 'px';
+                        viewer.style.bottom = (s.paddingVertical + _config.bottomInfoHeight) + 'px';
+                    }
+                    if (cfiBeforeResize) {
+                        _epub.rendition.display(cfiBeforeResize);
+                    }
                 }
             }
         }
@@ -124,6 +128,11 @@ function _finishNavigation() {
     requestAnimationFrame(function() {
         requestAnimationFrame(function() {
             Android.onNavigationComplete();
+            // resume 모드이면 paint 완료 후 overlay를 제거한다.
+            if (_epub._resumeMode) {
+                _epub._resumeMode = false;
+                try { Android.onResumeRestoreComplete(); } catch(e) {}
+            }
         });
     });
     if (_epub.searchHighlightQuery) { setTimeout(_applySearchHighlights, 50); }
