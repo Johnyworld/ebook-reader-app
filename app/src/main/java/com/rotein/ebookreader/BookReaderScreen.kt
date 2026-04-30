@@ -3,6 +3,9 @@ package com.rotein.ebookreader
 import android.content.Intent
 import android.webkit.WebView
 import androidx.activity.compose.BackHandler
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -103,6 +106,46 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
     DisposableEffect(viewerWebView.value) {
         activity?.currentEpubWebView = viewerWebView.value
         onDispose { activity?.currentEpubWebView = null }
+    }
+
+    // 백그라운드 전환 시 위치 복원: ON_PAUSE에서 CFI를 저장하고 ON_RESUME에서 복원한다.
+    // ON_PAUSE는 resize 이벤트보다 먼저 발생하므로 이 시점의 CFI는 항상 정확하다.
+    // 복원 중 잘못된 페이지가 보이지 않도록 흰색 오버레이로 가린다.
+    val pausedCfi = remember { mutableStateOf("") }
+    val showResumeOverlay = remember { mutableStateOf(false) }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        var paused = false
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_PAUSE -> {
+                    if (isEpub) {
+                        paused = true
+                        pausedCfi.value = vm.readingState.value.currentCfi
+                        showResumeOverlay.value = true
+                    }
+                }
+                Lifecycle.Event.ON_RESUME -> {
+                    if (paused && isEpub && pausedCfi.value.isNotEmpty()) {
+                        paused = false
+                        val cfi = pausedCfi.value
+                        val wv = viewerWebView.value ?: return@LifecycleEventObserver
+                        val escaped = cfi.escapeCfiForJs()
+                        wv.postDelayed({
+                            wv.evaluateJavascript(
+                                "if(typeof _epub!=='undefined'&&_epub.rendered){_epub.rendition.display('$escaped')}") {
+                                wv.postDelayed({ showResumeOverlay.value = false }, 100)
+                            }
+                        }, 500)
+                    } else {
+                        showResumeOverlay.value = false
+                    }
+                }
+                else -> {}
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     BackHandler {
@@ -211,6 +254,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                         val cfiArray = org.json.JSONArray(allCfis)
                         viewerWebView.value?.evaluateJavascript("window._setCfiList('${cfiArray.toString().replace("'", "\\'")}')", null)
                     }
+
                 },
                 onHighlight = { text, cfi ->
                     if (cfi.isNotEmpty()) {
@@ -302,6 +346,11 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
             }
         }
 
+        // 백그라운드 복귀 오버레이: 잘못된 페이지가 보이지 않도록 가린다
+        if (showResumeOverlay.value) {
+            Box(modifier = Modifier.fillMaxSize().background(EreaderColors.White))
+        }
+
         // 로딩 오버레이
         if (contentState.isLoading) {
             Box(
@@ -311,6 +360,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                 Text(text = "읽는 중...", style = EreaderFontSize.L)
             }
         }
+
 
         // 투명 스크림 - 클릭 이벤트는 아래 레이어로 통과 (가운데 탭으로 닫기)
         if (popupState.showMenu) {

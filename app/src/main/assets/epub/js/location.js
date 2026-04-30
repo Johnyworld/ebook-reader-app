@@ -147,7 +147,11 @@ _epub.rendition.on("relocated", function(location) {
             try {
                 var iframe = document.querySelector('iframe');
                 var iDoc = iframe && (iframe.contentDocument || (iframe.contentWindow && iframe.contentWindow.document));
-                if (iDoc && iDoc.fonts && iDoc.fonts.status === 'loading' && _config.savedCfi) {
+                // fonts.status 체크 없이 항상 fonts.ready를 기다린다.
+                // 폰트가 아직 로드 요청 전이면 status가 'loaded'로 보이지만
+                // 레이아웃 시 폰트가 필요해지면 뒤늦게 로드되어 위치가 틀어질 수 있다.
+                // fonts.ready는 이미 로드된 경우 즉시 resolve되므로 오버헤드가 없다.
+                if (iDoc && iDoc.fonts && _config.savedCfi) {
                     _epub.waitingForFonts = true;
                     _epub.navigating = true;
                     iDoc.fonts.ready.then(function() {

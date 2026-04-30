@@ -83,6 +83,33 @@ function _finishNavigation() {
     }
     _epub.retried = false;
     _epub.navigating = false;
+    // 네비게이션 중 지연된 resize가 있으면 현재 CFI를 기억한 후 resize를 실행한다.
+    // resize()가 scrollLeft를 초기화하므로 현재 CFI로 복원한다.
+    if (_epub._pendingResize) {
+        _epub._pendingResize = false;
+        var s = window._readerSettings;
+        if (s) {
+            var newW = window.innerWidth - s.paddingHorizontal * 2;
+            var newH = window.innerHeight - s.paddingVertical * 2 - _config.bottomInfoHeight;
+            if (newW !== _epub._lastResizeW || newH !== _epub._lastResizeH) {
+                var cfiBeforeResize = window._currentCfi || _config.savedCfi || '';
+                _epub._lastResizeW = newW;
+                _epub._lastResizeH = newH;
+                _epub.rendition.spread(_getSpreadMode(), 0);
+                _epub.rendition.resize(newW, newH);
+                var viewer = document.getElementById('viewer');
+                if (viewer) {
+                    viewer.style.top = s.paddingVertical + 'px';
+                    viewer.style.left = s.paddingHorizontal + 'px';
+                    viewer.style.right = s.paddingHorizontal + 'px';
+                    viewer.style.bottom = (s.paddingVertical + _config.bottomInfoHeight) + 'px';
+                }
+                if (cfiBeforeResize) {
+                    _epub.rendition.display(cfiBeforeResize);
+                }
+            }
+        }
+    }
     try {
         var loc = _epub.rendition.currentLocation();
         if (loc && loc.start && loc.start.cfi) {

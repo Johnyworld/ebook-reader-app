@@ -38,11 +38,48 @@ _epub.rendition = _epub.book.renderTo("viewer", {
     minSpreadWidth: 0
 });
 
+// resize 이벤트로 인한 위치 손실 방지
+// _lastResizeW/H는 resize 핸들러와 동일한 공식(정수 연산)으로 초기화하여
+// getBoundingClientRect의 서브픽셀 차이로 불필요한 resize가 발생하지 않게 한다.
+_epub._lastResizeW = window.innerWidth - _config.paddingHorizontal * 2;
+_epub._lastResizeH = window.innerHeight - _config.paddingVertical * 2 - _config.bottomInfoHeight;
+_epub._preResizeCfi = undefined;
+_epub._resizeRestoring = false;
+
+// 네비게이션 중이거나 아직 렌더링 전인 resize는 큐에 저장했다가
+// 네비게이션 완료 후 한 번만 실행한다.
+_epub._pendingResize = false;
+
 window.addEventListener('resize', function() {
     if (!window._readerSettings) return;
     var s = window._readerSettings;
+
+    var newW = window.innerWidth - s.paddingHorizontal * 2;
+    var newH = window.innerHeight - s.paddingVertical * 2 - _config.bottomInfoHeight;
+
+    // 크기가 실제로 변하지 않았으면 무시한다.
+    if (newW === _epub._lastResizeW && newH === _epub._lastResizeH) {
+        return;
+    }
+
+    // 초기 로드 네비게이션 중이면 resize를 지연시킨다.
+    // display(savedCfi)가 완료되기 전에 rendition.resize()를 호출하면
+    // scrollLeft가 초기화되어 잘못된 페이지로 이동하는 버그가 발생한다.
+    if (_epub.navigating) {
+        _epub._pendingResize = true;
+        return;
+    }
+
+    _epub._lastResizeW = newW;
+    _epub._lastResizeH = newH;
+
+    // 현재 CFI를 저장한다 (resize 후 복원용).
+    if (!_epub._preResizeCfi && !_epub._resizeRestoring) {
+        _epub._preResizeCfi = window._currentCfi || _config.savedCfi || '';
+    }
+
     _epub.rendition.spread(_getSpreadMode(), 0);
-    _epub.rendition.resize(window.innerWidth - s.paddingHorizontal * 2, window.innerHeight - s.paddingVertical * 2 - _config.bottomInfoHeight);
+    _epub.rendition.resize(newW, newH);
     var viewer = document.getElementById('viewer');
     if (viewer) {
         viewer.style.top = s.paddingVertical + 'px';
@@ -50,4 +87,19 @@ window.addEventListener('resize', function() {
         viewer.style.right = s.paddingHorizontal + 'px';
         viewer.style.bottom = (s.paddingVertical + _config.bottomInfoHeight) + 'px';
     }
+
+    // resize 후 CFI 복원: 디바운스로 마지막 resize 이후 실행
+    clearTimeout(_epub._resizeRestoreTimer);
+    _epub._resizeRestoreTimer = setTimeout(function() {
+        if (_epub._preResizeCfi && !_epub._resizeRestoring) {
+            var cfi = _epub._preResizeCfi;
+            _epub._preResizeCfi = undefined;
+            _epub._resizeRestoring = true;
+            _epub.rendition.display(cfi).then(function() {
+                _epub._resizeRestoring = false;
+            }).catch(function() {
+                _epub._resizeRestoring = false;
+            });
+        }
+    }, 500);
 });
