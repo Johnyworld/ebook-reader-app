@@ -122,6 +122,8 @@
     <string name="memo_placeholder">Enter memo…</string>
     <string name="delete">Delete</string>
     <string name="go_to_page">Go to page</string>
+    <string name="cancel">Cancel</string>
+    <string name="move">Move</string>
 
     <!-- SearchPopup -->
     <string name="enter_search_query">Enter a search query.</string>

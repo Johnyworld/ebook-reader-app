@@ -6,7 +6,9 @@ import androidx.activity.compose.BackHandler
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -46,6 +48,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -71,6 +74,7 @@ import com.rotein.ebookreader.reader.TocPopup
 import com.rotein.ebookreader.reader.TxtViewer
 import com.rotein.ebookreader.ui.components.ActionItem
 import com.rotein.ebookreader.ui.components.ActionPopup
+import com.rotein.ebookreader.ui.components.PageJumpDialog
 import com.rotein.ebookreader.ui.components.PopupHeaderBar
 import com.rotein.ebookreader.ui.theme.EreaderColors
 import com.rotein.ebookreader.ui.theme.EreaderFontSize
@@ -101,6 +105,8 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
     val searchState by vm.searchState.collectAsState()
     val viewerWebView = remember { mutableStateOf<WebView?>(null) }
     val onNavigationCompleteRef = remember { mutableStateOf<(() -> Unit)?>(null) }
+    // 페이지 이동 시 현재 화면을 캡처하여 오버레이로 사용
+    var pageJumpOverlay by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
 
     val activity = LocalContext.current as? MainActivity
     DisposableEffect(viewerWebView.value) {
@@ -331,12 +337,21 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
             "mobi" -> MobiViewer(book.path, onCenterTap)
             else   -> CenteredMessage(stringResource(R.string.unsupported_format))
         }
+
+        // 페이지 이동 중 캡처 오버레이 (WebView와 같은 statusBarsPadding 영역)
+        pageJumpOverlay?.let { bmp ->
+            Image(
+                bitmap = bmp.asImageBitmap(),
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize().clickable(enabled = false) {}
+            )
+        }
         }
 
         // 북마크 리본은 WebView 내부 HTML로 렌더링 (글자 하위 레이어)
 
         // 하단 정보 오버레이
-        if (!popupState.showMenu && contentState.isContentRendered) {
+        if (!popupState.showMenu && contentState.isContentRendered && pageJumpOverlay == null) {
             val leftText = readerBottomInfoText(readerSettings.leftInfo, book, readingState.chapterTitle, readingState.currentPage, readingState.totalPages, readingState.readingProgress, currentTime)
             val rightText = readerBottomInfoText(readerSettings.rightInfo, book, readingState.chapterTitle, readingState.currentPage, readingState.totalPages, readingState.readingProgress, currentTime)
             if (leftText != null || rightText != null) {
@@ -418,7 +433,9 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                                 Text(
                                     "${readingState.currentPage} / ${readingState.totalPages}",
                                     style = EreaderFontSize.M,
-                                    modifier = Modifier.testTag("pageInfoText")
+                                    modifier = Modifier
+                                        .testTag("pageInfoText")
+                                        .clickable { vm.setShowPageJumpDialog(true) }
                                 )
                             }
                             Spacer(Modifier.height(EreaderSpacing.S))
@@ -907,6 +924,36 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                 onFontChanged = { vm.updateSettings(readerSettings.copy(fontName = it)) },
                 onFontImported = {},
                 onDismiss = { vm.setShowFontPopup(false) }
+            )
+        }
+
+        // 페이지 이동 다이얼로그
+        if (popupState.showPageJumpDialog) {
+            PageJumpDialog(
+                currentPage = readingState.currentPage,
+                totalPages = readingState.totalPages,
+                onDismiss = { vm.setShowPageJumpDialog(false) },
+                onNavigate = { page ->
+                    if (onNavigationCompleteRef.value != null) return@PageJumpDialog
+                    val wv = viewerWebView.value ?: return@PageJumpDialog
+                    // 현재 화면을 캡처하여 오버레이로 사용
+                    if (wv.width > 0 && wv.height > 0) {
+                        val bmp = android.graphics.Bitmap.createBitmap(wv.width, wv.height, android.graphics.Bitmap.Config.RGB_565)
+                        wv.draw(android.graphics.Canvas(bmp))
+                        pageJumpOverlay = bmp
+                    }
+                    vm.setShowPageJumpDialog(false)
+                    vm.setShowMenu(false)
+                    onNavigationCompleteRef.value = {
+                        pageJumpOverlay?.recycle()
+                        pageJumpOverlay = null
+                    }
+                    if (isPdf) {
+                        wv.evaluateJavascript("window._goToPage($page)", null)
+                    } else {
+                        wv.evaluateJavascript("window._displayPageNum($page)", null)
+                    }
+                }
             )
         }
 

@@ -427,21 +427,34 @@ window._displayPageNum = function(pageNum) {
             }
         }
         var capturedTargetIdx = targetIdx;
+        _epub.navigating = true;
+        // step 이동 중간 과정이 보이지 않도록 숨김
+        var mgr = _epub.rendition.manager;
+        if (mgr && mgr.container && pageWithin > 0) mgr.container.style.visibility = 'hidden';
         _epub.rendition.display(items[targetIdx].href).then(function() {
+            // 챕터 시작으로 이동한 뒤, spine 내부 페이지로 step 이동
+            var m = _epub.rendition.manager;
+            if (m && m.container) m.container.scrollLeft = 0;
             var remaining = pageWithin;
+            function finish() {
+                // step 이동 중 숨겼던 컨테이너 복원
+                var mc = _epub.rendition.manager;
+                if (mc && mc.container) mc.container.style.visibility = '';
+                _finishNavigation();
+            }
             function step() {
-                if (remaining <= 0) { return; }
+                if (remaining <= 0) { finish(); return; }
                 remaining--;
                 _epub.rendition.next().then(function() {
                     var loc = _epub.rendition.currentLocation();
                     if (loc && loc.start && loc.start.index !== undefined && loc.start.index !== capturedTargetIdx) {
-                        _epub.rendition.prev();
+                        _epub.rendition.prev().then(function() { finish(); });
                     } else {
                         step();
                     }
-                }).catch(function() {});
+                }).catch(finish);
             }
             step();
-        }).catch(function() {});
-    } catch(e) {}
+        }).catch(_finishNavigation);
+    } catch(e) { _finishNavigation(); }
 };

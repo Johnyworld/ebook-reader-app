@@ -52,7 +52,8 @@ data class PopupState(
     val showMemoListPopup: Boolean = false,
     val showMemoEditor: Boolean = false,
     val showSettingsPopup: Boolean = false,
-    val showFontPopup: Boolean = false
+    val showFontPopup: Boolean = false,
+    val showPageJumpDialog: Boolean = false
 )
 
 data class SearchState(
@@ -539,6 +540,10 @@ class BookReaderViewModel(application: Application) : AndroidViewModel(applicati
 
     fun setShowFontPopup(show: Boolean) {
         _popupState.update { it.copy(showFontPopup = show) }
+    }
+
+    fun setShowPageJumpDialog(show: Boolean) {
+        _popupState.update { it.copy(showPageJumpDialog = show) }
     }
 
     fun setHighlightAction(state: HighlightActionState?) {
