@@ -7,20 +7,22 @@ import java.io.File
 object FileScanner {
 
     private val SUPPORTED_EXTENSIONS = setOf("epub", "pdf")
+    private const val MAX_SCAN_DEPTH = 30 // 심볼릭 링크 순환으로 인한 StackOverflow 방지
 
     fun scanBooks(@Suppress("UNUSED_PARAMETER") context: Context): List<BookFile> {
         val root = Environment.getExternalStorageDirectory()
         val books = mutableListOf<BookFile>()
-        scanDirectory(root, books)
+        scanDirectory(root, books, 0)
         return books
     }
 
-    private fun scanDirectory(dir: File, result: MutableList<BookFile>) {
+    private fun scanDirectory(dir: File, result: MutableList<BookFile>, depth: Int) {
+        if (depth > MAX_SCAN_DEPTH) return
         val files = dir.listFiles() ?: return
         for (file in files) {
             if (file.isDirectory) {
                 if (file.name.startsWith(".")) continue
-                scanDirectory(file, result)
+                scanDirectory(file, result, depth + 1)
             } else {
                 val ext = file.extension.lowercase()
                 if (ext in SUPPORTED_EXTENSIONS) {

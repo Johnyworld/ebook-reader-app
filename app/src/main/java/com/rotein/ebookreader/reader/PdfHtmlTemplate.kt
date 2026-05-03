@@ -1,6 +1,21 @@
 package com.rotein.ebookreader.reader
 
-internal fun buildPdfHtml(pdfPath: String, startPage: Int) = """<!DOCTYPE html>
+import org.json.JSONObject
+
+internal fun buildPdfHtml(pdfPath: String, startPage: Int): String {
+    // JSONObject로 빌드하여 문자열 인젝션을 구조적으로 방지
+    val config = JSONObject().apply {
+        put("pdfPath", pdfPath)
+        put("startPage", startPage)
+    }
+    // JSON을 JS 작은따옴표 문자열 안에 안전하게 삽입
+    // JSONObject.toString()이 이미 JSON 표준 이스케이프를 수행하므로,
+    // 작은따옴표와 </script> 탈출만 추가 처리
+    val safeJson = config.toString()
+        .replace("'", "\\'")     // 작은따옴표 이스케이프
+        .replace("</", "<\\/")   // </script> 탈출 방지
+
+    return """<!DOCTYPE html>
 <html>
 <head>
 <meta charset='UTF-8'/>
@@ -29,10 +44,7 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: #fff; }
 </div>
 <div id="pdf-container"></div>
 <script>
-var _pdfConfig = {
-    pdfPath: "$pdfPath",
-    startPage: $startPage
-};
+var _pdfConfig = JSON.parse('$safeJson');
 </script>
 <script src="pdfjs/pdf.min.js"></script>
 <script src="pdf/js/init.js"></script>
@@ -42,3 +54,4 @@ var _pdfConfig = {
 <script src="pdf/js/toc.js"></script>
 </body>
 </html>"""
+}

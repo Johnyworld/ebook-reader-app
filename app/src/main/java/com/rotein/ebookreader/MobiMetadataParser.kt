@@ -72,6 +72,8 @@ object MobiMetadataParser {
                             if (pos + 8 > record0.size) return@repeat
                             val type = readInt(record0, pos)
                             val length = readInt(record0, pos + 4)
+                            // EXTH 레코드 최소 길이는 8바이트 — 0 이하이면 무한 루프 방지
+                            if (length < 8) return@repeat
                             // type 201 = cover offset (4 bytes data, total length = 12)
                             if (type == 201 && length == 12) {
                                 coverOffset = readInt(record0, pos + 8)
@@ -172,6 +174,8 @@ object MobiMetadataParser {
                         if (pos + 8 > record0.size) return@repeat
                         val type = readInt(record0, pos)
                         val length = readInt(record0, pos + 4)
+                        // EXTH 레코드 최소 길이는 8바이트 — 0 이하이면 무한 루프 방지
+                        if (length < 8) return@repeat
                         val dataLength = length - 8
 
                         if (dataLength > 0 && pos + length <= record0.size) {

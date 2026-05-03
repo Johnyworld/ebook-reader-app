@@ -5,9 +5,11 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -117,9 +119,9 @@ class BookReaderViewModel(application: Application) : AndroidViewModel(applicati
     val annotationUiState: StateFlow<AnnotationUiState> = _annotationUiState.asStateFlow()
 
     init {
-        // 설정 변경 시 자동 저장
+        // 설정 변경 시 자동 저장 (drop(1)로 초기값 불필요 저장 방지)
         viewModelScope.launch {
-            _readerSettings.collect { settings ->
+            _readerSettings.drop(1).collect { settings ->
                 withContext(Dispatchers.IO) {
                     ReaderSettingsStore.save(getApplication(), settings)
                 }
@@ -175,10 +177,15 @@ class BookReaderViewModel(application: Application) : AndroidViewModel(applicati
                 }
             }
 
-            val bookmarks = withContext(Dispatchers.IO) { bookmarkDao.getByBook(path) }
-            val highlights = withContext(Dispatchers.IO) { highlightDao.getByBook(path) }
-            val memos = withContext(Dispatchers.IO) { memoDao.getByBook(path) }
-            _annotationState.value = AnnotationState(bookmarks = bookmarks, highlights = highlights, memos = memos)
+            // 3개의 독립적인 DB 쿼리를 병렬 실행
+            val bookmarksDeferred = async(Dispatchers.IO) { bookmarkDao.getByBook(path) }
+            val highlightsDeferred = async(Dispatchers.IO) { highlightDao.getByBook(path) }
+            val memosDeferred = async(Dispatchers.IO) { memoDao.getByBook(path) }
+            _annotationState.value = AnnotationState(
+                bookmarks = bookmarksDeferred.await(),
+                highlights = highlightsDeferred.await(),
+                memos = memosDeferred.await()
+            )
         }
     }
 

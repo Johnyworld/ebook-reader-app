@@ -37,6 +37,7 @@ import com.rotein.ebookreader.ImportedFontStore
 import com.rotein.ebookreader.LoadingIndicator
 import com.rotein.ebookreader.ReaderPageFlip
 import com.rotein.ebookreader.ReaderSettings
+import com.rotein.ebookreader.escapeForJs
 import com.rotein.ebookreader.fontFamilyForJs
 import com.rotein.ebookreader.R
 import com.rotein.ebookreader.ui.components.ActionItem
@@ -46,6 +47,7 @@ import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import org.xmlpull.v1.XmlPullParser
 import java.io.File
+import java.security.MessageDigest
 import java.util.zip.ZipFile
 
 @SuppressLint("ClickableViewAccessibility", "SetJavaScriptEnabled")
@@ -135,8 +137,8 @@ internal fun EpubViewer(
             "window._setCfiList('${cfiArray.toString().replace("'", "\\'")}');"
         } else ""
         val js = """${cfiListJs}window._applyReaderSettings(
-            "$fontFamily",
-            "$fontFilePath",
+            "${fontFamily.escapeForJs()}",
+            "${fontFilePath.escapeForJs()}",
             ${readerSettings.fontSize},
             "${readerSettings.textAlign.name.lowercase()}",
             ${readerSettings.lineHeight},
@@ -349,10 +351,13 @@ internal fun EpubViewer(
                                             val obj = org.json.JSONObject(json)
                                             val type = obj.getString("type")
                                             if (type == "external") {
-                                                // 외부 링크: 브라우저에서 열기
+                                                // 외부 링크: http/https 스킴만 허용하여 브라우저에서 열기
                                                 val href = obj.getString("href")
-                                                val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse(href))
-                                                ctx.startActivity(intent)
+                                                val uri = android.net.Uri.parse(href)
+                                                if (uri.scheme == "http" || uri.scheme == "https") {
+                                                    val intent = Intent(Intent.ACTION_VIEW, uri)
+                                                    ctx.startActivity(intent)
+                                                }
                                             } else if (type == "internal") {
                                                 // 내부 링크: 현재 페이지 비트맵을 오버레이에 캡처한 뒤 네비게이션
                                                 val ov = overlayRef.get()
@@ -371,7 +376,7 @@ internal fun EpubViewer(
                                                     nextSafetyRef.getAndSet(safetyRunnable)?.let { webView.removeCallbacks(it) }
                                                     webView.postDelayed(safetyRunnable, 5000)
                                                 }
-                                                val href = obj.getString("href").replace("'", "\\'")
+                                                val href = obj.getString("href").escapeForJs()
                                                 webView.evaluateJavascript("window._navigateInternalLink('$href')", null)
                                             }
                                         } catch (_: Exception) {}
@@ -556,7 +561,11 @@ private fun copyJsModules(context: Context, outDir: File) {
 }
 
 private fun extractEpub(context: Context, epubPath: String): Pair<String, String>? {
-    val hash = epubPath.hashCode().toString()
+    // SHA-256 해시로 충돌 방지 (기존 hashCode()는 32비트라 충돌 가능성 있음)
+    val hash = MessageDigest.getInstance("SHA-256")
+        .digest(epubPath.toByteArray())
+        .joinToString("") { "%02x".format(it) }
+        .take(16)
     val outDir = File(context.cacheDir, "epub/$hash")
     val opfMarker = File(outDir, ".opf_path")
 

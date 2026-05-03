@@ -2,11 +2,36 @@ package com.rotein.ebookreader.reader
 
 import com.rotein.ebookreader.ReaderSettings
 import com.rotein.ebookreader.fontFamilyForJs
+import org.json.JSONObject
 
 /** 하단 정보 영역을 위한 추가 여백 (px) */
 internal const val BOTTOM_INFO_HEIGHT = 32
 
-internal fun buildEpubJsHtml(opfPath: String, savedCfi: String, settings: ReaderSettings, fontFilePath: String = "") = """<!DOCTYPE html>
+internal fun buildEpubJsHtml(opfPath: String, savedCfi: String, settings: ReaderSettings, fontFilePath: String = ""): String {
+    // JSONObject로 빌드하여 문자열 인젝션을 구조적으로 방지
+    val config = JSONObject().apply {
+        put("opfPath", opfPath)
+        put("savedCfi", savedCfi)
+        put("dualPage", settings.dualPage)
+        put("fontName", settings.fontName)
+        put("fontSize", settings.fontSize)
+        put("textAlign", settings.textAlign.name)
+        put("lineHeight", settings.lineHeight)
+        put("paragraphSpacing", settings.paragraphSpacing)
+        put("paddingVertical", settings.paddingVertical)
+        put("paddingHorizontal", settings.paddingHorizontal)
+        put("fontFilePath", fontFilePath)
+        put("fontFamilyForJs", fontFamilyForJs(settings.fontName))
+        put("bottomInfoHeight", BOTTOM_INFO_HEIGHT)
+    }
+    // JSON을 JS 작은따옴표 문자열 안에 안전하게 삽입
+    // JSONObject.toString()이 이미 JSON 표준 이스케이프를 수행하므로,
+    // 작은따옴표와 </script> 탈출만 추가 처리
+    val safeJson = config.toString()
+        .replace("'", "\\'")     // 작은따옴표 이스케이프
+        .replace("</", "<\\/")   // </script> 탈출 방지
+
+    return """<!DOCTYPE html>
 <html>
 <head>
 <meta charset='UTF-8'/>
@@ -26,21 +51,7 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: #fff; }
 </div>
 <div id="viewer"></div>
 <script>
-var _config = {
-    opfPath: "$opfPath",
-    savedCfi: "${savedCfi.replace("\"", "\\\"")}",
-    dualPage: ${settings.dualPage},
-    fontName: "${settings.fontName}",
-    fontSize: ${settings.fontSize},
-    textAlign: "${settings.textAlign.name}",
-    lineHeight: ${settings.lineHeight},
-    paragraphSpacing: ${settings.paragraphSpacing},
-    paddingVertical: ${settings.paddingVertical},
-    paddingHorizontal: ${settings.paddingHorizontal},
-    fontFilePath: "$fontFilePath",
-    fontFamilyForJs: "${fontFamilyForJs(settings.fontName)}",
-    bottomInfoHeight: $BOTTOM_INFO_HEIGHT
-};
+var _config = JSON.parse('$safeJson');
 </script>
 <script src="epub.min.js"></script>
 <script src="js/init.js"></script>
@@ -53,3 +64,4 @@ var _config = {
 <script src="js/navigation.js"></script>
 </body>
 </html>"""
+}

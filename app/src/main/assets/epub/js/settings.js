@@ -19,7 +19,9 @@ function _buildReaderCss(s) {
     var fontFaceDecl = '';
     var ff;
     if (s.fontFilePath) {
-        fontFaceDecl = '@font-face { font-family: "_imported_"; src: url("' + s.fontFilePath + '"); }';
+        // CSS url() 인젝션 방지를 위해 특수문자 이스케이프
+        var safePath = s.fontFilePath.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\)/g, '\\)');
+        fontFaceDecl = '@font-face { font-family: "_imported_"; src: url("' + safePath + '"); }';
         ff = "'_imported_', sans-serif";
     } else {
         ff = s.fontFamily ? ("'" + s.fontFamily + "', sans-serif") : 'sans-serif';

@@ -43,6 +43,16 @@ internal fun fontFamilyForJs(fontName: String): String = when (fontName) {
 internal fun String.escapeCfiForJs(): String =
     replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n")
 
+/** JS 문자열 리터럴 안에 안전하게 삽입하기 위한 이스케이프 */
+internal fun String.escapeForJs(): String =
+    replace("\\", "\\\\")
+        .replace("\"", "\\\"")
+        .replace("'", "\\'")
+        .replace("\n", "\\n")
+        .replace("\r", "\\r")
+        .replace("<", "\\u003c")  // </script> 탈출 방지
+        .replace(">", "\\u003e")
+
 @Composable
 internal fun CenteredMessage(text: String) {
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {

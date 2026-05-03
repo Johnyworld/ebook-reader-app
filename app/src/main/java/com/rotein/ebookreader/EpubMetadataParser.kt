@@ -15,6 +15,8 @@ object EpubMetadataParser {
         null
     }
 
+    private const val MAX_COVER_SIZE = 10L * 1024 * 1024 // 10MB — 비정상적으로 큰 이미지 방지
+
     fun extractCover(path: String): ByteArray? = try {
         ZipFile(path).use { zip ->
             val opfPath = findOpfPath(zip) ?: return null
@@ -22,7 +24,8 @@ object EpubMetadataParser {
             val coverHref = findCoverHref(zip, opfPath) ?: return null
             val coverPath = if (opfDir.isEmpty()) coverHref else "$opfDir/$coverHref"
             val entry = zip.getEntry(coverPath) ?: return null
-            zip.getInputStream(entry).readBytes()
+            if (entry.size > MAX_COVER_SIZE) return null
+            zip.getInputStream(entry).use { it.readBytes() }
         }
     } catch (e: Exception) {
         null
@@ -30,17 +33,19 @@ object EpubMetadataParser {
 
     private fun findOpfPath(zip: ZipFile): String? {
         val entry = zip.getEntry("META-INF/container.xml") ?: return null
-        val parser = Xml.newPullParser()
-        parser.setInput(zip.getInputStream(entry), null)
+        return zip.getInputStream(entry).use { stream ->
+            val parser = Xml.newPullParser()
+            parser.setInput(stream, null)
 
-        var event = parser.eventType
-        while (event != XmlPullParser.END_DOCUMENT) {
-            if (event == XmlPullParser.START_TAG && parser.name == "rootfile") {
-                return parser.getAttributeValue(null, "full-path")
+            var event = parser.eventType
+            while (event != XmlPullParser.END_DOCUMENT) {
+                if (event == XmlPullParser.START_TAG && parser.name == "rootfile") {
+                    return@use parser.getAttributeValue(null, "full-path")
+                }
+                event = parser.next()
             }
-            event = parser.next()
+            null
         }
-        return null
     }
 
     /**
@@ -53,8 +58,9 @@ object EpubMetadataParser {
      */
     private fun findCoverHref(zip: ZipFile, opfPath: String): String? {
         val entry = zip.getEntry(opfPath) ?: return null
+        return zip.getInputStream(entry).use { stream ->
         val parser = Xml.newPullParser()
-        parser.setInput(zip.getInputStream(entry), null)
+        parser.setInput(stream, null)
 
         var coverId: String? = null
         val manifestItems = mutableMapOf<String, String>() // id -> href
@@ -83,19 +89,21 @@ object EpubMetadataParser {
             event = parser.next()
         }
 
-        return coverImageHref
+        coverImageHref
             ?: coverId?.let { manifestItems[it] }
             ?: manifestItems["cover"]
             ?: manifestItems.values.firstOrNull { href ->
                 href.contains("cover", ignoreCase = true) &&
                 (href.endsWith(".jpg", true) || href.endsWith(".jpeg", true) || href.endsWith(".png", true))
             }
+        } // use
     }
 
     private fun parseOpf(zip: ZipFile, opfPath: String): BookMetadata? {
         val entry = zip.getEntry(opfPath) ?: return null
+        return zip.getInputStream(entry).use { stream ->
         val parser = Xml.newPullParser()
-        parser.setInput(zip.getInputStream(entry), null)
+        parser.setInput(stream, null)
 
         var title: String? = null
         var author: String? = null
@@ -127,6 +135,7 @@ object EpubMetadataParser {
             event = parser.next()
         }
 
-        return BookMetadata(title, author, language, publisher, date, description)
+        BookMetadata(title, author, language, publisher, date, description)
+        } // use
     }
 }

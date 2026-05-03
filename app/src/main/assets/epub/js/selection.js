@@ -35,12 +35,6 @@ _epub.rendition.hooks.content.register(function(contents) {
             if (s.el.scrollLeft !== s.left) s.el.scrollLeft = s.left;
         });
     }
-    var _rafId = 0;
-    function _lockLoop() {
-        if (!_selLocked) return;
-        _restoreAll();
-        _rafId = (doc.defaultView || window).requestAnimationFrame(_lockLoop);
-    }
     _captureAll();
     doc.addEventListener('selectionchange', function() {
         var sel = doc.getSelection();
@@ -48,10 +42,9 @@ _epub.rendition.hooks.content.register(function(contents) {
         if (hasSelection && !_selLocked) {
             _captureAll();
             _selLocked = true;
-            _rafId = (doc.defaultView || window).requestAnimationFrame(_lockLoop);
+            _restoreAll(); // 잠금 시작 시 즉시 복원
         } else if (!hasSelection && _selLocked) {
             _selLocked = false;
-            if (_rafId) (doc.defaultView || window).cancelAnimationFrame(_rafId);
         }
     });
     _getAllScrollTargets().forEach(function(el) {
