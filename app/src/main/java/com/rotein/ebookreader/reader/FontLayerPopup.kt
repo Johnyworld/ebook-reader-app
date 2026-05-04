@@ -19,12 +19,10 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -52,6 +50,7 @@ import com.rotein.ebookreader.SystemFontFilter
 import com.rotein.ebookreader.SystemFontSortOrder
 import com.rotein.ebookreader.fontDisplayName
 import com.rotein.ebookreader.getFontFileMaps
+import com.rotein.ebookreader.ui.components.ConfirmDialog
 import com.rotein.ebookreader.ui.components.EreaderDropdownMenu
 import com.rotein.ebookreader.ui.components.EreaderTabBar
 import com.rotein.ebookreader.ui.components.FullScreenPopup
@@ -142,49 +141,39 @@ internal fun FontLayerPopup(
     }
 
     confirmImportFont?.let { (fontName, filePath) ->
-        AlertDialog(
-            onDismissRequest = { confirmImportFont = null },
-            title = { Text(stringResource(R.string.font_import_title)) },
-            text = { Text(stringResource(R.string.font_import_message, fontName)) },
-            confirmButton = {
-                TextButton(onClick = {
-                    try {
-                        val srcFile = File(filePath)
-                        val destFile = File(ImportedFontStore.getDir(context), srcFile.name)
-                        if (!destFile.exists()) srcFile.copyTo(destFile)
-                        ImportedFontStore.add(context, fontName, destFile.absolutePath)
-                        importedFonts = ImportedFontStore.load(context)
-                        onFontImported()
-                        // 가져오기 완료 후 글꼴 탭으로 전환하고 해당 글꼴 선택
-                        selectedTab = 0
-                        onFontChanged(fontName)
-                    } catch (e: Exception) { /* ignore */ }
-                    confirmImportFont = null
-                }) { Text(stringResource(R.string.yes)) }
+        ConfirmDialog(
+            title = stringResource(R.string.font_import_title),
+            message = stringResource(R.string.font_import_message, fontName),
+            onConfirm = {
+                try {
+                    val srcFile = File(filePath)
+                    val destFile = File(ImportedFontStore.getDir(context), srcFile.name)
+                    if (!destFile.exists()) srcFile.copyTo(destFile)
+                    ImportedFontStore.add(context, fontName, destFile.absolutePath)
+                    importedFonts = ImportedFontStore.load(context)
+                    onFontImported()
+                    // 가져오기 완료 후 글꼴 탭으로 전환하고 해당 글꼴 선택
+                    selectedTab = 0
+                    onFontChanged(fontName)
+                } catch (e: Exception) { /* ignore */ }
+                confirmImportFont = null
             },
-            dismissButton = {
-                TextButton(onClick = { confirmImportFont = null }) { Text(stringResource(R.string.no)) }
-            }
+            onDismiss = { confirmImportFont = null },
         )
     }
 
     confirmDeleteFont?.let { fontName ->
-        AlertDialog(
-            onDismissRequest = { confirmDeleteFont = null },
-            title = { Text(stringResource(R.string.font_delete_title)) },
-            text = { Text(stringResource(R.string.font_delete_message, fontName)) },
-            confirmButton = {
-                TextButton(onClick = {
-                    ImportedFontStore.remove(context, fontName)
-                    importedFonts = ImportedFontStore.load(context)
-                    onFontImported()
-                    if (fontName == currentFontName) onFontChanged(FONT_EPUB_ORIGINAL)
-                    confirmDeleteFont = null
-                }) { Text(stringResource(R.string.yes)) }
+        ConfirmDialog(
+            title = stringResource(R.string.font_delete_title),
+            message = stringResource(R.string.font_delete_message, fontName),
+            onConfirm = {
+                ImportedFontStore.remove(context, fontName)
+                importedFonts = ImportedFontStore.load(context)
+                onFontImported()
+                if (fontName == currentFontName) onFontChanged(FONT_EPUB_ORIGINAL)
+                confirmDeleteFont = null
             },
-            dismissButton = {
-                TextButton(onClick = { confirmDeleteFont = null }) { Text(stringResource(R.string.no)) }
-            }
+            onDismiss = { confirmDeleteFont = null },
         )
     }
 
