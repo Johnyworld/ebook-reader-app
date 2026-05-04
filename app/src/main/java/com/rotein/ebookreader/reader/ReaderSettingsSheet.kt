@@ -175,7 +175,8 @@ private fun ReaderMarginTab(settings: ReaderSettings, onSettingsChange: (ReaderS
             ReaderStepperField(
                 value = "%.1f".format(settings.lineHeight),
                 onDecrement = { if (settings.lineHeight > 1.0f) onSettingsChange(settings.copy(lineHeight = (Math.round(settings.lineHeight * 10) - 1) / 10f)) },
-                onIncrement = { if (settings.lineHeight < 3.0f) onSettingsChange(settings.copy(lineHeight = (Math.round(settings.lineHeight * 10) + 1) / 10f)) }
+                onIncrement = { if (settings.lineHeight < 3.0f) onSettingsChange(settings.copy(lineHeight = (Math.round(settings.lineHeight * 10) + 1) / 10f)) },
+                tag = "lineHeight"
             )
         }
         HorizontalDivider(color = EreaderColors.Gray)
@@ -199,7 +200,8 @@ private fun ReaderMarginTab(settings: ReaderSettings, onSettingsChange: (ReaderS
             ReaderStepperField(
                 value = settings.paddingHorizontal.toString(),
                 onDecrement = { if (settings.paddingHorizontal > minHorizontalPadding) onSettingsChange(settings.copy(paddingHorizontal = settings.paddingHorizontal - 2)) },
-                onIncrement = { if (settings.paddingHorizontal < 80) onSettingsChange(settings.copy(paddingHorizontal = settings.paddingHorizontal + 2)) }
+                onIncrement = { if (settings.paddingHorizontal < 80) onSettingsChange(settings.copy(paddingHorizontal = settings.paddingHorizontal + 2)) },
+                tag = "paddingHorizontal"
             )
         }
     }

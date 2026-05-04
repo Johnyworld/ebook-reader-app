@@ -75,6 +75,8 @@ internal fun EpubViewer(
     onMemoLongPress: (id: Long, x: Float, y: Float, bottom: Float) -> Unit = { _, _, _, _ -> },
     onNavigationComplete: () -> Unit = {},
     onResumeRestoreComplete: () -> Unit = {},
+    onSettingsApplyComplete: () -> Unit = {},
+    onBeforeSettingsApply: () -> Unit = {},
     readerSettings: ReaderSettings = ReaderSettings(),
     annotationCfis: List<String> = emptyList()
 ) {
@@ -127,7 +129,19 @@ internal fun EpubViewer(
 
     // annotationCfis의 최신 값을 참조하되, readerSettings 변경 시에만 실행
     val latestAnnotationCfis = rememberUpdatedState(annotationCfis)
+    // 초기 로드 시에는 onBeforeSettingsApply를 호출하지 않기 위한 플래그
+    val settingsInitialized = remember { mutableStateOf(false) }
     LaunchedEffect(readerSettings) {
+        // 콘텐츠가 렌더링된 후의 설정 변경에만 캡쳐 오버레이 + 디바운스 적용
+        if (settingsInitialized.value) {
+            onBeforeSettingsApply()
+            // 연속 클릭 시 마지막 설정만 적용하기 위한 디바운스.
+            // LaunchedEffect는 key가 바뀌면 이전 코루틴을 취소하므로
+            // delay 중 새 클릭이 오면 이 코루틴이 취소되고 새 코루틴이 시작된다.
+            kotlinx.coroutines.delay(300)
+        } else {
+            settingsInitialized.value = true
+        }
         val fontFamily = fontFamilyForJs(readerSettings.fontName)
         val fontFilePath = ImportedFontStore.load(context).find { it.name == readerSettings.fontName }?.filePath ?: ""
         // 재스캔 전에 최신 annotation CFI 목록을 전달하여 정확한 페이지 계산 보장
@@ -241,6 +255,9 @@ internal fun EpubViewer(
                             },
                             onResumeRestoreCompleteCallback = {
                                 onResumeRestoreComplete()
+                            },
+                            onSettingsApplyCompleteCallback = {
+                                onSettingsApplyComplete()
                             }
                         ), "Android")
                     }

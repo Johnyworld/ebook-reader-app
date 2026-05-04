@@ -18,7 +18,8 @@ internal class EpubBridge(
     private val onNavigationCompleteCallback: () -> Unit = {},
     private val onPrevTransitionDoneCallback: () -> Unit = {},
     private val onNextTransitionDoneCallback: () -> Unit = {},
-    private val onResumeRestoreCompleteCallback: () -> Unit = {}
+    private val onResumeRestoreCompleteCallback: () -> Unit = {},
+    private val onSettingsApplyCompleteCallback: () -> Unit = {}
 ) {
     private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
 
@@ -113,6 +114,11 @@ internal class EpubBridge(
     @android.webkit.JavascriptInterface
     fun onResumeRestoreComplete() {
         mainHandler.post { onResumeRestoreCompleteCallback() }
+    }
+
+    @android.webkit.JavascriptInterface
+    fun onSettingsApplyComplete() {
+        mainHandler.post { onSettingsApplyCompleteCallback() }
     }
 
 }

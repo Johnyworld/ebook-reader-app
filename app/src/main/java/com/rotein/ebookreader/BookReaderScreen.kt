@@ -107,6 +107,10 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
     val onNavigationCompleteRef = remember { mutableStateOf<(() -> Unit)?>(null) }
     // 페이지 이동 시 현재 화면을 캡처하여 오버레이로 사용
     var pageJumpOverlay by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
+    // 설정 변경 중 현재 화면을 캡처하여 오버레이로 사용
+    var settingsOverlay by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
+    // 설정 오버레이 안전장치 타이머 (중복 방지용)
+    val settingsOverlayTimeout = remember { mutableStateOf<Runnable?>(null) }
 
     val activity = LocalContext.current as? MainActivity
     DisposableEffect(viewerWebView.value) {
@@ -301,6 +305,28 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                 onResumeRestoreComplete = {
                     showResumeOverlay.value = false
                 },
+                onSettingsApplyComplete = {
+                    // 이전 안전장치 타이머 취소
+                    settingsOverlayTimeout.value?.let { viewerWebView.value?.removeCallbacks(it) }
+                    settingsOverlayTimeout.value = null
+                    settingsOverlay = null
+                },
+                onBeforeSettingsApply = {
+                    // 이미 오버레이가 있으면 재캡쳐하지 않음 (연속 클릭 시 최초 화면 유지)
+                    if (settingsOverlay == null) {
+                        val wv = viewerWebView.value
+                        if (wv != null && wv.width > 0 && wv.height > 0) {
+                            val bmp = android.graphics.Bitmap.createBitmap(wv.width, wv.height, android.graphics.Bitmap.Config.RGB_565)
+                            wv.draw(android.graphics.Canvas(bmp))
+                            settingsOverlay = bmp
+                        }
+                    }
+                    // 이전 안전장치 타이머 취소 후 새로 등록
+                    settingsOverlayTimeout.value?.let { viewerWebView.value?.removeCallbacks(it) }
+                    val timeout = Runnable { settingsOverlay = null }
+                    settingsOverlayTimeout.value = timeout
+                    viewerWebView.value?.postDelayed(timeout, 3000)
+                },
                 readerSettings = readerSettings,
                 annotationCfis = remember(annotationState.bookmarks, annotationState.highlights, annotationState.memos) {
                     (annotationState.bookmarks.map { it.cfi } + annotationState.highlights.map { it.cfi } + annotationState.memos.map { it.cfi })
@@ -344,6 +370,17 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                 bitmap = bmp.asImageBitmap(),
                 contentDescription = null,
                 modifier = Modifier.fillMaxSize().clickable(enabled = false) {}
+            )
+        }
+        // 설정 변경 중 캡처 오버레이
+        settingsOverlay?.let { bmp ->
+            Image(
+                bitmap = bmp.asImageBitmap(),
+                contentDescription = null,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .testTag("settingsOverlay")
+                    .clickable(enabled = false) {}
             )
         }
         }
@@ -945,7 +982,6 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                     vm.setShowPageJumpDialog(false)
                     vm.setShowMenu(false)
                     onNavigationCompleteRef.value = {
-                        pageJumpOverlay?.recycle()
                         pageJumpOverlay = null
                     }
                     if (isPdf) {
