@@ -257,7 +257,22 @@ window._displayCfi = function(cfi) {
     }
     _epub.navigating = true;
     _removeSearchHighlights();
-    _epub.rendition.display(navCfi).then(_finishNavigation).catch(_finishNavigation);
+
+    // 현재 챕터의 spine index를 기록
+    var curLoc = _epub.rendition.currentLocation();
+    var curIndex = (curLoc && curLoc.start) ? curLoc.start.index : -1;
+
+    _epub.rendition.display(navCfi).then(function() {
+        // 크로스 챕터 이동 시 epub.js가 scrollLeft를 잘못 유지하는 문제 보정:
+        // 새 챕터가 로드된 후 CFI를 한 번 더 display하면 정확한 위치로 이동
+        var newLoc = _epub.rendition.currentLocation();
+        var newIndex = (newLoc && newLoc.start) ? newLoc.start.index : -1;
+        if (curIndex >= 0 && newIndex >= 0 && curIndex !== newIndex) {
+            _epub.rendition.display(navCfi).then(_finishNavigation).catch(_finishNavigation);
+        } else {
+            _finishNavigation();
+        }
+    }).catch(_finishNavigation);
 };
 
 // 지정된 좌표에 링크가 있으면 링크 정보를 반환한다 (네비게이션은 하지 않음).

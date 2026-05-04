@@ -964,14 +964,12 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                 spinePageOffsets = pageCalcState.spinePageOffsets,
                 cfiPageMap = pageCalcState.cfiPageMap,
                 onNavigate = { cfi ->
+                    if (onNavigationCompleteRef.value != null) return@BookmarkPopup
+                    onNavigationCompleteRef.value = { vm.setShowBookmarkPopup(false); vm.setShowMenu(false) }
                     if (isPdf) {
-                        if (onNavigationCompleteRef.value != null) return@BookmarkPopup
-                        onNavigationCompleteRef.value = { vm.setShowBookmarkPopup(false); vm.setShowMenu(false) }
                         val pageNum = cfi.removePrefix("pdf-page:").toIntOrNull() ?: 1
                         viewerWebView.value?.evaluateJavascript("window._goToPage($pageNum)", null)
                     } else {
-                        if (onNavigationCompleteRef.value != null) return@BookmarkPopup
-                        onNavigationCompleteRef.value = { vm.setShowBookmarkPopup(false); vm.setShowMenu(false) }
                         viewerWebView.value?.post {
                             val escaped = cfi.escapeCfiForJs()
                             viewerWebView.value?.evaluateJavascript("window._displayCfi(\"$escaped\")", null)
