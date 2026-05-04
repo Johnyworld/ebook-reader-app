@@ -5,6 +5,7 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -200,22 +201,12 @@ class BookmarkPageConsistencyTest {
             down(androidx.compose.ui.geometry.Offset(centerX, height * 0.1f))
             up()
         }
-        Thread.sleep(1000)
+        // 설정 오버레이(3초 타이머) 제거 대기
+        Thread.sleep(5000)
 
-        // 6. re-pagination 완료 대기 (큰 파일이므로 최대 약 2분)
+        // 6. re-pagination 완료 대기
         Log.d(TAG, "단계 6: re-pagination 대기")
-        var scanComplete = false
-        repeat(40) {
-            tapCenter()
-            Thread.sleep(1500)
-            val tocNodes = rule.onAllNodesWithTag("tocButton").fetchSemanticsNodes()
-            if (tocNodes.isNotEmpty()) {
-                scanComplete = true
-                return@repeat
-            }
-            tapCenter()
-            Thread.sleep(2000)
-        }
+        val scanComplete = openMenuAndWaitForScan()
         assertTrue("폰트 변경 후 re-pagination 완료 실패", scanComplete)
         Log.d(TAG, "단계 6 완료: re-pagination 완료")
 
@@ -245,7 +236,7 @@ class BookmarkPageConsistencyTest {
 
         // 10. 북마크 탭하여 이동
         Log.d(TAG, "단계 10: 북마크 탭하여 이동")
-        rule.onNodeWithTag("bookmarkItem").performClick()
+        rule.onAllNodesWithTag("bookmarkItem").onFirst().performClick()
         Thread.sleep(3000)
 
         // 11. 이동 후 실제 페이지 번호 캡처
