@@ -1,33 +1,5 @@
 // navigation.js — page navigation, display, prev/next
 
-window._isSelectionAtPageEnd = function() {
-    try {
-        var manager = _epub.rendition.manager;
-        if (!manager || !manager.container) return false;
-        var scrollLeft = manager.container.scrollLeft;
-        var offsetWidth = manager.container.offsetWidth;
-        var scrollWidth = manager.container.scrollWidth;
-        var delta = manager.layout ? manager.layout.delta : offsetWidth;
-        // spine item 마지막 페이지이면 이어하기 불가
-        if (scrollLeft + offsetWidth + delta > scrollWidth + delta * 0.5) return false;
-
-        var iframe = document.querySelector('iframe');
-        if (!iframe || !iframe.contentDocument) return false;
-        var doc = iframe.contentDocument;
-        var sel = doc.getSelection();
-        if (!sel || sel.rangeCount === 0 || sel.toString().trim().length === 0) return false;
-        var range = sel.getRangeAt(0);
-        var rightEdge = scrollLeft + delta;
-
-        // 선택 영역의 마지막 rect의 오른쪽 끝이 페이지 오른쪽 끝에 닿아 있는지
-        var selRects = range.getClientRects();
-        if (selRects.length === 0) return false;
-        var lastRect = selRects[selRects.length - 1];
-        var tolerance = 20;
-        return lastRect.right >= rightEdge - tolerance;
-    } catch(e) { return false; }
-};
-
 window._autoSelectFirstWord = function() {
     try {
         var iframe = document.querySelector('iframe');

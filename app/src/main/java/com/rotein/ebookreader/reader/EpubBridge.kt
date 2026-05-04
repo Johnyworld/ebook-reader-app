@@ -13,7 +13,7 @@ internal class EpubBridge(
     private val onSearchResultsPartialCallback: (resultsJson: String) -> Unit = {},
     private val onSearchCompleteCallback: () -> Unit = {},
     private val onTextSelectedCallback: (text: String, x: Float, y: Float, bottom: Float) -> Unit = { _, _, _, _ -> },
-    private val onSelectionTappedCallback: (text: String, x: Float, y: Float, bottom: Float, cfi: String, isAtPageEnd: Boolean) -> Unit = { _, _, _, _, _, _ -> },
+    private val onSelectionTappedCallback: (text: String, x: Float, y: Float, bottom: Float, cfi: String) -> Unit = { _, _, _, _, _ -> },
     private val onAutoSelectReadyCallback: (cssX: Float, cssY: Float) -> Unit = { _, _ -> },
     private val onNavigationCompleteCallback: () -> Unit = {},
     private val onPrevTransitionDoneCallback: () -> Unit = {},
@@ -87,8 +87,8 @@ internal class EpubBridge(
     }
 
     @android.webkit.JavascriptInterface
-    fun onSelectionTapped(text: String, x: Float, y: Float, bottom: Float, cfi: String, isAtPageEnd: Boolean) {
-        mainHandler.post { onSelectionTappedCallback(text, x, y, bottom, cfi, isAtPageEnd) }
+    fun onSelectionTapped(text: String, x: Float, y: Float, bottom: Float, cfi: String) {
+        mainHandler.post { onSelectionTappedCallback(text, x, y, bottom, cfi) }
     }
 
     @android.webkit.JavascriptInterface

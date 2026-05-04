@@ -84,7 +84,7 @@ internal fun EpubViewer(
     var bookDir by remember(path) { mutableStateOf<String?>(null) }
     var opfPath by remember(path) { mutableStateOf<String?>(null) }
     var error by remember(path) { mutableStateOf(false) }
-    data class SelectionState(val text: String, val x: Float, val y: Float, val bottom: Float, val cfi: String = "", val isAtPageEnd: Boolean = false)
+    data class SelectionState(val text: String, val x: Float, val y: Float, val bottom: Float, val cfi: String = "")
     var selectionState by remember { mutableStateOf<SelectionState?>(null) }
     var pendingStartText by remember { mutableStateOf<String?>(null) }
     var isContinuationMode by remember { mutableStateOf(false) }
@@ -123,8 +123,8 @@ internal fun EpubViewer(
             }
         }
     }
-    val selectionOnSelectionTapped: (String, Float, Float, Float, String, Boolean) -> Unit = { text, x, y, bottom, cfi, isAtPageEnd ->
-        if (text.isNotEmpty()) selectionState = SelectionState(text, x, y, bottom, cfi, isAtPageEnd)
+    val selectionOnSelectionTapped: (String, Float, Float, Float, String) -> Unit = { text, x, y, bottom, cfi ->
+        if (text.isNotEmpty()) selectionState = SelectionState(text, x, y, bottom, cfi)
     }
 
     // annotationCfis의 최신 값을 참조하되, readerSettings 변경 시에만 실행
@@ -333,14 +333,12 @@ internal fun EpubViewer(
                                                     if (docX >= r.left && docX <= r.right && docY >= r.top && docY <= r.bottom) {
                                                         var boundRect = range.getBoundingClientRect();
                                                         var cfi = typeof window._getCfiFromSelection === 'function' ? (window._getCfiFromSelection() || '') : '';
-                                                        var isAtPageEnd = typeof window._isSelectionAtPageEnd === 'function' ? window._isSelectionAtPageEnd() : false;
                                                         Android.onSelectionTapped(
                                                             sel.toString().trim(),
                                                             $cssX,
                                                             $cssY,
                                                             $cssY,
-                                                            cfi,
-                                                            isAtPageEnd
+                                                            cfi
                                                         );
                                                         return;
                                                     }
@@ -542,7 +540,7 @@ internal fun EpubViewer(
                     resetContinuation()
                     clearSelection()
                 })
-                if (sel.isAtPageEnd && !isContinuationMode) {
+                if (!isContinuationMode) {
                     add(ActionItem(stringResource(R.string.continue_selection)) {
                         pendingStartText = sel.text
                         isContinuationMode = true
