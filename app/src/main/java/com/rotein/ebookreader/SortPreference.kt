@@ -37,10 +37,10 @@ val MemoSortStore = AnnotationSortStore("memo_sort_pref")
 val HighlightSortStore = AnnotationSortStore("highlight_sort_pref")
 
 enum class SortField(@StringRes val labelRes: Int) {
-    TITLE(R.string.sort_title),
-    AUTHOR(R.string.sort_author),
+    LAST_READ(R.string.sort_last_read),
     DATE_ADDED(R.string.sort_date_added),
-    LAST_READ(R.string.sort_last_read);
+    TITLE(R.string.sort_title),
+    AUTHOR(R.string.sort_author);
 
     /** 각 필드의 기본 정렬 방향 */
     val defaultDescending: Boolean get() = this == DATE_ADDED || this == LAST_READ
