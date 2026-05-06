@@ -6,14 +6,12 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
@@ -35,9 +33,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -92,13 +90,10 @@ internal fun SearchPopup(
     }
 
     val density = LocalDensity.current
-    val screenHeightDp = LocalConfiguration.current.screenHeightDp
-    val statusBarHeightDp = with(density) { WindowInsets.statusBars.getTop(this).toDp().value.toInt() }
     val itemHeightDp = 80
-    val headerHeightDp = 56
-    val paginationHeightDp = 56
-    val searchBarHeightDp = 45
-    val itemsPerPage = maxOf(1, (screenHeightDp - statusBarHeightDp - headerHeightDp - paginationHeightDp - searchBarHeightDp) / itemHeightDp)
+    // 콘텐츠 영역의 실제 높이를 측정하여 페이지당 아이템 수 계산
+    var contentHeightDp by remember { mutableStateOf(0) }
+    val itemsPerPage = if (contentHeightDp > 0) maxOf(1, contentHeightDp / itemHeightDp) else 1
     val resultList = sortedResults ?: emptyList()
     val totalPages = maxOf(1, (resultList.size + itemsPerPage - 1) / itemsPerPage)
     val pageItems = resultList.drop(currentPage * itemsPerPage).take(itemsPerPage)
@@ -109,7 +104,9 @@ internal fun SearchPopup(
     FullScreenPopup(applyImePadding = false) {
             PopupHeaderBar(title = stringResource(R.string.search_content), onBack = onDismiss)
 
-            Box(modifier = Modifier.weight(1f)) {
+            Box(modifier = Modifier.weight(1f).onSizeChanged {
+                contentHeightDp = with(density) { it.height.toDp().value.toInt() }
+            }) {
                 when {
                     searchResults == null -> Box(
                         modifier = Modifier.fillMaxSize(),
