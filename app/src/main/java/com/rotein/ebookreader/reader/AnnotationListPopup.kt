@@ -2,10 +2,8 @@ package com.rotein.ebookreader.reader
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBars
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -16,7 +14,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
@@ -48,11 +46,9 @@ internal fun <T : AnnotationItem> AnnotationListPopup(
 ) {
     val context = LocalContext.current
     val density = LocalDensity.current
-    val screenHeightDp = LocalConfiguration.current.screenHeightDp
-    val statusBarHeightDp = with(density) { WindowInsets.statusBars.getTop(this).toDp().value.toInt() }
-    val headerHeightDp = 56
-    val paginationHeightDp = 72
-    val itemsPerPage = maxOf(1, (screenHeightDp - statusBarHeightDp - headerHeightDp - paginationHeightDp) / itemHeightDp)
+    // 콘텐츠 영역의 실제 높이를 측정하여 페이지당 아이템 수 계산
+    var contentHeightDp by remember { mutableStateOf(0) }
+    val itemsPerPage = if (contentHeightDp > 0) maxOf(1, contentHeightDp / itemHeightDp) else 1
     var currentPage by remember { mutableStateOf(0) }
     var sortOrder by remember { mutableStateOf(sortStore.load(context)) }
     val sortedItems = remember(items, sortOrder) {
@@ -84,7 +80,9 @@ internal fun <T : AnnotationItem> AnnotationListPopup(
             )
         }
 
-        Box(modifier = Modifier.weight(1f)) {
+        Box(modifier = Modifier.weight(1f).onSizeChanged {
+            contentHeightDp = with(density) { it.height.toDp().value.toInt() }
+        }) {
             if (items.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text(emptyText, style = EreaderFontSize.M)
