@@ -5,23 +5,25 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -84,140 +86,149 @@ fun PageJumpDialog(
                     .border(1.dp, EreaderColors.Black)
                     .clickable(enabled = false) {} // 내부 클릭 전파 차단
             ) {
-                Column(
-                    modifier = Modifier
-                        .padding(EreaderSpacing.L)
-                        .verticalScroll(rememberScrollState()),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    // 제목
-                    Text(
-                        stringResource(R.string.go_to_page),
-                        style = EreaderFontSize.L
-                    )
-
-                    Spacer(Modifier.height(EreaderSpacing.L))
-
-                    // 숫자 입력 필드
-                    TextField(
-                        value = pageText,
-                        onValueChange = { text ->
-                            // 숫자만 허용, 빈 문자열도 허용 (이동 시점에 파싱)
-                            pageText = text.filter { it.isDigit() }
-                        },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        singleLine = true,
-                        textStyle = EreaderFontSize.L.copy(textAlign = TextAlign.Center),
-                        colors = TextFieldDefaults.colors(
-                            focusedContainerColor = Color.Transparent,
-                            unfocusedContainerColor = Color.Transparent,
-                            focusedIndicatorColor = EreaderColors.Black,
-                            unfocusedIndicatorColor = EreaderColors.Gray,
-                            cursorColor = EreaderColors.Black
-                        ),
-                        modifier = Modifier.widthIn(max = 120.dp).testTag("pageJumpInput"),
-                        suffix = {
-                            Text(
-                                " / $totalPages",
-                                style = EreaderFontSize.M,
-                                color = EreaderColors.DarkGray
-                            )
-                        }
-                    )
-
-                    Spacer(Modifier.height(EreaderSpacing.L))
-
-                    // +/- 버튼 그리드 (감소 왼쪽, 증가 오른쪽)
-                    val steps = listOf(1, 5, 10, 50, 100)
-                    val isLandscape = LocalConfiguration.current.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(EreaderSpacing.S)
+                Column {
+                    // 콘텐츠 영역
+                    Column(
+                        modifier = Modifier
+                            .padding(EreaderSpacing.L)
+                            .verticalScroll(rememberScrollState()),
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        // 감소 버튼 (왼쪽)
-                        Column(
-                            modifier = Modifier.weight(1f),
-                            verticalArrangement = Arrangement.spacedBy(EreaderSpacing.S)
+                        // 제목
+                        Text(
+                            stringResource(R.string.go_to_page),
+                            style = EreaderFontSize.L
+                        )
+
+                        Spacer(Modifier.height(EreaderSpacing.L))
+
+                        // 숫자 입력 필드
+                        TextField(
+                            value = pageText,
+                            onValueChange = { text ->
+                                // 숫자만 허용, 빈 문자열도 허용 (이동 시점에 파싱)
+                                pageText = text.filter { it.isDigit() }
+                            },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            singleLine = true,
+                            textStyle = EreaderFontSize.L.copy(textAlign = TextAlign.Center),
+                            colors = TextFieldDefaults.colors(
+                                focusedContainerColor = Color.Transparent,
+                                unfocusedContainerColor = Color.Transparent,
+                                focusedIndicatorColor = EreaderColors.Black,
+                                unfocusedIndicatorColor = EreaderColors.Gray,
+                                cursorColor = EreaderColors.Black
+                            ),
+                            modifier = Modifier.widthIn(max = 120.dp).testTag("pageJumpInput"),
+                            suffix = {
+                                Text(
+                                    " / $totalPages",
+                                    style = EreaderFontSize.M,
+                                    color = EreaderColors.DarkGray
+                                )
+                            }
+                        )
+
+                        Spacer(Modifier.height(EreaderSpacing.L))
+
+                        // +/- 버튼 그리드 (감소 왼쪽, 증가 오른쪽)
+                        val steps = listOf(1, 5, 10, 50, 100)
+                        val isLandscape = LocalConfiguration.current.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(EreaderSpacing.S)
                         ) {
-                            if (isLandscape) {
-                                // 가로모드: 2열 배치
-                                steps.chunked(2).forEach { chunk ->
-                                    Row(horizontalArrangement = Arrangement.spacedBy(EreaderSpacing.S)) {
-                                        chunk.forEach { step ->
-                                            Box(Modifier.weight(1f)) {
-                                                StepButton(label = "-$step") {
-                                                    val result = clampedPage(effectivePage() - step)
-                                                    pageText = result.toString()
+                            // 감소 버튼 (왼쪽)
+                            Column(
+                                modifier = Modifier.weight(1f),
+                                verticalArrangement = Arrangement.spacedBy(EreaderSpacing.S)
+                            ) {
+                                if (isLandscape) {
+                                    // 가로모드: 2열 배치
+                                    steps.chunked(2).forEach { chunk ->
+                                        Row(horizontalArrangement = Arrangement.spacedBy(EreaderSpacing.S)) {
+                                            chunk.forEach { step ->
+                                                Box(Modifier.weight(1f)) {
+                                                    StepButton(label = "-$step") {
+                                                        val result = clampedPage(effectivePage() - step)
+                                                        pageText = result.toString()
+                                                    }
                                                 }
                                             }
+                                            // 홀수 개일 때 빈 공간 채우기
+                                            if (chunk.size < 2) Spacer(Modifier.weight(1f))
                                         }
-                                        // 홀수 개일 때 빈 공간 채우기
-                                        if (chunk.size < 2) Spacer(Modifier.weight(1f))
                                     }
-                                }
-                            } else {
-                                steps.forEach { step ->
-                                    StepButton(label = "-$step") {
-                                        val result = clampedPage(effectivePage() - step)
-                                        pageText = result.toString()
+                                } else {
+                                    steps.forEach { step ->
+                                        StepButton(label = "-$step") {
+                                            val result = clampedPage(effectivePage() - step)
+                                            pageText = result.toString()
+                                        }
                                     }
                                 }
                             }
-                        }
-                        // 증가 버튼 (오른쪽)
-                        Column(
-                            modifier = Modifier.weight(1f),
-                            verticalArrangement = Arrangement.spacedBy(EreaderSpacing.S)
-                        ) {
-                            if (isLandscape) {
-                                steps.chunked(2).forEach { chunk ->
-                                    Row(horizontalArrangement = Arrangement.spacedBy(EreaderSpacing.S)) {
-                                        chunk.forEach { step ->
-                                            Box(Modifier.weight(1f)) {
-                                                StepButton(label = "+$step") {
-                                                    val result = clampedPage(effectivePage() + step)
-                                                    pageText = result.toString()
+                            // 증가 버튼 (오른쪽)
+                            Column(
+                                modifier = Modifier.weight(1f),
+                                verticalArrangement = Arrangement.spacedBy(EreaderSpacing.S)
+                            ) {
+                                if (isLandscape) {
+                                    steps.chunked(2).forEach { chunk ->
+                                        Row(horizontalArrangement = Arrangement.spacedBy(EreaderSpacing.S)) {
+                                            chunk.forEach { step ->
+                                                Box(Modifier.weight(1f)) {
+                                                    StepButton(label = "+$step") {
+                                                        val result = clampedPage(effectivePage() + step)
+                                                        pageText = result.toString()
+                                                    }
                                                 }
                                             }
+                                            if (chunk.size < 2) Spacer(Modifier.weight(1f))
                                         }
-                                        if (chunk.size < 2) Spacer(Modifier.weight(1f))
                                     }
-                                }
-                            } else {
-                                steps.forEach { step ->
-                                    StepButton(label = "+$step") {
-                                        val result = clampedPage(effectivePage() + step)
-                                        pageText = result.toString()
+                                } else {
+                                    steps.forEach { step ->
+                                        StepButton(label = "+$step") {
+                                            val result = clampedPage(effectivePage() + step)
+                                            pageText = result.toString()
+                                        }
                                     }
                                 }
                             }
                         }
                     }
 
-                    Spacer(Modifier.height(EreaderSpacing.L))
-
-                    // 하단 버튼: 취소 / 이동
+                    // 구분선 + 버튼 영역 (ConfirmDialog 스타일)
+                    HorizontalDivider(color = EreaderColors.Black)
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.End,
-                        verticalAlignment = Alignment.CenterVertically
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(IntrinsicSize.Min),
                     ) {
-                        TextButton(onClick = onDismiss, modifier = Modifier.testTag("pageJumpCancel")) {
-                            Text(
-                                stringResource(R.string.cancel),
-                                color = EreaderColors.Black,
-                                style = EreaderFontSize.M
-                            )
+                        // 취소 버튼
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable(onClick = onDismiss)
+                                .padding(vertical = EreaderSpacing.M)
+                                .testTag("pageJumpCancel"),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(stringResource(R.string.cancel), style = EreaderFontSize.M)
                         }
-                        Spacer(Modifier.width(EreaderSpacing.S))
-                        TextButton(onClick = {
-                            onNavigate(effectivePage())
-                        }, modifier = Modifier.testTag("pageJumpMove")) {
-                            Text(
-                                stringResource(R.string.move),
-                                color = EreaderColors.Black,
-                                style = EreaderFontSize.M
-                            )
+                        // 세로 구분선
+                        VerticalDivider(color = EreaderColors.Black, modifier = Modifier.fillMaxHeight())
+                        // 이동 버튼
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable(onClick = { onNavigate(effectivePage()) })
+                                .padding(vertical = EreaderSpacing.M)
+                                .testTag("pageJumpMove"),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(stringResource(R.string.move), style = EreaderFontSize.M)
                         }
                     }
                 }
