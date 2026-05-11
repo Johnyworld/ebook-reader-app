@@ -3,6 +3,7 @@ package com.rotein.ebookreader
 import android.content.Context
 import android.os.Environment
 import java.io.File
+import java.text.Normalizer
 
 object FileScanner {
 
@@ -27,9 +28,11 @@ object FileScanner {
                 val ext = file.extension.lowercase()
                 if (ext in SUPPORTED_EXTENSIONS) {
                     val metadata = extractMetadata(file.absolutePath, ext)
+                    // macOS NFD 파일명 등으로 인한 폰트 폴백 방지
+                    val normalizedName = Normalizer.normalize(file.name, Normalizer.Form.NFC)
                     result.add(
                         BookFile(
-                            name = file.name,
+                            name = normalizedName,
                             path = file.absolutePath,
                             extension = ext,
                             size = file.length(),

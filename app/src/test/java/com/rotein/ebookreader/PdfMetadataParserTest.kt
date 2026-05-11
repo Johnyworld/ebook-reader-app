@@ -119,6 +119,66 @@ class PdfMetadataParserTest {
     }
 
     @Test
+    fun `parse - UTF-16BE 이스케이프된 괄호 포함 제목`() {
+        val file = File.createTempFile("utf16_", ".pdf")
+        file.deleteOnExit()
+        tempFiles.add(file)
+
+        // "패" = U+D328, UTF-16BE 바이트 D3 28 → 28은 '('이므로 PDF에서 \(로 이스케이프됨
+        // 테스트 제목: "패스" (U+D328 U+C2A4)
+        val bom = byteArrayOf(0xFE.toByte(), 0xFF.toByte())
+        val titleBytes = bom + byteArrayOf(0xD3.toByte(), 0x28, 0xC2.toByte(), 0xA4.toByte())
+        // PDF literal string에서 0x28='('은 \(로, 0x5C='\'은 \\로 이스케이프
+        val escaped = buildString {
+            for (b in titleBytes) {
+                val c = (b.toInt() and 0xFF).toChar()
+                when (c) {
+                    '(', ')' -> { append('\\'); append(c) }
+                    '\\' -> append("\\\\")
+                    else -> append(c)
+                }
+            }
+        }
+
+        val sb = StringBuilder()
+        sb.append("%PDF-1.4\n")
+        sb.append("1 0 obj\n<< /Title ($escaped) >>\nendobj\n")
+        sb.append("2 0 obj\n<< /Type /Catalog >>\nendobj\n")
+        sb.append("trailer\n<< /Info 1 0 R /Root 2 0 R >>\n")
+        sb.append("%%EOF\n")
+        file.writeBytes(sb.toString().toByteArray(Charsets.ISO_8859_1))
+
+        val metadata = PdfMetadataParser.parse(file.absolutePath)
+        assertNotNull(metadata)
+        assertEquals("패스", metadata!!.title)
+    }
+
+    @Test
+    fun `parse - Info dictionary가 파일 앞부분에 있는 큰 파일`() {
+        val file = File.createTempFile("bigpdf_", ".pdf")
+        file.deleteOnExit()
+        tempFiles.add(file)
+
+        // Info dict를 파일 앞에 두고, 중간에 큰 패딩, trailer를 파일 끝에 배치
+        val sb = StringBuilder()
+        sb.append("%PDF-1.4\n")
+        sb.append("1 0 obj\n<< /Title (Front Title) /Author (Front Author) >>\nendobj\n")
+        sb.append("2 0 obj\n<< /Type /Catalog >>\nendobj\n")
+        // 8KB 이상의 패딩으로 Info dict가 tail 범위 밖에 놓이게 함
+        sb.append("% ")
+        repeat(20000) { sb.append('X') }
+        sb.append("\n")
+        sb.append("trailer\n<< /Info 1 0 R /Root 2 0 R >>\n")
+        sb.append("%%EOF\n")
+        file.writeText(sb.toString())
+
+        val metadata = PdfMetadataParser.parse(file.absolutePath)
+        assertNotNull(metadata)
+        assertEquals("Front Title", metadata!!.title)
+        assertEquals("Front Author", metadata.author)
+    }
+
+    @Test
     fun `parse - Info dictionary 없는 PDF`() {
         val file = File.createTempFile("noinfo_", ".pdf")
         file.deleteOnExit()
