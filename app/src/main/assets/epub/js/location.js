@@ -141,6 +141,23 @@ _epub.rendition.on("relocated", function(location) {
         // (relocated 이벤트의 location 파라미터는 보정 전 위치 기준이므로 stale)
         try { location = _epub.rendition.currentLocation(); } catch(e) {}
     }
+    // 서브픽셀 오차 누적 방지: scrollLeft를 가장 가까운 페이지 경계로 스냅한다.
+    // epub.js의 next()가 scrollLeft += delta로 상대 이동하므로,
+    // 브라우저의 픽셀 스냅 오차가 페이지를 넘길수록 누적된다.
+    // 매 relocated마다 절대 위치로 보정하여 오차 전파를 차단한다.
+    try {
+        var m = _epub.rendition.manager;
+        if (m && m.container && m.layout) {
+            var sl = m.container.scrollLeft;
+            var d = m.layout.delta;
+            if (d > 0) {
+                var snapped = Math.round(sl / d) * d;
+                if (sl !== snapped) {
+                    m.container.scrollLeft = snapped;
+                }
+            }
+        }
+    } catch(e) {}
     if (!_epub.rendered || _epub.waitingForFonts) {
         _epub.rendered = true;
         if (!_epub.waitingForFonts) {
