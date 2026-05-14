@@ -30,7 +30,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.rotein.ebookreader"
+        applicationId = "com.eera"
         minSdk = 26
         targetSdk = 35
         versionCode = 4
