@@ -68,6 +68,9 @@ import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.os.LocaleListCompat
 import com.rotein.ebookreader.ui.components.EreaderDropdownMenu
 import com.rotein.ebookreader.ui.components.PaginationBar
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -93,6 +96,7 @@ fun AllBooksScreen(
             }
         )
     }
+    val lifecycleOwner = LocalLifecycleOwner.current
     var books by remember { mutableStateOf(BookCache.books ?: emptyList()) }
     var isLoading by remember { mutableStateOf(false) }
     var isSearchActive by remember { mutableStateOf(false) }
@@ -162,10 +166,12 @@ fun AllBooksScreen(
         }
     }
 
+    // 최초 로드: 캐시가 있으면 그대로 사용, 없으면 전체 스캔
     LaunchedEffect(hasPermission) {
         if (hasPermission) {
-            val bookList = if (BookCache.books != null) {
-                BookCache.books!!
+            val cached = BookCache.books
+            val bookList = if (cached != null) {
+                cached
             } else {
                 isLoading = true
                 val scanned = withContext(Dispatchers.IO) { FileScanner.scanBooks(context) }
@@ -174,10 +180,64 @@ fun AllBooksScreen(
                 scanned
             }
             books = bookList
-            // 스플래시 동안 커버를 미리 로드한 후 완료 통지
+            val booksNeedingCovers = bookList.filter { it.path !in covers }
+            if (booksNeedingCovers.isNotEmpty()) {
+                val newCovers = withContext(Dispatchers.IO) {
+                    val result = mutableMapOf<String, Bitmap?>()
+                    booksNeedingCovers.forEach { book ->
+                        val bitmap = BookCoverLoader.getCached(book.path)
+                            ?: BookCoverLoader.load(book.path, book.extension)
+                        result[book.path] = bitmap
+                    }
+                    result
+                }
+                covers = covers + newCovers
+            }
+            onLoadComplete()
+        } else {
+            onLoadComplete()
+        }
+    }
+
+    // 앱 포그라운드 복귀 시 diff 스캔
+    LaunchedEffect(lifecycleOwner) {
+        var isFirstResume = true
+        lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+            if (isFirstResume) { isFirstResume = false; return@repeatOnLifecycle }
+            val cached = BookCache.books ?: return@repeatOnLifecycle
+            val refreshed = withContext(Dispatchers.IO) { FileScanner.refreshBooks(cached) }
+            BookCache.books = refreshed
+            books = refreshed
+            val booksNeedingCovers = refreshed.filter { it.path !in covers }
+            if (booksNeedingCovers.isNotEmpty()) {
+                val newCovers = withContext(Dispatchers.IO) {
+                    val result = mutableMapOf<String, Bitmap?>()
+                    booksNeedingCovers.forEach { book ->
+                        val bitmap = BookCoverLoader.getCached(book.path)
+                            ?: BookCoverLoader.load(book.path, book.extension)
+                        result[book.path] = bitmap
+                    }
+                    result
+                }
+                covers = covers + newCovers
+            }
+        }
+    }
+
+    // 화면 재진입 시 diff 스캔 (리더에서 돌아올 때)
+    var prevRefreshKey by remember { mutableStateOf(refreshKey) }
+    LaunchedEffect(refreshKey) {
+        if (prevRefreshKey == refreshKey) return@LaunchedEffect
+        prevRefreshKey = refreshKey
+        val cached = BookCache.books ?: return@LaunchedEffect
+        val refreshed = withContext(Dispatchers.IO) { FileScanner.refreshBooks(cached) }
+        BookCache.books = refreshed
+        books = refreshed
+        val booksNeedingCovers = refreshed.filter { it.path !in covers }
+        if (booksNeedingCovers.isNotEmpty()) {
             val newCovers = withContext(Dispatchers.IO) {
                 val result = mutableMapOf<String, Bitmap?>()
-                bookList.forEach { book ->
+                booksNeedingCovers.forEach { book ->
                     val bitmap = BookCoverLoader.getCached(book.path)
                         ?: BookCoverLoader.load(book.path, book.extension)
                     result[book.path] = bitmap
@@ -185,9 +245,6 @@ fun AllBooksScreen(
                 result
             }
             covers = covers + newCovers
-            onLoadComplete()
-        } else {
-            onLoadComplete()
         }
     }
 
