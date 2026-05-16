@@ -222,6 +222,13 @@ enum class ReaderPageFlip(@StringRes val labelRes: Int) {
     TB_NEXT_PREV(R.string.page_flip_tb_next_prev)
 }
 
+// 볼륨 키로 페이지 넘기기 설정
+enum class VolumeKeyAction(@StringRes val labelRes: Int) {
+    OFF(R.string.volume_key_off),
+    UP_PREV_DOWN_NEXT(R.string.volume_key_up_prev),
+    UP_NEXT_DOWN_PREV(R.string.volume_key_up_next)
+}
+
 enum class ReaderBottomInfo(@StringRes val labelRes: Int) {
     NONE(R.string.bottom_info_none),
     BOOK_TITLE(R.string.bottom_info_book_title),
@@ -242,7 +249,8 @@ data class ReaderSettings(
     val pageFlip: ReaderPageFlip = ReaderPageFlip.LR_PREV_NEXT,
     val leftInfo: ReaderBottomInfo = ReaderBottomInfo.NONE,
     val rightInfo: ReaderBottomInfo = ReaderBottomInfo.PAGE,
-    val dualPage: Boolean = false
+    val dualPage: Boolean = false,
+    val volumeKey: VolumeKeyAction = VolumeKeyAction.UP_PREV_DOWN_NEXT
 )
 
 fun ReaderSettings.layoutFingerprint(): String =
@@ -264,7 +272,8 @@ object ReaderSettingsStore {
             pageFlip = ReaderPageFlip.entries.firstOrNull { it.name == prefs.getString("pageFlip", null) } ?: ReaderPageFlip.LR_PREV_NEXT,
             leftInfo = ReaderBottomInfo.entries.firstOrNull { it.name == prefs.getString("leftInfo", null) } ?: ReaderBottomInfo.NONE,
             rightInfo = ReaderBottomInfo.entries.firstOrNull { it.name == prefs.getString("rightInfo", null) } ?: ReaderBottomInfo.PAGE,
-            dualPage = prefs.getBoolean("dualPage", false)
+            dualPage = prefs.getBoolean("dualPage", false),
+            volumeKey = VolumeKeyAction.entries.firstOrNull { it.name == prefs.getString("volumeKey", null) } ?: VolumeKeyAction.UP_PREV_DOWN_NEXT
         )
     }
 
@@ -281,6 +290,7 @@ object ReaderSettingsStore {
             .putString("leftInfo", settings.leftInfo.name)
             .putString("rightInfo", settings.rightInfo.name)
             .putBoolean("dualPage", settings.dualPage)
+            .putString("volumeKey", settings.volumeKey.name)
             .apply()
     }
 }

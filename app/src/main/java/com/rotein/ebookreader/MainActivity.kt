@@ -26,6 +26,7 @@ import com.rotein.ebookreader.ui.theme.EbookReaderAppTheme
 
 class MainActivity : AppCompatActivity() {
     var currentEpubWebView: WebView? = null
+    var currentVolumeKeyAction: VolumeKeyAction = VolumeKeyAction.OFF
     private var isReady = false
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
@@ -38,6 +39,23 @@ class MainActivity : AppCompatActivity() {
                 KeyEvent.KEYCODE_DPAD_RIGHT -> {
                     currentEpubWebView?.evaluateJavascript("window._next()", null)
                     return true
+                }
+                // 볼륨 키로 페이지 넘기기 (리더 화면이 열려 있을 때만)
+                KeyEvent.KEYCODE_VOLUME_UP -> {
+                    val wv = currentEpubWebView ?: return super.dispatchKeyEvent(event)
+                    when (currentVolumeKeyAction) {
+                        VolumeKeyAction.UP_PREV_DOWN_NEXT -> { wv.evaluateJavascript("window._prev()", null); return true }
+                        VolumeKeyAction.UP_NEXT_DOWN_PREV -> { wv.evaluateJavascript("window._next()", null); return true }
+                        VolumeKeyAction.OFF -> {}
+                    }
+                }
+                KeyEvent.KEYCODE_VOLUME_DOWN -> {
+                    val wv = currentEpubWebView ?: return super.dispatchKeyEvent(event)
+                    when (currentVolumeKeyAction) {
+                        VolumeKeyAction.UP_PREV_DOWN_NEXT -> { wv.evaluateJavascript("window._next()", null); return true }
+                        VolumeKeyAction.UP_NEXT_DOWN_PREV -> { wv.evaluateJavascript("window._prev()", null); return true }
+                        VolumeKeyAction.OFF -> {}
+                    }
                 }
             }
         }

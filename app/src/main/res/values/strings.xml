@@ -100,6 +100,10 @@
     <string name="setting_page_flip">Page flip</string>
     <string name="setting_left_info">Left bottom info</string>
     <string name="setting_right_info">Right bottom info</string>
+    <string name="setting_volume_key">Volume key page flip</string>
+    <string name="volume_key_off">Off</string>
+    <string name="volume_key_up_prev">Vol+\nPrev</string>
+    <string name="volume_key_up_next">Vol+\nNext</string>
     <string name="setting_dual_page">Dual page in landscape</string>
 
     <!-- BookReaderScreen -->

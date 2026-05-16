@@ -118,6 +118,12 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
         onDispose { activity?.currentEpubWebView = null }
     }
 
+    // 볼륨 키 설정을 Activity에 전달
+    DisposableEffect(readerSettings.volumeKey) {
+        activity?.currentVolumeKeyAction = readerSettings.volumeKey
+        onDispose { activity?.currentVolumeKeyAction = VolumeKeyAction.OFF }
+    }
+
     // 백그라운드 전환 시 위치 복원: ON_PAUSE에서 CFI를 저장하고 ON_RESUME에서 즉시 복원한다.
     // resize로 인해 잘못된 페이지가 보이는 것을 방지하기 위해 오버레이를 사용한다.
     val pausedCfi = remember { mutableStateOf("") }

@@ -88,6 +88,10 @@
     <string name="setting_page_flip">페이지 넘김</string>
     <string name="setting_left_info">왼쪽 하단 정보</string>
     <string name="setting_right_info">오른쪽 하단 정보</string>
+    <string name="setting_volume_key">볼륨 키 페이지 넘김</string>
+    <string name="volume_key_off">끄기</string>
+    <string name="volume_key_up_prev">Vol+\n이전</string>
+    <string name="volume_key_up_next">Vol+\n다음</string>
     <string name="setting_dual_page">가로모드 두 쪽 보기</string>
 
     <!-- BookReaderScreen -->

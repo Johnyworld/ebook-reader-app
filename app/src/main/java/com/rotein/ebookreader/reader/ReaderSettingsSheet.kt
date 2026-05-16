@@ -42,6 +42,7 @@ import com.rotein.ebookreader.READER_BUILTIN_FONT_NAMES
 import com.rotein.ebookreader.ReaderBottomInfo
 import com.rotein.ebookreader.ReaderPageFlip
 import com.rotein.ebookreader.ReaderSettings
+import com.rotein.ebookreader.VolumeKeyAction
 import com.rotein.ebookreader.fontDisplayName
 import com.rotein.ebookreader.ui.components.EreaderTabBar
 import com.rotein.ebookreader.ui.components.ReaderCycleSelectorField
@@ -97,7 +98,7 @@ internal fun ReaderSettingsBottomSheet(
         }
         HorizontalDivider(color = EreaderColors.Black)
 
-        Box(modifier = Modifier.fillMaxWidth().height(230.dp)) {
+        Box(modifier = Modifier.fillMaxWidth().height(278.dp)) {
             if (isPdf) {
                 ReaderViewerTab(settings, onSettingsChange)
             } else {
@@ -234,6 +235,15 @@ private fun ReaderViewerTab(settings: ReaderSettings, onSettingsChange: (ReaderS
                 options = ReaderBottomInfo.entries,
                 selected = settings.rightInfo,
                 onSelect = { onSettingsChange(settings.copy(rightInfo = it)) },
+                labelFor = { stringResource(it.labelRes) }
+            )
+        }
+        HorizontalDivider(color = EreaderColors.Gray)
+        ReaderSettingRow(stringResource(R.string.setting_volume_key)) {
+            ReaderCycleSelectorField(
+                options = VolumeKeyAction.entries,
+                selected = settings.volumeKey,
+                onSelect = { onSettingsChange(settings.copy(volumeKey = it)) },
                 labelFor = { stringResource(it.labelRes) }
             )
         }
