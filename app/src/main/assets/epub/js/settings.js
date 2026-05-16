@@ -11,10 +11,12 @@ window._readerSettings = {
 };
 
 function _buildReaderCss(s) {
-    var baseRule = 'font-size: ' + s.fontSize + 'px !important; line-height: ' + s.lineHeight + ' !important;';
+    // font-size, line-height는 body에만 !important로 설정하여
+    // EPUB 원본 CSS(드롭캡, ::first-letter 등)가 동작하도록 상속에 의존한다.
+    var bodyRule = 'body { font-size: ' + s.fontSize + 'px !important; line-height: ' + s.lineHeight + ' !important; }';
     var paragraphRule = s.paragraphSpacing > 0 ? 'p { margin-bottom: ' + s.paragraphSpacing + 'px !important; }' : '';
     if (s.fontFamily === 'epub_original') {
-        return 'html, body, p, div, span, li, td, blockquote, h1, h2, h3, h4, h5, h6 {' + baseRule + '}' + paragraphRule;
+        return bodyRule + paragraphRule;
     }
     var fontFaceDecl = '';
     var ff;
@@ -26,7 +28,8 @@ function _buildReaderCss(s) {
     } else {
         ff = s.fontFamily ? ("'" + s.fontFamily + "', sans-serif") : 'sans-serif';
     }
-    return fontFaceDecl + 'html, body, p, div, span, li, td, blockquote, h1, h2, h3, h4, h5, h6 {font-family: ' + ff + ' !important; ' + baseRule + '}' + paragraphRule;
+    // 폰트 패밀리는 모든 요소에 적용하되, 크기/행간은 body 상속에 맡긴다.
+    return fontFaceDecl + 'html, body, p, div, span, li, td, blockquote, h1, h2, h3, h4, h5, h6 {font-family: ' + ff + ' !important; }' + bodyRule + paragraphRule;
 }
 
 function _injectReaderStyle(doc) {

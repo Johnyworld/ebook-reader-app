@@ -224,9 +224,9 @@ enum class ReaderPageFlip(@StringRes val labelRes: Int) {
 
 // 볼륨 키로 페이지 넘기기 설정
 enum class VolumeKeyAction(@StringRes val labelRes: Int) {
-    OFF(R.string.volume_key_off),
     UP_PREV_DOWN_NEXT(R.string.volume_key_up_prev),
-    UP_NEXT_DOWN_PREV(R.string.volume_key_up_next)
+    UP_NEXT_DOWN_PREV(R.string.volume_key_up_next),
+    OFF(R.string.volume_key_off)
 }
 
 enum class ReaderBottomInfo(@StringRes val labelRes: Int) {
