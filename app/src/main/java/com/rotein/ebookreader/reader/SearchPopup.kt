@@ -90,7 +90,7 @@ internal fun SearchPopup(
     }
 
     val density = LocalDensity.current
-    val itemHeightDp = 80
+    val itemHeightDp = 92
     // 콘텐츠 영역의 실제 높이를 측정하여 페이지당 아이템 수 계산
     var contentHeightDp by remember { mutableStateOf(0) }
     val itemsPerPage = if (contentHeightDp > 0) maxOf(1, contentHeightDp / itemHeightDp) else 1
@@ -133,7 +133,7 @@ internal fun SearchPopup(
                             Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .height(80.dp)
+                                    .height(92.dp)
                                     .clickable { onNavigate(result.cfi, effectivePage) }
                                     .padding(horizontal = EreaderSpacing.L, vertical = EreaderSpacing.M)
                             ) {
