@@ -11,12 +11,14 @@ window._readerSettings = {
 };
 
 function _buildReaderCss(s) {
-    // font-size, line-height는 body에만 !important로 설정하여
-    // EPUB 원본 CSS(드롭캡, ::first-letter 등)가 동작하도록 상속에 의존한다.
-    var bodyRule = 'body { font-size: ' + s.fontSize + 'px !important; line-height: ' + s.lineHeight + ' !important; }';
+    // font-size는 body에만 설정하여 EPUB 원본 CSS(드롭캡, ::first-letter 등)가 동작하도록 한다.
+    // line-height는 EPUB CSS가 개별 요소에 지정하면 상속이 무시되므로 모든 요소에 !important로 적용한다.
+    var allElements = 'html, body, p, div, span, li, td, blockquote, h1, h2, h3, h4, h5, h6';
+    var bodyRule = 'body { font-size: ' + s.fontSize + 'px !important; }';
+    var lineHeightRule = allElements + ' { line-height: ' + s.lineHeight + ' !important; }';
     var paragraphRule = s.paragraphSpacing > 0 ? 'p { margin-bottom: ' + s.paragraphSpacing + 'px !important; }' : '';
     if (s.fontFamily === 'epub_original') {
-        return bodyRule + paragraphRule;
+        return bodyRule + lineHeightRule + paragraphRule;
     }
     var fontFaceDecl = '';
     var ff;
@@ -28,8 +30,8 @@ function _buildReaderCss(s) {
     } else {
         ff = s.fontFamily ? ("'" + s.fontFamily + "', sans-serif") : 'sans-serif';
     }
-    // 폰트 패밀리는 모든 요소에 적용하되, 크기/행간은 body 상속에 맡긴다.
-    return fontFaceDecl + 'html, body, p, div, span, li, td, blockquote, h1, h2, h3, h4, h5, h6 {font-family: ' + ff + ' !important; }' + bodyRule + paragraphRule;
+    // 폰트 패밀리는 모든 요소에 적용한다.
+    return fontFaceDecl + allElements + ' {font-family: ' + ff + ' !important; }' + bodyRule + lineHeightRule + paragraphRule;
 }
 
 function _injectReaderStyle(doc) {
