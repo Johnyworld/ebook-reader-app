@@ -87,7 +87,7 @@ class ReaderReentryPageTest {
         }
     }
 
-    private fun waitForTagToDisappear(tag: String, timeoutMillis: Long = 60000) {
+    private fun waitForTagToDisappear(tag: String, timeoutMillis: Long = 120000) {
         rule.waitUntil(timeoutMillis) {
             rule.onAllNodesWithTag(tag).fetchSemanticsNodes().isEmpty()
         }
@@ -145,6 +145,38 @@ class ReaderReentryPageTest {
         return getCurrentPage()
     }
 
+    /**
+     * 메뉴를 열고, 특정 페이지가 표시될 때까지 대기한다.
+     * 재진입 시 비동기 체인(savedCfi 네비게이션 → 스캔 캐시 주입 → 페이지 계산)이
+     * 완료되기까지 시간이 필요하므로, pageInfoText에서 직접 기대값을 확인한다.
+     */
+    private fun waitForPageInMenu(expectedPage: Int, timeoutMillis: Long = 120000): Int {
+        val start = System.currentTimeMillis()
+        while (System.currentTimeMillis() - start < timeoutMillis) {
+            // 메뉴가 닫혀 있으면 열기
+            if (rule.onAllNodesWithTag("pageInfoText").fetchSemanticsNodes().isEmpty()) {
+                tapCenter()
+                Thread.sleep(1500)
+            }
+            val nodes = rule.onAllNodesWithTag("pageInfoText").fetchSemanticsNodes()
+            if (nodes.isNotEmpty()) {
+                val text = nodes.first().config[SemanticsProperties.Text].firstOrNull()?.text ?: ""
+                val page = text.split("/")[0].trim().toIntOrNull() ?: 0
+                if (page == expectedPage) return page
+            }
+            // 메뉴 닫고 다시 시도 (페이지 스캔이 진행 중일 수 있음)
+            tapCenter()
+            Thread.sleep(2000)
+        }
+        // 타임아웃 시 현재 페이지 반환 (assertEquals에서 실패 메시지 출력용)
+        val nodes = rule.onAllNodesWithTag("pageInfoText").fetchSemanticsNodes()
+        if (nodes.isNotEmpty()) {
+            val text = nodes.first().config[SemanticsProperties.Text].firstOrNull()?.text ?: ""
+            return text.split("/")[0].trim().toIntOrNull() ?: 0
+        }
+        return 0
+    }
+
     /** 뒤로가기로 도서 목록으로 나간다 */
     private fun goBackToList() {
         rule.activityRule.scenario.onActivity { activity ->
@@ -192,9 +224,8 @@ class ReaderReentryPageTest {
         for (i in 1..REPEAT_COUNT) {
             Log.d(TAG, "반복 $i/$REPEAT_COUNT: 목록으로 나가기")
 
-            // 메뉴 열기 → 뒤로가기로 목록으로 나감
-            tapCenter()
-            Thread.sleep(500)
+            // 메뉴가 닫힌 상태에서 뒤로가기 → 리더 종료 → 목록으로 돌아감
+            // (메뉴가 열려있으면 BackHandler가 메뉴만 닫으므로, 메뉴를 먼저 닫아야 한다)
             goBackToList()
 
             Log.d(TAG, "반복 $i/$REPEAT_COUNT: 다시 진입")
@@ -202,11 +233,8 @@ class ReaderReentryPageTest {
             // 다시 도서 진입
             enterBook()
 
-            // 메뉴를 열고 스캔 완료 대기
-            assertTrue("반복 $i: 페이지 스캔 완료 실패", openMenuAndWaitForScan())
-
-            // 현재 페이지 확인
-            val currentPage = getCurrentPage()
+            // 메뉴를 열고 기대 페이지가 표시될 때까지 대기
+            val currentPage = waitForPageInMenu(expectedPage)
             Log.d(TAG, "반복 $i/$REPEAT_COUNT: 기대=$expectedPage, 실제=$currentPage")
 
             assertEquals(

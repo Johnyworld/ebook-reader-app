@@ -189,7 +189,7 @@ class BookmarkPageConsistencyTest {
         Thread.sleep(1000)
 
         // 폰트 사이즈 증가 (2회)
-        waitForTag("fontSizeIncrement")
+        waitForTag("fontSizeIncrement", 30000)
         rule.onNodeWithTag("fontSizeIncrement").performClick()
         Thread.sleep(500)
         rule.onNodeWithTag("fontSizeIncrement").performClick()

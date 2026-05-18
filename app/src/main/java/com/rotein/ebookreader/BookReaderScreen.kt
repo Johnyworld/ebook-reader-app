@@ -255,20 +255,27 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                 onTocLoaded = { tocJson -> vm.onTocLoaded(tocJson) },
                 onTocReady = { tocJson -> vm.onTocReady(tocJson) },
                 onContentRendered = {
-                    if (readingState.savedCfi.isNullOrEmpty()) vm.setLoading(false)
+                    // ViewModel의 StateFlow에서 최신 값을 직접 읽는다.
+                    // AndroidView factory에서 콜백이 캡처되므로, Compose state 대신
+                    // StateFlow.value를 사용해야 재진입 시에도 정확한 값을 참조한다.
+                    val rs = vm.readingState.value
+                    val cs = vm.contentState.value
+                    val pcs = vm.pageCalcState.value
+                    val ans = vm.annotationState.value
+                    if (rs.savedCfi.isNullOrEmpty()) vm.setLoading(false)
                     vm.setContentRendered(true)
-                    if (contentState.scanCacheValid && pageCalcState.spinePageOffsets.isNotEmpty()) {
+                    if (cs.scanCacheValid && pcs.spinePageOffsets.isNotEmpty()) {
                         val jsonObj = org.json.JSONObject()
-                        pageCalcState.spinePageOffsets.forEach { (k, v) -> jsonObj.put(k.toString(), v) }
-                        val charBreaksJs = if (pageCalcState.spineCharPageBreaksJson.isNotEmpty()) "_epub.spineCharPageBreaks=${pageCalcState.spineCharPageBreaksJson};" else ""
-                        val js = "_epub.spinePageOffsets=$jsonObj;_epub.totalVisualPages=${readingState.totalPages};$charBreaksJs" +
+                        pcs.spinePageOffsets.forEach { (k, v) -> jsonObj.put(k.toString(), v) }
+                        val charBreaksJs = if (pcs.spineCharPageBreaksJson.isNotEmpty()) "_epub.spineCharPageBreaks=${pcs.spineCharPageBreaksJson};" else ""
+                        val js = "_epub.spinePageOffsets=$jsonObj;_epub.totalVisualPages=${rs.totalPages};$charBreaksJs" +
                             "if(_epub.pendingLocation){reportLocation(_epub.pendingLocation);_epub.pendingLocation=null;}" +
                             "else{var l=_epub.rendition.currentLocation();if(l&&l.start)reportLocation(l);}"
                         viewerWebView.value?.evaluateJavascript(js, null)
                     } else {
                         vm.setScanning(true)
                     }
-                    val allCfis = (annotationState.bookmarks.map { it.cfi } + annotationState.highlights.map { it.cfi } + annotationState.memos.map { it.cfi })
+                    val allCfis = (ans.bookmarks.map { it.cfi } + ans.highlights.map { it.cfi } + ans.memos.map { it.cfi })
                         .filter { it.isNotEmpty() }.distinct()
                     if (allCfis.isNotEmpty()) {
                         val cfiArray = org.json.JSONArray(allCfis)
