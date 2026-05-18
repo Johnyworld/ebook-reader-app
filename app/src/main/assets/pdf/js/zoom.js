@@ -47,6 +47,12 @@ window._resetZoom = function() {
     _applyZoom();
 };
 
+// 페이지 이동 후 이전 줌 배율과 오프셋을 복원
+window._restoreZoom = function() {
+    _clampZoom();
+    _applyZoom();
+};
+
 window._zoomBy = function(factor, focusX, focusY) {
     var newScale = Math.max(1, Math.min(5, _pdf.zoomScale * factor));
     var ratio = newScale / _pdf.zoomScale;

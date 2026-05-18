@@ -112,8 +112,8 @@ internal fun PdfViewer(
                                 val y = e.y
                                 val w = this@apply.width.toFloat()
                                 val h = this@apply.height.toFloat()
-                                val doPrev = { currentZoomScale = 1f; webView.evaluateJavascript("window._prevPage()", null) }
-                                val doNext = { currentZoomScale = 1f; webView.evaluateJavascript("window._nextPage()", null) }
+                                val doPrev = { webView.evaluateJavascript("window._prevPage()", null) }
+                                val doNext = { webView.evaluateJavascript("window._nextPage()", null) }
                                 when (pageFlipRef.get()) {
                                     ReaderPageFlip.LR_PREV_NEXT -> when {
                                         x < w / 3f -> doPrev()

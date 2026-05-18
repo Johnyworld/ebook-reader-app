@@ -92,7 +92,8 @@ function _renderPage(pageNum) {
                 Android.onNavigationComplete();
             }
 
-            if (typeof window._resetZoom === 'function') window._resetZoom();
+            // 페이지 렌더링 후 줌 배율/위치 복원 (캔버스 크기 변경에 따른 clamp 재계산)
+            if (typeof window._restoreZoom === 'function') window._restoreZoom();
 
             if (_pdf.pendingPage !== null) {
                 var next = _pdf.pendingPage;

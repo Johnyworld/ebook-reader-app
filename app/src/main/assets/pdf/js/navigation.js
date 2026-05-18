@@ -4,13 +4,11 @@ _pdf.navigating = false;
 
 window._prevPage = function() {
     if (_pdf.currentPage <= 1) return;
-    if (typeof window._resetZoom === 'function') window._resetZoom();
     _renderPage(_pdf.currentPage - 1);
 };
 
 window._nextPage = function() {
     if (_pdf.currentPage >= _pdf.totalPages) return;
-    if (typeof window._resetZoom === 'function') window._resetZoom();
     _renderPage(_pdf.currentPage + 1);
 };
 
@@ -19,6 +17,5 @@ window._goToPage = function(pageNum) {
     pageNum = parseInt(pageNum);
     if (isNaN(pageNum)) return;
     _pdf.navigating = true;
-    if (typeof window._resetZoom === 'function') window._resetZoom();
     _renderPage(pageNum);
 };
