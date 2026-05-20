@@ -13,8 +13,11 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -95,9 +98,14 @@ class MainActivity : AppCompatActivity() {
         hideStatusBarIfNoCutout()
         setContent {
             EbookReaderAppTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
+                // Scaffold의 insets 소비를 비활성화하여 하위 화면들이 직접 insets를 처리
+                Scaffold(
+                    modifier = Modifier.fillMaxSize(),
+                    contentWindowInsets = WindowInsets(0, 0, 0, 0)
+                ) { innerPadding ->
                     HomeScreen(
-                        modifier = Modifier.padding(innerPadding),
+                        // Scaffold의 insets 소비를 비활성화했으므로 직접 시스템 바 패딩 적용
+                        modifier = Modifier.padding(innerPadding).statusBarsPadding().navigationBarsPadding(),
                         onLoadComplete = { isReady = true }
                     )
                 }
