@@ -40,3 +40,4 @@ keystore.properties
 *.jks
 .externalNativeBuild
 .cxx
+.worktrees/
