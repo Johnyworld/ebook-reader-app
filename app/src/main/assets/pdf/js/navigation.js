@@ -12,6 +12,10 @@ window._nextPage = function() {
     _renderPage(_pdf.currentPage + 1);
 };
 
+// MainActivity 볼륨키 핸들러가 _prev/_next를 호출하므로 별칭 추가
+window._prev = window._prevPage;
+window._next = window._nextPage;
+
 window._goToPage = function(pageNum) {
     if (_pdf.navigating) return;
     pageNum = parseInt(pageNum);
