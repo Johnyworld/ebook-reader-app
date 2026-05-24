@@ -351,6 +351,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                 path = book.path,
                 savedPage = readingState.savedCfi
                     ?.removePrefix("pdf-page:")?.toIntOrNull() ?: 1,
+                dualPage = readerSettings.dualPage,
                 pageFlip = readerSettings.pageFlip,
                 onCenterTap = onCenterTap,
                 onPageChanged = { page, total ->
