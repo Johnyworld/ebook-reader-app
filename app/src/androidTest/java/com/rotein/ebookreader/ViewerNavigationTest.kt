@@ -165,6 +165,11 @@ private fun runTocNavigationTest(
         return text.split("/")[0].trim().toInt()
     }
 
+    // 가로모드에서 탭 좌표/페이지네이션 문제 방지
+    val activity = composeTestRule.activity as? android.app.Activity
+    activity?.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+    composeTestRule.waitForIdle()
+
     // Enter reader
     composeTestRule.waitUntil(10000) {
         composeTestRule.onAllNodesWithText(bookTitle).fetchSemanticsNodes().isNotEmpty()
@@ -308,6 +313,11 @@ class EpubViewerNavigationTest {
             val text = node.config[SemanticsProperties.Text].firstOrNull()?.text ?: ""
             return text.split("/")[0].trim().toInt()
         }
+
+        // 가로모드에서 탭 좌표/페이지네이션 문제 방지
+        (composeTestRule.activity as? android.app.Activity)?.requestedOrientation =
+            android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        composeTestRule.waitForIdle()
 
         // Enter reader
         composeTestRule.waitUntil(10000) {

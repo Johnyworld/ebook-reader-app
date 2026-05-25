@@ -130,6 +130,11 @@ class ReaderReentryPageTest {
 
     /** 도서 진입 후 로딩 완료까지 대기 */
     private fun enterBook() {
+        // 가로모드에서 탭 좌표/페이지네이션 문제 방지
+        (rule.activity as? android.app.Activity)?.requestedOrientation =
+            android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        rule.waitForIdle()
+
         rule.waitUntil(15000) {
             rule.onAllNodesWithText(BOOK_TITLE, substring = true).fetchSemanticsNodes().isNotEmpty()
         }

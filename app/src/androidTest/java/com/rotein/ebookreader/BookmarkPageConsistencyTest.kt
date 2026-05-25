@@ -127,6 +127,11 @@ class BookmarkPageConsistencyTest {
 
     @Test
     fun bookmarkPageMatchesAfterFontSizeChange() {
+        // 가로모드에서 탭 좌표/페이지네이션 문제 방지
+        (rule.activity as? android.app.Activity)?.requestedOrientation =
+            android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        rule.waitForIdle()
+
         // 1. 리더 진입
         Log.d(TAG, "단계 1: 리더 진입")
         rule.waitUntil(15000) {

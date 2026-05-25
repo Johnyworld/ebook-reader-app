@@ -150,6 +150,11 @@ class ReaderMenuOpenCloseTest {
     fun cleanup() { BookCache.books = null }
 
     private fun enterReader() {
+        // 가로모드에서 탭 좌표/페이지네이션 문제 방지
+        (rule.activity as? android.app.Activity)?.requestedOrientation =
+            android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        rule.waitForIdle()
+
         rule.waitUntil(10000) {
             rule.onAllNodesWithText("메뉴 테스트 도서").fetchSemanticsNodes().isNotEmpty()
         }
@@ -241,6 +246,11 @@ class ReaderProgressDisplayTest {
     fun cleanup() { BookCache.books = null }
 
     private fun enterReader() {
+        // 가로모드에서 탭 좌표/페이지네이션 문제 방지
+        (rule.activity as? android.app.Activity)?.requestedOrientation =
+            android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        rule.waitForIdle()
+
         rule.waitUntil(10000) {
             rule.onAllNodesWithText("메뉴 테스트 도서").fetchSemanticsNodes().isNotEmpty()
         }
@@ -325,6 +335,11 @@ class ReaderNextPageTest {
     fun cleanup() { BookCache.books = null }
 
     private fun enterReader() {
+        // 가로모드에서 탭 좌표/페이지네이션 문제 방지
+        (rule.activity as? android.app.Activity)?.requestedOrientation =
+            android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        rule.waitForIdle()
+
         rule.waitUntil(10000) {
             rule.onAllNodesWithText("메뉴 테스트 도서").fetchSemanticsNodes().isNotEmpty()
         }
