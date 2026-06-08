@@ -17,8 +17,10 @@ function _buildReaderCss(s) {
     var bodyRule = 'body { font-size: ' + s.fontSize + 'px !important; }';
     var lineHeightRule = allElements + ' { line-height: ' + s.lineHeight + ' !important; }';
     var paragraphRule = s.paragraphSpacing > 0 ? 'p { margin-bottom: ' + s.paragraphSpacing + 'px !important; }' : '';
+    // 이미지가 컬럼 너비를 초과하여 텍스트와 겹치는 것을 방지한다.
+    var imgRule = 'img, svg, image { max-width: 100% !important; height: auto !important; break-inside: avoid; box-sizing: border-box; }';
     if (s.fontFamily === 'epub_original') {
-        return bodyRule + lineHeightRule + paragraphRule;
+        return bodyRule + lineHeightRule + paragraphRule + imgRule;
     }
     var fontFaceDecl = '';
     var ff;
@@ -31,7 +33,7 @@ function _buildReaderCss(s) {
         ff = s.fontFamily ? ("'" + s.fontFamily + "', sans-serif") : 'sans-serif';
     }
     // 폰트 패밀리는 모든 요소에 적용한다.
-    return fontFaceDecl + allElements + ' {font-family: ' + ff + ' !important; }' + bodyRule + lineHeightRule + paragraphRule;
+    return fontFaceDecl + allElements + ' {font-family: ' + ff + ' !important; }' + bodyRule + lineHeightRule + paragraphRule + imgRule;
 }
 
 function _injectReaderStyle(doc) {
