@@ -103,7 +103,7 @@ internal fun FontLayerPopup(
         }
     }
 
-    val fontMaps = remember { getFontFileMaps() }
+    val fontMaps = remember { getFontFileMaps(context) }
     val systemFonts = remember(systemFontSortOrder, systemFontFilter, importedFonts) {
         val importedNames = importedFonts.map { it.name }.toSet()
         val sourceMap = when (systemFontFilter) {
