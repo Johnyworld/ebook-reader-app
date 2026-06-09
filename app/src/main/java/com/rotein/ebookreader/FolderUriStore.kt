@@ -54,6 +54,10 @@ object FolderUriStore {
         prefs.edit().putStringSet(KEY_URIS, current).apply()
     }
 
-    /** 선택된 폴더가 있는지 확인 */
-    fun hasAny(context: Context): Boolean = load(context).isNotEmpty()
+    /** 선택된 폴더가 있는지 확인 (UI 표시용, 권한 유효성은 검사하지 않음) */
+    fun hasAny(context: Context): Boolean {
+        val prefs = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
+        val raw = prefs.getStringSet(KEY_URIS, emptySet()) ?: emptySet()
+        return raw.isNotEmpty()
+    }
 }

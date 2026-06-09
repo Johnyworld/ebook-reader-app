@@ -7,6 +7,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.After
 import org.junit.Before
 import org.junit.Rule
@@ -54,6 +55,10 @@ class HomeToReaderFlowTest {
     init {
         // Activity 실행 전에 BookCache 세팅
         BookCache.books = dummyBooks
+        // SAF 폴더 선택 상태 시뮬레이션
+        InstrumentationRegistry.getInstrumentation().targetContext
+            .getSharedPreferences("folder_uris", android.content.Context.MODE_PRIVATE)
+            .edit().putStringSet("selected_uris", setOf("content://test")).apply()
     }
 
     @get:Rule
@@ -67,6 +72,10 @@ class HomeToReaderFlowTest {
     @After
     fun cleanup() {
         BookCache.books = null
+        // 더미 폴더 URI 정리
+        InstrumentationRegistry.getInstrumentation().targetContext
+            .getSharedPreferences("folder_uris", android.content.Context.MODE_PRIVATE)
+            .edit().clear().apply()
     }
 
     private fun waitForBookList() {

@@ -133,13 +133,23 @@ class ReaderMenuOpenCloseTest {
                 )
             )
         )
+        // SAF 폴더 선택 상태 시뮬레이션
+        instrumentation.targetContext
+            .getSharedPreferences("folder_uris", android.content.Context.MODE_PRIVATE)
+            .edit().putStringSet("selected_uris", setOf("content://test")).apply()
     }
 
     @get:Rule
     val rule = createAndroidComposeRule<MainActivity>()
 
     @After
-    fun cleanup() { BookCache.books = null }
+    fun cleanup() {
+        BookCache.books = null
+        // 더미 폴더 URI 정리
+        instrumentation.targetContext
+            .getSharedPreferences("folder_uris", android.content.Context.MODE_PRIVATE)
+            .edit().clear().apply()
+    }
 
     private fun enterReader() {
         // 가로모드에서 탭 좌표/페이지네이션 문제 방지
@@ -228,13 +238,23 @@ class ReaderProgressDisplayTest {
                 )
             )
         )
+        // SAF 폴더 선택 상태 시뮬레이션
+        instrumentation.targetContext
+            .getSharedPreferences("folder_uris", android.content.Context.MODE_PRIVATE)
+            .edit().putStringSet("selected_uris", setOf("content://test")).apply()
     }
 
     @get:Rule
     val rule = createAndroidComposeRule<MainActivity>()
 
     @After
-    fun cleanup() { BookCache.books = null }
+    fun cleanup() {
+        BookCache.books = null
+        // 더미 폴더 URI 정리
+        instrumentation.targetContext
+            .getSharedPreferences("folder_uris", android.content.Context.MODE_PRIVATE)
+            .edit().clear().apply()
+    }
 
     private fun enterReader() {
         // 가로모드에서 탭 좌표/페이지네이션 문제 방지
@@ -316,13 +336,23 @@ class ReaderNextPageTest {
                 )
             )
         )
+        // SAF 폴더 선택 상태 시뮬레이션
+        instrumentation.targetContext
+            .getSharedPreferences("folder_uris", android.content.Context.MODE_PRIVATE)
+            .edit().putStringSet("selected_uris", setOf("content://test")).apply()
     }
 
     @get:Rule
     val rule = createAndroidComposeRule<MainActivity>()
 
     @After
-    fun cleanup() { BookCache.books = null }
+    fun cleanup() {
+        BookCache.books = null
+        // 더미 폴더 URI 정리
+        instrumentation.targetContext
+            .getSharedPreferences("folder_uris", android.content.Context.MODE_PRIVATE)
+            .edit().clear().apply()
+    }
 
     private fun enterReader() {
         // 가로모드에서 탭 좌표/페이지네이션 문제 방지

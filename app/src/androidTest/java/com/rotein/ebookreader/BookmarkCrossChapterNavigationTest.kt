@@ -67,13 +67,23 @@ class BookmarkCrossChapterNavigationTest {
                 )
             )
         )
+        // SAF 폴더 선택 상태 시뮬레이션
+        instrumentation.targetContext
+            .getSharedPreferences("folder_uris", android.content.Context.MODE_PRIVATE)
+            .edit().putStringSet("selected_uris", setOf("content://test")).apply()
     }
 
     @get:Rule
     val rule = createAndroidComposeRule<MainActivity>()
 
     @After
-    fun cleanup() { BookCache.books = null }
+    fun cleanup() {
+        BookCache.books = null
+        // 더미 폴더 URI 정리
+        instrumentation.targetContext
+            .getSharedPreferences("folder_uris", android.content.Context.MODE_PRIVATE)
+            .edit().clear().apply()
+    }
 
     // --- 유틸리티 함수 ---
 
