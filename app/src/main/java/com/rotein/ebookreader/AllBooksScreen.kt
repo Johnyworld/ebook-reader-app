@@ -1,14 +1,10 @@
 package com.rotein.ebookreader
 
-import android.Manifest
-import android.content.Intent
 import android.graphics.Bitmap
-import androidx.core.net.toUri
-import android.os.Build
-import android.os.Environment
-import android.provider.Settings
+import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.result.contract.ActivityResultContracts.OpenDocumentTree
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -86,16 +82,7 @@ fun AllBooksScreen(
     val scope = rememberCoroutineScope()
     val dao = remember { BookDatabase.getInstance(context).bookReadRecordDao() }
 
-    var hasPermission by remember {
-        mutableStateOf(
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                Environment.isExternalStorageManager()
-            } else {
-                context.checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) ==
-                        android.content.pm.PackageManager.PERMISSION_GRANTED
-            }
-        )
-    }
+    var hasFolders by remember { mutableStateOf(FolderUriStore.hasAny(context)) }
     val lifecycleOwner = LocalLifecycleOwner.current
     var books by remember { mutableStateOf(BookCache.books ?: emptyList()) }
     var isLoading by remember { mutableStateOf(false) }
@@ -154,21 +141,17 @@ fun AllBooksScreen(
         if (sortPref.field.defaultDescending) sorted.reversed() else sorted
     }
 
-    val permissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { granted -> hasPermission = granted }
-
-    val manageStorageLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.StartActivityForResult()
-    ) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            hasPermission = Environment.isExternalStorageManager()
+    // SAF 폴더 선택 런처
+    val folderPickerLauncher = rememberLauncherForActivityResult(OpenDocumentTree()) { uri: Uri? ->
+        if (uri != null) {
+            FolderUriStore.add(context, uri)
+            hasFolders = true
         }
     }
 
     // 최초 로드: 캐시가 있으면 그대로 사용, 없으면 전체 스캔
-    LaunchedEffect(hasPermission) {
-        if (hasPermission) {
+    LaunchedEffect(hasFolders) {
+        if (hasFolders) {
             val cached = BookCache.books
             val bookList = if (cached != null) {
                 cached
@@ -205,7 +188,7 @@ fun AllBooksScreen(
         lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
             if (isFirstResume) { isFirstResume = false; return@repeatOnLifecycle }
             val cached = BookCache.books ?: return@repeatOnLifecycle
-            val refreshed = withContext(Dispatchers.IO) { FileScanner.refreshBooks(cached) }
+            val refreshed = withContext(Dispatchers.IO) { FileScanner.refreshBooks(context, cached) }
             BookCache.books = refreshed
             books = refreshed
             val booksNeedingCovers = refreshed.filter { it.path !in covers }
@@ -230,7 +213,7 @@ fun AllBooksScreen(
         if (prevRefreshKey == refreshKey) return@LaunchedEffect
         prevRefreshKey = refreshKey
         val cached = BookCache.books ?: return@LaunchedEffect
-        val refreshed = withContext(Dispatchers.IO) { FileScanner.refreshBooks(cached) }
+        val refreshed = withContext(Dispatchers.IO) { FileScanner.refreshBooks(context, cached) }
         BookCache.books = refreshed
         books = refreshed
         val booksNeedingCovers = refreshed.filter { it.path !in covers }
@@ -275,25 +258,15 @@ fun AllBooksScreen(
 
         Box(modifier = Modifier.weight(1f).fillMaxSize()) {
             when {
-                !hasPermission -> {
+                !hasFolders -> {
                     Column(
                         modifier = Modifier.align(Alignment.Center).padding(EreaderSpacing.XL),
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(EreaderSpacing.M)
                     ) {
-                        Text(stringResource(R.string.permission_description))
-                        Button(onClick = {
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                                val intent = Intent(
-                                    Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
-                                    "package:${context.packageName}".toUri()
-                                )
-                                manageStorageLauncher.launch(intent)
-                            } else {
-                                permissionLauncher.launch(Manifest.permission.READ_EXTERNAL_STORAGE)
-                            }
-                        }) {
-                            Text(stringResource(R.string.grant_permission))
+                        Text(stringResource(R.string.folder_select_description))
+                        Button(onClick = { folderPickerLauncher.launch(null) }) {
+                            Text(stringResource(R.string.select_folder))
                         }
                     }
                 }

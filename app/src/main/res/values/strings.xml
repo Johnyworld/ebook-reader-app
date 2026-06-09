@@ -5,6 +5,8 @@
     <!-- AllBooksScreen -->
     <string name="permission_description">To search files on your device,\nstorage access permission is required.</string>
     <string name="grant_permission">Grant Permission</string>
+    <string name="folder_select_description">Select a folder containing your e-books.</string>
+    <string name="select_folder">Select Folder</string>
     <string name="loading_files">Searching files…</string>
     <string name="empty">Empty</string>
     <string name="search">Search</string>

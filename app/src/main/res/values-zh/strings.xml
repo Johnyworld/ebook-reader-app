@@ -3,6 +3,8 @@
     <!-- AllBooksScreen -->
     <string name="permission_description">要搜索设备上的文件，\n需要存储访问权限。</string>
     <string name="grant_permission">授予权限</string>
+    <string name="folder_select_description">请选择包含电子书的文件夹。</string>
+    <string name="select_folder">选择文件夹</string>
     <string name="loading_files">正在搜索文件…</string>
     <string name="empty">无内容</string>
     <string name="search">搜索</string>
