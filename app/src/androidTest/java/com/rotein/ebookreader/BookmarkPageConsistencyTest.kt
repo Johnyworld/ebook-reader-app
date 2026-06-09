@@ -46,18 +46,22 @@ class BookmarkPageConsistencyTest {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
 
     init {
-        // 파일 존재 확인
-        val sourceFile = File(SOURCE_EPUB_PATH)
-        require(sourceFile.exists()) {
-            "테스트용 EPUB 파일이 기기에 없습니다. 다음 명령어로 먼저 넣어주세요:\n" +
-            "adb push \"프로젝트 헤일메리 - 앤디 위어.epub\" $SOURCE_EPUB_PATH"
-        }
-
-        // 앱 내부 저장소로 복사 (저장소 권한 없이 접근 가능)
+        // 앱 내부 저장소에 캐시된 파일을 우선 사용 (저장소 권한 불필요)
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val internalFile = File(context.filesDir, "test_hailmary.epub")
-        if (!internalFile.exists() || internalFile.length() != sourceFile.length()) {
-            sourceFile.copyTo(internalFile, overwrite = true)
+        if (!internalFile.exists()) {
+            // UiAutomation shell은 /sdcard/ 접근 가능 (앱 권한 무관)
+            val pfd = InstrumentationRegistry.getInstrumentation().uiAutomation
+                .executeShellCommand("cat $SOURCE_EPUB_PATH")
+            android.os.ParcelFileDescriptor.AutoCloseInputStream(pfd).use { input ->
+                internalFile.outputStream().use { output -> input.copyTo(output) }
+            }
+            // 빈/깨진 파일이 캐시로 남지 않도록 정리
+            if (internalFile.length() == 0L) internalFile.delete()
+            require(internalFile.exists() && internalFile.length() > 0) {
+                "테스트용 EPUB 파일이 기기에 없습니다. 다음 명령어로 먼저 넣어주세요:\n" +
+                "adb push \"프로젝트 헤일메리 - 앤디 위어.epub\" $SOURCE_EPUB_PATH"
+            }
         }
         val epubPath = internalFile.absolutePath
 
@@ -66,7 +70,7 @@ class BookmarkPageConsistencyTest {
                 name = "test_hailmary.epub",
                 path = epubPath,
                 extension = "epub",
-                size = sourceFile.length(),
+                size = internalFile.length(),
                 dateAdded = 1000L,
                 dateModified = 1000L,
                 metadata = BookMetadata(
