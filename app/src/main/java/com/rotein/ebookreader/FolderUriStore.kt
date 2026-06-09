@@ -12,11 +12,19 @@ object FolderUriStore {
     private const val PREF_NAME = "folder_uris"
     private const val KEY_URIS = "selected_uris"
 
-    /** 저장된 폴더 URI 목록 반환 */
+    /** 저장된 폴더 URI 목록 반환 (유효한 권한이 있는 URI만 반환) */
     fun load(context: Context): List<Uri> {
         val prefs = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
         val raw = prefs.getStringSet(KEY_URIS, emptySet()) ?: emptySet()
-        return raw.mapNotNull { Uri.parse(it) }
+        // 시스템에 유효한 persistable 권한이 남아있는 URI만 반환
+        val persisted = context.contentResolver.persistedUriPermissions
+            .map { it.uri.toString() }.toSet()
+        val valid = raw.filter { it in persisted }
+        // 무효한 URI가 있으면 정리
+        if (valid.size < raw.size) {
+            prefs.edit().putStringSet(KEY_URIS, valid.toSet()).apply()
+        }
+        return valid.mapNotNull { Uri.parse(it) }
     }
 
     /** 새 폴더 URI 추가 + persistable 권한 취득 */

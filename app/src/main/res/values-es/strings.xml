@@ -1,8 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- AllBooksScreen -->
-    <string name="permission_description">Para buscar archivos en tu dispositivo,\nse necesita permiso de acceso al almacenamiento.</string>
-    <string name="grant_permission">Conceder permiso</string>
     <string name="folder_select_description">Selecciona la carpeta que contiene tus libros electrónicos.</string>
     <string name="select_folder">Seleccionar carpeta</string>
     <string name="loading_files">Buscando archivos…</string>

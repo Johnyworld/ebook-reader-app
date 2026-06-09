@@ -1,8 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- AllBooksScreen -->
-    <string name="permission_description">기기 내 파일을 검색하려면\n저장소 접근 권한이 필요합니다.</string>
-    <string name="grant_permission">권한 허용</string>
     <string name="folder_select_description">전자책이 있는 폴더를 선택해주세요.</string>
     <string name="select_folder">폴더 선택</string>
     <string name="loading_files">파일 검색 중…</string>

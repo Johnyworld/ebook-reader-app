@@ -3,6 +3,7 @@ package com.rotein.ebookreader
 import android.content.Context
 import android.net.Uri
 import java.io.File
+import java.security.MessageDigest
 
 /**
  * SAF content URI의 파일을 로컬 캐시에 복사한다.
@@ -18,9 +19,11 @@ object BookFileCache {
      */
     fun ensureCached(context: Context, contentUri: Uri, fileName: String, fileSize: Long): String {
         val cacheDir = File(context.filesDir, CACHE_DIR).also { it.mkdirs() }
-        // URI 해시 + 원본 확장자로 안정적 파일명 생성
+        // URI의 SHA-256 해시로 충돌 안전한 파일명 생성
         val ext = fileName.substringAfterLast('.', "bin")
-        val hash = contentUri.toString().hashCode().toUInt().toString(16)
+        val digest = MessageDigest.getInstance("SHA-256")
+        val hash = digest.digest(contentUri.toString().toByteArray())
+            .take(8).joinToString("") { "%02x".format(it) }
         val cached = File(cacheDir, "$hash.$ext")
 
         // 캐시 히트: 크기가 같으면 재사용
