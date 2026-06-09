@@ -46,12 +46,6 @@ class BookmarkPageConsistencyTest {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
 
     init {
-        // 저장소 권한 부여
-        val packageName = instrumentation.targetContext.packageName
-        instrumentation.uiAutomation
-            .executeShellCommand("appops set $packageName MANAGE_EXTERNAL_STORAGE allow")
-            .close()
-
         // 파일 존재 확인
         val file = File(EPUB_PATH)
         require(file.exists()) {

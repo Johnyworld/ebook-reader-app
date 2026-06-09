@@ -45,11 +45,6 @@ class ReaderReentryPageTest {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
 
     init {
-        val packageName = instrumentation.targetContext.packageName
-        instrumentation.uiAutomation
-            .executeShellCommand("appops set $packageName MANAGE_EXTERNAL_STORAGE allow")
-            .close()
-
         val file = File(EPUB_PATH)
         require(file.exists()) {
             "테스트용 EPUB 파일이 기기에 없습니다. 다음 명령어로 먼저 넣어주세요:\n" +

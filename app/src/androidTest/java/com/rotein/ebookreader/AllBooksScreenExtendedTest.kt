@@ -22,15 +22,6 @@ import org.junit.runner.RunWith
 private fun str(resId: Int): String =
     InstrumentationRegistry.getInstrumentation().targetContext.getString(resId)
 
-private fun grantPermission() {
-    val instrumentation = InstrumentationRegistry.getInstrumentation()
-    val packageName = instrumentation.targetContext.packageName
-    // 셸 명령 완료를 보장하기 위해 출력을 모두 읽은 뒤 닫는다
-    instrumentation.uiAutomation
-        .executeShellCommand("appops set $packageName MANAGE_EXTERNAL_STORAGE allow")
-        .use { java.io.FileInputStream(it.fileDescriptor).readBytes() }
-}
-
 /** 가로모드에서 페이지네이션으로 항목이 가려지는 것을 방지하기 위해 세로 고정 */
 private fun forcePortrait(rule: androidx.compose.ui.test.junit4.AndroidComposeTestRule<*, *>) {
     val activity = rule.activity as? android.app.Activity ?: return
@@ -101,7 +92,6 @@ private fun waitForBookList(rule: androidx.compose.ui.test.junit4.AndroidCompose
 class SearchByAuthorTest {
 
     init {
-        grantPermission()
         resetTestState()
         BookCache.books = threeBooks
     }
@@ -132,7 +122,6 @@ class SearchByAuthorTest {
 class SearchNoResultsTest {
 
     init {
-        grantPermission()
         resetTestState()
         BookCache.books = threeBooks
     }
@@ -164,7 +153,6 @@ class SearchNoResultsTest {
 class SearchClearRestoresListTest {
 
     init {
-        grantPermission()
         resetTestState()
         BookCache.books = threeBooks
     }
@@ -203,7 +191,6 @@ class SearchClearRestoresListTest {
 class SearchMixedCharactersTest {
 
     init {
-        grantPermission()
         resetTestState()
         BookCache.books = threeBooks
     }
@@ -237,7 +224,6 @@ class SearchMixedCharactersTest {
 class SortByTitleTest {
 
     init {
-        grantPermission()
         resetTestState()
         BookCache.books = threeBooks
     }
@@ -276,7 +262,6 @@ class SortByTitleTest {
 class SortByDateAddedTest {
 
     init {
-        grantPermission()
         resetTestState()
         BookCache.books = threeBooks
     }
@@ -315,7 +300,6 @@ class SortByDateAddedTest {
 class FilterAllTest {
 
     init {
-        grantPermission()
         resetTestState()
         BookCache.books = threeBooks
     }
@@ -343,7 +327,6 @@ class FilterAllTest {
 class FilterFavoriteEmptyTest {
 
     init {
-        grantPermission()
         resetTestState()
         BookCache.books = threeBooks
     }
@@ -375,7 +358,6 @@ class FilterFavoriteEmptyTest {
 class FilterHiddenTest {
 
     init {
-        grantPermission()
         resetTestState()
         BookCache.books = threeBooks
     }
@@ -415,7 +397,6 @@ class FilterHiddenTest {
 class HideBookTest {
 
     init {
-        grantPermission()
         resetTestState()
         BookCache.books = threeBooks
     }
@@ -449,7 +430,6 @@ class HideBookTest {
 class UnhideBookTest {
 
     init {
-        grantPermission()
         resetTestState()
         BookCache.books = threeBooks
     }

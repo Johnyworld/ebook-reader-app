@@ -108,13 +108,6 @@ $paragraphs
     return outFile.absolutePath
 }
 
-private fun grantStoragePermissionForMenu() {
-    val packageName = instrumentation.targetContext.packageName
-    instrumentation.uiAutomation
-        .executeShellCommand("appops set $packageName MANAGE_EXTERNAL_STORAGE allow")
-        .close()
-}
-
 private fun str(resId: Int): String =
     instrumentation.targetContext.getString(resId)
 
@@ -124,7 +117,6 @@ class ReaderMenuOpenCloseTest {
     private val testFilePath: String
 
     init {
-        grantStoragePermissionForMenu()
         testFilePath = createTestEpubForMenu()
         BookCache.books = listOf(
             BookFile(
@@ -220,7 +212,6 @@ class ReaderProgressDisplayTest {
     private val testFilePath: String
 
     init {
-        grantStoragePermissionForMenu()
         testFilePath = createTestEpubForMenu()
         BookCache.books = listOf(
             BookFile(
@@ -309,7 +300,6 @@ class ReaderNextPageTest {
     private val testFilePath: String
 
     init {
-        grantStoragePermissionForMenu()
         testFilePath = createTestEpubForMenu()
         BookCache.books = listOf(
             BookFile(

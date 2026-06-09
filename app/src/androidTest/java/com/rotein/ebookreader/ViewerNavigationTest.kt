@@ -120,13 +120,6 @@ $paragraphs
     return outFile.absolutePath
 }
 
-private fun grantStoragePermission() {
-    val packageName = instrumentation.targetContext.packageName
-    instrumentation.uiAutomation
-        .executeShellCommand("appops set $packageName MANAGE_EXTERNAL_STORAGE allow")
-        .close()
-}
-
 private fun runTocNavigationTest(
     composeTestRule: AndroidComposeTestRule<*, *>,
     bookTitle: String
@@ -254,7 +247,6 @@ class EpubViewerNavigationTest {
     private val testFilePath: String
 
     init {
-        grantStoragePermission()
         testFilePath = createTestEpub()
         BookCache.books = listOf(
             BookFile(

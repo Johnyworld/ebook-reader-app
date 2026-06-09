@@ -119,13 +119,6 @@ $paragraphs
     return outFile.absolutePath
 }
 
-private fun grantStoragePermission() {
-    val packageName = instrumentation.targetContext.packageName
-    instrumentation.uiAutomation
-        .executeShellCommand("appops set $packageName MANAGE_EXTERNAL_STORAGE allow")
-        .close()
-}
-
 private fun evalJs(webView: WebView, script: String): String {
     val latch = CountDownLatch(1)
     var result = ""
@@ -212,7 +205,6 @@ class SettingsChangePageRestoreTest {
     private val testFilePath: String
 
     init {
-        grantStoragePermission()
         testFilePath = createTestEpubForSettings()
         BookCache.books = listOf(
             BookFile(

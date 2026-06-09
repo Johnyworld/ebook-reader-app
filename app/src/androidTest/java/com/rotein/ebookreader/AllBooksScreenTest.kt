@@ -59,11 +59,6 @@ class AllBooksScreenTest {
     )
 
     init {
-        val instrumentation = InstrumentationRegistry.getInstrumentation()
-        val packageName = instrumentation.targetContext.packageName
-        instrumentation.uiAutomation
-            .executeShellCommand("appops set $packageName MANAGE_EXTERNAL_STORAGE allow")
-            .close()
         BookCache.books = dummyBooks
     }
 
@@ -163,11 +158,6 @@ class AllBooksScreenTest {
 class AllBooksScreenEmptyTest {
 
     init {
-        val instrumentation = InstrumentationRegistry.getInstrumentation()
-        val packageName = instrumentation.targetContext.packageName
-        instrumentation.uiAutomation
-            .executeShellCommand("appops set $packageName MANAGE_EXTERNAL_STORAGE allow")
-            .close()
         BookCache.books = emptyList()
     }
 
