@@ -71,6 +71,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+/** 커버 맵의 키: SAF URI 또는 기존 경로 */
+private fun BookFile.coverKey(): String = contentUri.ifEmpty { path }
+
 @Composable
 fun AllBooksScreen(
     onBookClick: (BookFile) -> Unit,
@@ -163,14 +166,22 @@ fun AllBooksScreen(
                 scanned
             }
             books = bookList
-            val booksNeedingCovers = bookList.filter { it.path !in covers }
+            val booksNeedingCovers = bookList.filter { it.coverKey() !in covers }
             if (booksNeedingCovers.isNotEmpty()) {
                 val newCovers = withContext(Dispatchers.IO) {
                     val result = mutableMapOf<String, Bitmap?>()
                     booksNeedingCovers.forEach { book ->
-                        val bitmap = BookCoverLoader.getCached(book.path)
-                            ?: BookCoverLoader.load(book.path, book.extension)
-                        result[book.path] = bitmap
+                        val loadPath = if (book.contentUri.isNotEmpty()) {
+                            try {
+                                BookFileCache.ensureCached(context, Uri.parse(book.contentUri), book.name, book.size)
+                            } catch (_: Exception) { null }
+                        } else {
+                            book.path
+                        }
+                        val bitmap = if (loadPath != null) {
+                            BookCoverLoader.getCached(loadPath) ?: BookCoverLoader.load(loadPath, book.extension)
+                        } else null
+                        result[book.coverKey()] = bitmap
                     }
                     result
                 }
@@ -191,14 +202,22 @@ fun AllBooksScreen(
             val refreshed = withContext(Dispatchers.IO) { FileScanner.refreshBooks(context, cached) }
             BookCache.books = refreshed
             books = refreshed
-            val booksNeedingCovers = refreshed.filter { it.path !in covers }
+            val booksNeedingCovers = refreshed.filter { it.coverKey() !in covers }
             if (booksNeedingCovers.isNotEmpty()) {
                 val newCovers = withContext(Dispatchers.IO) {
                     val result = mutableMapOf<String, Bitmap?>()
                     booksNeedingCovers.forEach { book ->
-                        val bitmap = BookCoverLoader.getCached(book.path)
-                            ?: BookCoverLoader.load(book.path, book.extension)
-                        result[book.path] = bitmap
+                        val loadPath = if (book.contentUri.isNotEmpty()) {
+                            try {
+                                BookFileCache.ensureCached(context, Uri.parse(book.contentUri), book.name, book.size)
+                            } catch (_: Exception) { null }
+                        } else {
+                            book.path
+                        }
+                        val bitmap = if (loadPath != null) {
+                            BookCoverLoader.getCached(loadPath) ?: BookCoverLoader.load(loadPath, book.extension)
+                        } else null
+                        result[book.coverKey()] = bitmap
                     }
                     result
                 }
@@ -216,14 +235,22 @@ fun AllBooksScreen(
         val refreshed = withContext(Dispatchers.IO) { FileScanner.refreshBooks(context, cached) }
         BookCache.books = refreshed
         books = refreshed
-        val booksNeedingCovers = refreshed.filter { it.path !in covers }
+        val booksNeedingCovers = refreshed.filter { it.coverKey() !in covers }
         if (booksNeedingCovers.isNotEmpty()) {
             val newCovers = withContext(Dispatchers.IO) {
                 val result = mutableMapOf<String, Bitmap?>()
                 booksNeedingCovers.forEach { book ->
-                    val bitmap = BookCoverLoader.getCached(book.path)
-                        ?: BookCoverLoader.load(book.path, book.extension)
-                    result[book.path] = bitmap
+                    val loadPath = if (book.contentUri.isNotEmpty()) {
+                        try {
+                            BookFileCache.ensureCached(context, Uri.parse(book.contentUri), book.name, book.size)
+                        } catch (_: Exception) { null }
+                    } else {
+                        book.path
+                    }
+                    val bitmap = if (loadPath != null) {
+                        BookCoverLoader.getCached(loadPath) ?: BookCoverLoader.load(loadPath, book.extension)
+                    } else null
+                    result[book.coverKey()] = bitmap
                 }
                 result
             }
@@ -304,10 +331,18 @@ fun AllBooksScreen(
                         val newCovers = mutableMapOf<String, Bitmap?>()
                         for (i in tStart until tEnd) {
                             val book = processedBooks[i]
-                            if (book.path !in covers) {
-                                val bitmap = BookCoverLoader.getCached(book.path)
-                                    ?: BookCoverLoader.load(book.path, book.extension)
-                                newCovers[book.path] = bitmap
+                            if (book.coverKey() !in covers) {
+                                val loadPath = if (book.contentUri.isNotEmpty()) {
+                                    try {
+                                        BookFileCache.ensureCached(context, Uri.parse(book.contentUri), book.name, book.size)
+                                    } catch (_: Exception) { null }
+                                } else {
+                                    book.path
+                                }
+                                val bitmap = if (loadPath != null) {
+                                    BookCoverLoader.getCached(loadPath) ?: BookCoverLoader.load(loadPath, book.extension)
+                                } else null
+                                newCovers[book.coverKey()] = bitmap
                             }
                         }
                         if (newCovers.isNotEmpty()) {
@@ -323,7 +358,7 @@ fun AllBooksScreen(
                                 val isFavorite = book.path in favorites
                                 BookItem(
                                     book = book,
-                                    cover = covers[book.path],
+                                    cover = covers[book.coverKey()],
                                     isFavorite = isFavorite,
                                     isHidden = isHidden,
                                     readingProgress = readingProgressMap[book.path] ?: 0f,

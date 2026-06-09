@@ -80,7 +80,10 @@ import com.rotein.ebookreader.ui.components.PopupHeaderBar
 import com.rotein.ebookreader.ui.theme.EreaderColors
 import com.rotein.ebookreader.ui.theme.EreaderFontSize
 import com.rotein.ebookreader.ui.theme.EreaderSpacing
+import android.net.Uri
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -195,8 +198,20 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
         }
     }
 
-    LaunchedEffect(book.path) {
-        vm.loadBook(book.path, book.extension.lowercase() == "epub")
+    // SAF URI가 있으면 캐시에서 로컬 경로 확보, 없으면 기존 경로 사용
+    var localPath by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(book.contentUri, book.path) {
+        val resolved = if (book.contentUri.isNotEmpty()) {
+            withContext(Dispatchers.IO) {
+                BookFileCache.ensureCached(
+                    context, Uri.parse(book.contentUri), book.name, book.size
+                )
+            }
+        } else {
+            book.path
+        }
+        localPath = resolved
+        vm.loadBook(resolved, book.extension.lowercase() == "epub")
     }
 
     LaunchedEffect(contentState.isContentRendered) {
@@ -243,10 +258,15 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
     Box(modifier = modifier.fillMaxSize().clipToBounds().testTag("bookReaderScreen")) {
         // 뷰어 콘텐츠 영역 — 상태바가 있는 기기에서 콘텐츠가 가려지지 않도록 패딩 적용
         Box(modifier = Modifier.fillMaxSize().statusBarsPadding()) {
-        when (book.extension.lowercase()) {
-            "txt"  -> TxtViewer(book.path, onCenterTap)
+        val currentPath = localPath
+        if (currentPath == null) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text(stringResource(R.string.loading_files))
+            }
+        } else when (book.extension.lowercase()) {
+            "txt"  -> TxtViewer(currentPath, onCenterTap)
             "epub" -> EpubViewer(
-                path = book.path,
+                path = currentPath,
                 savedCfi = readingState.savedCfi,
                 onCenterTap = onCenterTap,
                 onLocationUpdate = { progress, cfi, chapter ->
@@ -348,7 +368,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                 }
             )
             "pdf"  -> if (readingState.savedCfi == null) LoadingIndicator() else PdfViewer(
-                path = book.path,
+                path = currentPath,
                 savedPage = readingState.savedCfi
                     ?.removePrefix("pdf-page:")?.toIntOrNull() ?: 1,
                 dualPage = readerSettings.dualPage,
@@ -375,7 +395,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                 },
                 onWebViewCreated = { webView -> viewerWebView.value = webView }
             )
-            "mobi" -> MobiViewer(book.path, onCenterTap)
+            "mobi" -> MobiViewer(currentPath, onCenterTap)
             else   -> CenteredMessage(stringResource(R.string.unsupported_format))
         }
 
@@ -615,7 +635,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                                 if (isPdf) {
                                     val pageNum = readingState.currentCfi.removePrefix("pdf-page:").toIntOrNull() ?: 0
                                     val bookmark = Bookmark(
-                                        bookPath = book.path,
+                                        bookPath = localPath ?: book.path,
                                         cfi = readingState.currentCfi,
                                         chapterTitle = "",
                                         excerpt = context.getString(R.string.page_number, pageNum),
@@ -627,7 +647,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                                 val wv = viewerWebView.value
                                 val saveBookmark = { cfi: String, excerpt: String ->
                                     val bookmark = Bookmark(
-                                        bookPath = book.path,
+                                        bookPath = localPath ?: book.path,
                                         cfi = cfi,
                                         chapterTitle = readingState.chapterTitle,
                                         excerpt = excerpt,
