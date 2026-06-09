@@ -211,7 +211,8 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
             book.path
         }
         localPath = resolved
-        vm.loadBook(resolved, book.extension.lowercase() == "epub")
+        // DB 키로는 bookKey()(SAF URI 또는 기존 경로)를 사용
+        vm.loadBook(book.bookKey(), book.extension.lowercase() == "epub")
     }
 
     LaunchedEffect(contentState.isContentRendered) {
@@ -635,7 +636,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                                 if (isPdf) {
                                     val pageNum = readingState.currentCfi.removePrefix("pdf-page:").toIntOrNull() ?: 0
                                     val bookmark = Bookmark(
-                                        bookPath = localPath ?: book.path,
+                                        bookPath = book.bookKey(),
                                         cfi = readingState.currentCfi,
                                         chapterTitle = "",
                                         excerpt = context.getString(R.string.page_number, pageNum),
@@ -647,7 +648,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                                 val wv = viewerWebView.value
                                 val saveBookmark = { cfi: String, excerpt: String ->
                                     val bookmark = Bookmark(
-                                        bookPath = localPath ?: book.path,
+                                        bookPath = book.bookKey(),
                                         cfi = cfi,
                                         chapterTitle = readingState.chapterTitle,
                                         excerpt = excerpt,

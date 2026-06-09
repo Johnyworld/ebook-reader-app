@@ -10,3 +10,6 @@ data class BookFile(
     val dateModified: Long,   // MediaStore DATE_MODIFIED (초 단위) — 읽은 순 proxy
     val metadata: BookMetadata? = null
 )
+
+/** DB 키로 사용하는 안정적 식별자: SAF URI 또는 기존 절대 경로 */
+fun BookFile.bookKey(): String = contentUri.ifEmpty { path }

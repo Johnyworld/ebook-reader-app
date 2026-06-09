@@ -71,8 +71,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-/** 커버 맵의 키: SAF URI 또는 기존 경로 */
-private fun BookFile.coverKey(): String = contentUri.ifEmpty { path }
+// bookKey()는 BookFile.kt에 정의된 확장 함수를 사용
 
 @Composable
 fun AllBooksScreen(
@@ -119,9 +118,9 @@ fun AllBooksScreen(
     val processedBooks = remember(books, searchQuery, sortPref, lastReadTimes, hiddenBooks, favorites, filterMode) {
         // 0) 필터 모드 적용
         val visible = when (filterMode) {
-            FilterMode.ALL -> books.filter { it.path !in hiddenBooks }
-            FilterMode.FAVORITE -> books.filter { it.path in favorites && it.path !in hiddenBooks }
-            FilterMode.HIDDEN -> books.filter { it.path in hiddenBooks }
+            FilterMode.ALL -> books.filter { it.bookKey() !in hiddenBooks }
+            FilterMode.FAVORITE -> books.filter { it.bookKey() in favorites && it.bookKey() !in hiddenBooks }
+            FilterMode.HIDDEN -> books.filter { it.bookKey() in hiddenBooks }
         }
         // 1) 검색 필터
         val filtered = if (searchQuery.isBlank()) visible
@@ -138,7 +137,7 @@ fun AllBooksScreen(
             SortField.TITLE -> compareBy { (it.metadata?.title ?: it.name).lowercase() }
             SortField.AUTHOR -> compareBy { it.metadata?.author?.lowercase() ?: "\uFFFF" }
             SortField.DATE_ADDED -> compareBy { it.dateAdded }
-            SortField.LAST_READ -> compareBy { lastReadTimes[it.path] ?: 0L }
+            SortField.LAST_READ -> compareBy { lastReadTimes[it.bookKey()] ?: 0L }
         }
         val sorted = filtered.sortedWith(comparator)
         if (sortPref.field.defaultDescending) sorted.reversed() else sorted
@@ -168,7 +167,7 @@ fun AllBooksScreen(
                 scanned
             }
             books = bookList
-            val booksNeedingCovers = bookList.filter { it.coverKey() !in covers }
+            val booksNeedingCovers = bookList.filter { it.bookKey() !in covers }
             if (booksNeedingCovers.isNotEmpty()) {
                 val newCovers = withContext(Dispatchers.IO) {
                     val result = mutableMapOf<String, Bitmap?>()
@@ -183,7 +182,7 @@ fun AllBooksScreen(
                         val bitmap = if (loadPath != null) {
                             BookCoverLoader.getCached(loadPath) ?: BookCoverLoader.load(loadPath, book.extension)
                         } else null
-                        result[book.coverKey()] = bitmap
+                        result[book.bookKey()] = bitmap
                     }
                     result
                 }
@@ -204,7 +203,7 @@ fun AllBooksScreen(
             val refreshed = withContext(Dispatchers.IO) { FileScanner.refreshBooks(context, cached) }
             BookCache.books = refreshed
             books = refreshed
-            val booksNeedingCovers = refreshed.filter { it.coverKey() !in covers }
+            val booksNeedingCovers = refreshed.filter { it.bookKey() !in covers }
             if (booksNeedingCovers.isNotEmpty()) {
                 val newCovers = withContext(Dispatchers.IO) {
                     val result = mutableMapOf<String, Bitmap?>()
@@ -219,7 +218,7 @@ fun AllBooksScreen(
                         val bitmap = if (loadPath != null) {
                             BookCoverLoader.getCached(loadPath) ?: BookCoverLoader.load(loadPath, book.extension)
                         } else null
-                        result[book.coverKey()] = bitmap
+                        result[book.bookKey()] = bitmap
                     }
                     result
                 }
@@ -237,7 +236,7 @@ fun AllBooksScreen(
         val refreshed = withContext(Dispatchers.IO) { FileScanner.refreshBooks(context, cached) }
         BookCache.books = refreshed
         books = refreshed
-        val booksNeedingCovers = refreshed.filter { it.coverKey() !in covers }
+        val booksNeedingCovers = refreshed.filter { it.bookKey() !in covers }
         if (booksNeedingCovers.isNotEmpty()) {
             val newCovers = withContext(Dispatchers.IO) {
                 val result = mutableMapOf<String, Bitmap?>()
@@ -252,7 +251,7 @@ fun AllBooksScreen(
                     val bitmap = if (loadPath != null) {
                         BookCoverLoader.getCached(loadPath) ?: BookCoverLoader.load(loadPath, book.extension)
                     } else null
-                    result[book.coverKey()] = bitmap
+                    result[book.bookKey()] = bitmap
                 }
                 result
             }
@@ -333,7 +332,7 @@ fun AllBooksScreen(
                         val newCovers = mutableMapOf<String, Bitmap?>()
                         for (i in tStart until tEnd) {
                             val book = processedBooks[i]
-                            if (book.coverKey() !in covers) {
+                            if (book.bookKey() !in covers) {
                                 val loadPath = if (book.contentUri.isNotEmpty()) {
                                     try {
                                         BookFileCache.ensureCached(context, Uri.parse(book.contentUri), book.name, book.size)
@@ -344,7 +343,7 @@ fun AllBooksScreen(
                                 val bitmap = if (loadPath != null) {
                                     BookCoverLoader.getCached(loadPath) ?: BookCoverLoader.load(loadPath, book.extension)
                                 } else null
-                                newCovers[book.coverKey()] = bitmap
+                                newCovers[book.bookKey()] = bitmap
                             }
                         }
                         if (newCovers.isNotEmpty()) {
@@ -356,33 +355,33 @@ fun AllBooksScreen(
                     Column(modifier = Modifier.fillMaxSize()) {
                         Column(modifier = Modifier.weight(1f)) {
                             pageItems.forEach { book ->
-                                val isHidden = book.path in hiddenBooks
-                                val isFavorite = book.path in favorites
+                                val isHidden = book.bookKey() in hiddenBooks
+                                val isFavorite = book.bookKey() in favorites
                                 BookItem(
                                     book = book,
-                                    cover = covers[book.coverKey()],
+                                    cover = covers[book.bookKey()],
                                     isFavorite = isFavorite,
                                     isHidden = isHidden,
-                                    readingProgress = readingProgressMap[book.path] ?: 0f,
+                                    readingProgress = readingProgressMap[book.bookKey()] ?: 0f,
                                     onClick = {
                                         val now = System.currentTimeMillis()
                                         scope.launch(Dispatchers.IO) {
-                                            dao.upsertLastReadAt(book.path, now)
+                                            dao.upsertLastReadAt(book.bookKey(), now)
                                         }
                                         onBookClick(book)
                                     },
                                     onToggleFavorite = if (isHidden && !isFavorite) null else {{
                                         val newValue = !isFavorite
-                                        favorites = if (newValue) favorites + book.path else favorites - book.path
+                                        favorites = if (newValue) favorites + book.bookKey() else favorites - book.bookKey()
                                         scope.launch(Dispatchers.IO) {
-                                            dao.upsertFavorite(book.path, newValue)
+                                            dao.upsertFavorite(book.bookKey(), newValue)
                                         }
                                     }},
                                     onToggleHidden = {
                                         val newValue = !isHidden
-                                        hiddenBooks = if (newValue) hiddenBooks + book.path else hiddenBooks - book.path
+                                        hiddenBooks = if (newValue) hiddenBooks + book.bookKey() else hiddenBooks - book.bookKey()
                                         scope.launch(Dispatchers.IO) {
-                                            dao.upsertHidden(book.path, newValue)
+                                            dao.upsertHidden(book.bookKey(), newValue)
                                         }
                                     }
                                 )
