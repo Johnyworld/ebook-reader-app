@@ -161,6 +161,8 @@ fun AllBooksScreen(
             } else {
                 isLoading = true
                 val scanned = withContext(Dispatchers.IO) { FileScanner.scanBooks(context) }
+                // 기존 절대 경로 레코드를 SAF URI로 마이그레이션
+                withContext(Dispatchers.IO) { migrateBookPathsToUri(context, scanned) }
                 BookCache.books = scanned
                 isLoading = false
                 scanned
