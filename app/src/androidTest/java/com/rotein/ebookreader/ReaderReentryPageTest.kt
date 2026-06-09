@@ -37,7 +37,7 @@ class ReaderReentryPageTest {
 
     companion object {
         private const val TAG = "ReentryPageTest"
-        private const val EPUB_PATH = "/sdcard/Download/test_hailmary.epub"
+        private const val SOURCE_EPUB_PATH = "/sdcard/Download/test_hailmary.epub"
         private const val BOOK_TITLE = "프로젝트 헤일메리"
         private const val REPEAT_COUNT = 10
     }
@@ -45,18 +45,26 @@ class ReaderReentryPageTest {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
 
     init {
-        val file = File(EPUB_PATH)
-        require(file.exists()) {
+        val sourceFile = File(SOURCE_EPUB_PATH)
+        require(sourceFile.exists()) {
             "테스트용 EPUB 파일이 기기에 없습니다. 다음 명령어로 먼저 넣어주세요:\n" +
-            "adb push \"프로젝트 헤일메리 - 앤디 위어.epub\" $EPUB_PATH"
+            "adb push \"프로젝트 헤일메리 - 앤디 위어.epub\" $SOURCE_EPUB_PATH"
         }
+
+        // 앱 내부 저장소로 복사 (저장소 권한 없이 접근 가능)
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val internalFile = File(context.filesDir, "test_hailmary.epub")
+        if (!internalFile.exists() || internalFile.length() != sourceFile.length()) {
+            sourceFile.copyTo(internalFile, overwrite = true)
+        }
+        val epubPath = internalFile.absolutePath
 
         BookCache.books = listOf(
             BookFile(
                 name = "test_hailmary.epub",
-                path = EPUB_PATH,
+                path = epubPath,
                 extension = "epub",
-                size = file.length(),
+                size = sourceFile.length(),
                 dateAdded = 1000L,
                 dateModified = 1000L,
                 metadata = BookMetadata(
