@@ -3,6 +3,9 @@
     <!-- AllBooksScreen -->
     <string name="folder_select_description">電子書籍が入っているフォルダを選択してください。</string>
     <string name="select_folder">フォルダ選択</string>
+    <string name="manage_folders">フォルダ管理</string>
+    <string name="add_folder">フォルダ追加</string>
+    <string name="no_folders">フォルダが選択されていません。</string>
     <string name="loading_files">ファイルを検索中…</string>
     <string name="empty">空</string>
     <string name="search">検索</string>

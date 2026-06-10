@@ -7,6 +7,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.result.contract.ActivityResultContracts.OpenDocumentTree
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -23,6 +24,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
@@ -60,6 +62,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupProperties
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.os.LocaleListCompat
 import com.rotein.ebookreader.ui.components.EreaderDropdownMenu
@@ -85,6 +89,7 @@ fun AllBooksScreen(
     val dao = remember { BookDatabase.getInstance(context).bookReadRecordDao() }
 
     var hasFolders by remember { mutableStateOf(FolderUriStore.hasAny(context)) }
+    var folders by remember { mutableStateOf(FolderUriStore.load(context)) }
     val lifecycleOwner = LocalLifecycleOwner.current
     var books by remember { mutableStateOf(BookCache.books ?: emptyList()) }
     var isLoading by remember { mutableStateOf(false) }
@@ -148,6 +153,7 @@ fun AllBooksScreen(
         if (uri != null) {
             FolderUriStore.add(context, uri)
             hasFolders = true
+            folders = FolderUriStore.load(context)
         }
     }
 
@@ -235,6 +241,7 @@ fun AllBooksScreen(
             searchQuery = searchQuery,
             sortPref = sortPref,
             filterMode = filterMode,
+            folders = folders,
             onSearchClick = { isSearchActive = true },
             onQueryChange = { searchQuery = it },
             onSearchClear = {
@@ -242,7 +249,15 @@ fun AllBooksScreen(
                 isSearchActive = false
             },
             onSortChange = { sortPref = it },
-            onFilterChange = { filterMode = it }
+            onFilterChange = { filterMode = it },
+            onAddFolder = { folderPickerLauncher.launch(null) },
+            onRemoveFolder = { uri ->
+                FolderUriStore.remove(context, uri)
+                folders = FolderUriStore.load(context)
+                hasFolders = FolderUriStore.hasAny(context)
+                // 폴더 제거 후 도서 목록 다시 스캔
+                BookCache.books = null
+            }
         )
 
         var currentPage by remember { mutableIntStateOf(0) }
@@ -370,11 +385,14 @@ private fun TopBar(
     searchQuery: String,
     sortPref: SortPreference,
     filterMode: FilterMode,
+    folders: List<Uri>,
     onSearchClick: () -> Unit,
     onQueryChange: (String) -> Unit,
     onSearchClear: () -> Unit,
     onSortChange: (SortPreference) -> Unit,
-    onFilterChange: (FilterMode) -> Unit
+    onFilterChange: (FilterMode) -> Unit,
+    onAddFolder: () -> Unit,
+    onRemoveFolder: (Uri) -> Unit
 ) {
     val focusRequester = remember { FocusRequester() }
     LaunchedEffect(isSearchActive) {
@@ -387,7 +405,7 @@ private fun TopBar(
             .padding(top = 4.dp)
             .height(56.dp)
     ) {
-        // 베이스 레이어: 돋보기 아이콘 + 정렬 컨트롤
+        // 베이스 레이어: 돋보기 아이콘 + 정렬 컨트롤 + 케밥 메뉴
         Row(
             modifier = Modifier
                 .fillMaxSize()
@@ -420,37 +438,12 @@ private fun TopBar(
                 label = { stringResource(it.labelRes) },
             )
 
-            // 언어 선택 드롭다운
-            val appLocale = AppCompatDelegate.getApplicationLocales().get(0)?.language
-            val currentLocale = appLocale ?: java.util.Locale.getDefault().language
-            val languageOptions = listOf(
-                "en" to "English",
-                "ko" to "한국어",
-                "ja" to "日本語",
-                "zh" to "中文",
-                "es" to "Español",
+            // 케밥 메뉴 (설정)
+            KebabMenu(
+                folders = folders,
+                onAddFolder = onAddFolder,
+                onRemoveFolder = onRemoveFolder
             )
-            val currentLanguageCode = languageOptions.firstOrNull { it.first == currentLocale }?.first ?: languageOptions.first().first
-
-            EreaderDropdownMenu(
-                items = languageOptions,
-                selectedItem = languageOptions.first { it.first == currentLanguageCode },
-                onSelect = { (code, _) ->
-                    val localeList = LocaleListCompat.forLanguageTags(code)
-                    AppCompatDelegate.setApplicationLocales(localeList)
-                },
-                label = { it.second },
-                trigger = { onClick ->
-                    Text(
-                        text = stringResource(R.string.language),
-                        style = EreaderFontSize.M,
-                        modifier = Modifier
-                            .clickable { onClick() }
-                            .padding(horizontal = EreaderSpacing.M, vertical = EreaderSpacing.S)
-                    )
-                }
-            )
-
         }
 
         // 오버레이 레이어: 검색 활성 시 전체 행을 덮음
@@ -508,6 +501,186 @@ private fun TopBar(
     }
 
     HorizontalDivider(color = EreaderColors.Black)
+}
+
+/** 케밥 메뉴: 언어 설정 + 폴더 관리 */
+@Composable
+private fun KebabMenu(
+    folders: List<Uri>,
+    onAddFolder: () -> Unit,
+    onRemoveFolder: (Uri) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    var showLanguage by remember { mutableStateOf(false) }
+    var showFolders by remember { mutableStateOf(false) }
+
+    Box {
+        IconButton(onClick = { expanded = true }) {
+            Icon(
+                imageVector = Icons.Default.MoreVert,
+                contentDescription = stringResource(R.string.settings),
+                tint = EreaderColors.DarkGray
+            )
+        }
+
+        if (expanded) {
+            Popup(
+                alignment = Alignment.TopEnd,
+                onDismissRequest = {
+                    expanded = false
+                    showLanguage = false
+                    showFolders = false
+                },
+                properties = PopupProperties(focusable = true)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .width(220.dp)
+                        .background(EreaderColors.White)
+                        .border(1.dp, EreaderColors.Black)
+                ) {
+                    if (!showLanguage && !showFolders) {
+                        // 메인 메뉴
+                        KebabMenuItem(
+                            text = stringResource(R.string.language),
+                            onClick = { showLanguage = true }
+                        )
+                        HorizontalDivider(color = EreaderColors.Gray)
+                        KebabMenuItem(
+                            text = stringResource(R.string.manage_folders),
+                            onClick = { showFolders = true }
+                        )
+                    } else if (showLanguage) {
+                        // 언어 선택 서브메뉴
+                        KebabMenuItem(
+                            text = "← ${stringResource(R.string.language)}",
+                            onClick = { showLanguage = false }
+                        )
+                        HorizontalDivider(color = EreaderColors.Black)
+
+                        val appLocale = AppCompatDelegate.getApplicationLocales().get(0)?.language
+                        val currentLocale = appLocale ?: java.util.Locale.getDefault().language
+                        val languages = listOf(
+                            "en" to "English",
+                            "ko" to "한국어",
+                            "ja" to "日本語",
+                            "zh" to "中文",
+                            "es" to "Español",
+                        )
+                        languages.forEachIndexed { index, (code, name) ->
+                            val isSelected = code == currentLocale
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        val localeList = LocaleListCompat.forLanguageTags(code)
+                                        AppCompatDelegate.setApplicationLocales(localeList)
+                                        expanded = false
+                                        showLanguage = false
+                                    }
+                                    .padding(horizontal = EreaderSpacing.L, vertical = EreaderSpacing.M)
+                            ) {
+                                Text(
+                                    text = name,
+                                    style = EreaderFontSize.M,
+                                    color = EreaderColors.Black,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                if (isSelected) {
+                                    Icon(
+                                        imageVector = Icons.Default.Check,
+                                        contentDescription = null,
+                                        tint = EreaderColors.Black,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                            }
+                            if (index < languages.lastIndex) {
+                                HorizontalDivider(color = EreaderColors.Gray)
+                            }
+                        }
+                    } else if (showFolders) {
+                        // 폴더 관리 서브메뉴
+                        KebabMenuItem(
+                            text = "← ${stringResource(R.string.manage_folders)}",
+                            onClick = { showFolders = false }
+                        )
+                        HorizontalDivider(color = EreaderColors.Black)
+
+                        if (folders.isEmpty()) {
+                            Text(
+                                text = stringResource(R.string.no_folders),
+                                style = EreaderFontSize.S,
+                                color = EreaderColors.DarkGray,
+                                modifier = Modifier.padding(EreaderSpacing.L)
+                            )
+                        } else {
+                            folders.forEach { uri ->
+                                // URI에서 마지막 경로 세그먼트를 표시명으로 사용
+                                val displayName = uri.lastPathSegment
+                                    ?.substringAfterLast(':')
+                                    ?.substringAfterLast('/')
+                                    ?: uri.toString()
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(start = EreaderSpacing.L, end = EreaderSpacing.XS, top = EreaderSpacing.XS, bottom = EreaderSpacing.XS)
+                                ) {
+                                    Text(
+                                        text = displayName,
+                                        style = EreaderFontSize.S,
+                                        color = EreaderColors.Black,
+                                        modifier = Modifier.weight(1f),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    IconButton(
+                                        onClick = {
+                                            onRemoveFolder(uri)
+                                        },
+                                        modifier = Modifier.size(32.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Close,
+                                            contentDescription = stringResource(R.string.delete),
+                                            tint = EreaderColors.DarkGray,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+                                }
+                                HorizontalDivider(color = EreaderColors.Gray)
+                            }
+                        }
+
+                        // 폴더 추가 버튼
+                        KebabMenuItem(
+                            text = "+ ${stringResource(R.string.add_folder)}",
+                            onClick = {
+                                onAddFolder()
+                                expanded = false
+                                showFolders = false
+                            }
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun KebabMenuItem(text: String, onClick: () -> Unit) {
+    Text(
+        text = text,
+        style = EreaderFontSize.M,
+        color = EreaderColors.Black,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() }
+            .padding(horizontal = EreaderSpacing.L, vertical = EreaderSpacing.M)
+    )
 }
 
 @Composable

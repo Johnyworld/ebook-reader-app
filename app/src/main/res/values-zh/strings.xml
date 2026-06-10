@@ -3,6 +3,9 @@
     <!-- AllBooksScreen -->
     <string name="folder_select_description">请选择包含电子书的文件夹。</string>
     <string name="select_folder">选择文件夹</string>
+    <string name="manage_folders">管理文件夹</string>
+    <string name="add_folder">添加文件夹</string>
+    <string name="no_folders">未选择文件夹。</string>
     <string name="loading_files">正在搜索文件…</string>
     <string name="empty">无内容</string>
     <string name="search">搜索</string>

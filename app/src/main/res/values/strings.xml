@@ -5,6 +5,9 @@
     <!-- AllBooksScreen -->
     <string name="folder_select_description">Select a folder containing your e-books.</string>
     <string name="select_folder">Select Folder</string>
+    <string name="manage_folders">Manage Folders</string>
+    <string name="add_folder">Add Folder</string>
+    <string name="no_folders">No folders selected.</string>
     <string name="loading_files">Searching files…</string>
     <string name="empty">Empty</string>
     <string name="search">Search</string>
