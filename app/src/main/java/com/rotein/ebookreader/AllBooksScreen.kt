@@ -197,6 +197,8 @@ fun AllBooksScreen(
             if (isFirstResume) { isFirstResume = false; return@repeatOnLifecycle }
             val cached = BookCache.books ?: return@repeatOnLifecycle
             val refreshed = withContext(Dispatchers.IO) { FileScanner.refreshBooks(context, cached) }
+            // 미마이그레이션 레코드가 남아있으면 재시도
+            withContext(Dispatchers.IO) { migrateBookPathsToUri(context, refreshed) }
             BookCache.books = refreshed
             books = refreshed
             val booksNeedingCovers = refreshed.filter { it.bookKey() !in covers }
@@ -220,6 +222,7 @@ fun AllBooksScreen(
         prevRefreshKey = refreshKey
         val cached = BookCache.books ?: return@LaunchedEffect
         val refreshed = withContext(Dispatchers.IO) { FileScanner.refreshBooks(context, cached) }
+        withContext(Dispatchers.IO) { migrateBookPathsToUri(context, refreshed) }
         BookCache.books = refreshed
         books = refreshed
         val booksNeedingCovers = refreshed.filter { it.bookKey() !in covers }
