@@ -172,17 +172,7 @@ fun AllBooksScreen(
                 val newCovers = withContext(Dispatchers.IO) {
                     val result = mutableMapOf<String, Bitmap?>()
                     booksNeedingCovers.forEach { book ->
-                        val loadPath = if (book.contentUri.isNotEmpty()) {
-                            try {
-                                BookFileCache.ensureCached(context, Uri.parse(book.contentUri), book.name, book.size)
-                            } catch (_: Exception) { null }
-                        } else {
-                            book.path
-                        }
-                        val bitmap = if (loadPath != null) {
-                            BookCoverLoader.getCached(loadPath) ?: BookCoverLoader.load(loadPath, book.extension)
-                        } else null
-                        result[book.bookKey()] = bitmap
+                        result[book.bookKey()] = BookCoverLoader.loadFromBook(context, book)
                     }
                     result
                 }
@@ -208,17 +198,7 @@ fun AllBooksScreen(
                 val newCovers = withContext(Dispatchers.IO) {
                     val result = mutableMapOf<String, Bitmap?>()
                     booksNeedingCovers.forEach { book ->
-                        val loadPath = if (book.contentUri.isNotEmpty()) {
-                            try {
-                                BookFileCache.ensureCached(context, Uri.parse(book.contentUri), book.name, book.size)
-                            } catch (_: Exception) { null }
-                        } else {
-                            book.path
-                        }
-                        val bitmap = if (loadPath != null) {
-                            BookCoverLoader.getCached(loadPath) ?: BookCoverLoader.load(loadPath, book.extension)
-                        } else null
-                        result[book.bookKey()] = bitmap
+                        result[book.bookKey()] = BookCoverLoader.loadFromBook(context, book)
                     }
                     result
                 }
@@ -241,17 +221,7 @@ fun AllBooksScreen(
             val newCovers = withContext(Dispatchers.IO) {
                 val result = mutableMapOf<String, Bitmap?>()
                 booksNeedingCovers.forEach { book ->
-                    val loadPath = if (book.contentUri.isNotEmpty()) {
-                        try {
-                            BookFileCache.ensureCached(context, Uri.parse(book.contentUri), book.name, book.size)
-                        } catch (_: Exception) { null }
-                    } else {
-                        book.path
-                    }
-                    val bitmap = if (loadPath != null) {
-                        BookCoverLoader.getCached(loadPath) ?: BookCoverLoader.load(loadPath, book.extension)
-                    } else null
-                    result[book.bookKey()] = bitmap
+                    result[book.bookKey()] = BookCoverLoader.loadFromBook(context, book)
                 }
                 result
             }
@@ -333,17 +303,7 @@ fun AllBooksScreen(
                         for (i in tStart until tEnd) {
                             val book = processedBooks[i]
                             if (book.bookKey() !in covers) {
-                                val loadPath = if (book.contentUri.isNotEmpty()) {
-                                    try {
-                                        BookFileCache.ensureCached(context, Uri.parse(book.contentUri), book.name, book.size)
-                                    } catch (_: Exception) { null }
-                                } else {
-                                    book.path
-                                }
-                                val bitmap = if (loadPath != null) {
-                                    BookCoverLoader.getCached(loadPath) ?: BookCoverLoader.load(loadPath, book.extension)
-                                } else null
-                                newCovers[book.bookKey()] = bitmap
+                                newCovers[book.bookKey()] = BookCoverLoader.loadFromBook(context, book)
                             }
                         }
                         if (newCovers.isNotEmpty()) {
