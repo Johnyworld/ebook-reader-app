@@ -1,16 +1,13 @@
 package com.rotein.ebookreader
 
-import android.Manifest
-import android.content.Intent
 import android.graphics.Bitmap
-import androidx.core.net.toUri
-import android.os.Build
-import android.os.Environment
-import android.provider.Settings
+import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.result.contract.ActivityResultContracts.OpenDocumentTree
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -27,6 +24,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
@@ -64,6 +62,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupProperties
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.os.LocaleListCompat
 import com.rotein.ebookreader.ui.components.EreaderDropdownMenu
@@ -74,6 +74,8 @@ import androidx.lifecycle.repeatOnLifecycle
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+
+// bookKey()는 BookFile.kt에 정의된 확장 함수를 사용
 
 @Composable
 fun AllBooksScreen(
@@ -86,16 +88,8 @@ fun AllBooksScreen(
     val scope = rememberCoroutineScope()
     val dao = remember { BookDatabase.getInstance(context).bookReadRecordDao() }
 
-    var hasPermission by remember {
-        mutableStateOf(
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                Environment.isExternalStorageManager()
-            } else {
-                context.checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) ==
-                        android.content.pm.PackageManager.PERMISSION_GRANTED
-            }
-        )
-    }
+    var hasFolders by remember { mutableStateOf(FolderUriStore.hasAny(context)) }
+    var folders by remember { mutableStateOf(FolderUriStore.load(context)) }
     val lifecycleOwner = LocalLifecycleOwner.current
     var books by remember { mutableStateOf(BookCache.books ?: emptyList()) }
     var isLoading by remember { mutableStateOf(false) }
@@ -129,9 +123,9 @@ fun AllBooksScreen(
     val processedBooks = remember(books, searchQuery, sortPref, lastReadTimes, hiddenBooks, favorites, filterMode) {
         // 0) 필터 모드 적용
         val visible = when (filterMode) {
-            FilterMode.ALL -> books.filter { it.path !in hiddenBooks }
-            FilterMode.FAVORITE -> books.filter { it.path in favorites && it.path !in hiddenBooks }
-            FilterMode.HIDDEN -> books.filter { it.path in hiddenBooks }
+            FilterMode.ALL -> books.filter { it.bookKey() !in hiddenBooks }
+            FilterMode.FAVORITE -> books.filter { it.bookKey() in favorites && it.bookKey() !in hiddenBooks }
+            FilterMode.HIDDEN -> books.filter { it.bookKey() in hiddenBooks }
         }
         // 1) 검색 필터
         val filtered = if (searchQuery.isBlank()) visible
@@ -148,46 +142,43 @@ fun AllBooksScreen(
             SortField.TITLE -> compareBy { (it.metadata?.title ?: it.name).lowercase() }
             SortField.AUTHOR -> compareBy { it.metadata?.author?.lowercase() ?: "\uFFFF" }
             SortField.DATE_ADDED -> compareBy { it.dateAdded }
-            SortField.LAST_READ -> compareBy { lastReadTimes[it.path] ?: 0L }
+            SortField.LAST_READ -> compareBy { lastReadTimes[it.bookKey()] ?: 0L }
         }
         val sorted = filtered.sortedWith(comparator)
         if (sortPref.field.defaultDescending) sorted.reversed() else sorted
     }
 
-    val permissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { granted -> hasPermission = granted }
-
-    val manageStorageLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.StartActivityForResult()
-    ) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            hasPermission = Environment.isExternalStorageManager()
+    // SAF 폴더 선택 런처
+    val folderPickerLauncher = rememberLauncherForActivityResult(OpenDocumentTree()) { uri: Uri? ->
+        if (uri != null) {
+            FolderUriStore.add(context, uri)
+            hasFolders = true
+            folders = FolderUriStore.load(context)
         }
     }
 
     // 최초 로드: 캐시가 있으면 그대로 사용, 없으면 전체 스캔
-    LaunchedEffect(hasPermission) {
-        if (hasPermission) {
+    LaunchedEffect(hasFolders) {
+        if (hasFolders) {
             val cached = BookCache.books
             val bookList = if (cached != null) {
                 cached
             } else {
                 isLoading = true
                 val scanned = withContext(Dispatchers.IO) { FileScanner.scanBooks(context) }
+                // 기존 절대 경로 레코드를 SAF URI로 마이그레이션
+                withContext(Dispatchers.IO) { migrateBookPathsToUri(context, scanned) }
                 BookCache.books = scanned
                 isLoading = false
                 scanned
             }
             books = bookList
-            val booksNeedingCovers = bookList.filter { it.path !in covers }
+            val booksNeedingCovers = bookList.filter { it.bookKey() !in covers }
             if (booksNeedingCovers.isNotEmpty()) {
                 val newCovers = withContext(Dispatchers.IO) {
                     val result = mutableMapOf<String, Bitmap?>()
                     booksNeedingCovers.forEach { book ->
-                        val bitmap = BookCoverLoader.getCached(book.path)
-                            ?: BookCoverLoader.load(book.path, book.extension)
-                        result[book.path] = bitmap
+                        result[book.bookKey()] = BookCoverLoader.loadFromBook(context, book)
                     }
                     result
                 }
@@ -205,17 +196,17 @@ fun AllBooksScreen(
         lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
             if (isFirstResume) { isFirstResume = false; return@repeatOnLifecycle }
             val cached = BookCache.books ?: return@repeatOnLifecycle
-            val refreshed = withContext(Dispatchers.IO) { FileScanner.refreshBooks(cached) }
+            val refreshed = withContext(Dispatchers.IO) { FileScanner.refreshBooks(context, cached) }
+            // 미마이그레이션 레코드가 남아있으면 재시도
+            withContext(Dispatchers.IO) { migrateBookPathsToUri(context, refreshed) }
             BookCache.books = refreshed
             books = refreshed
-            val booksNeedingCovers = refreshed.filter { it.path !in covers }
+            val booksNeedingCovers = refreshed.filter { it.bookKey() !in covers }
             if (booksNeedingCovers.isNotEmpty()) {
                 val newCovers = withContext(Dispatchers.IO) {
                     val result = mutableMapOf<String, Bitmap?>()
                     booksNeedingCovers.forEach { book ->
-                        val bitmap = BookCoverLoader.getCached(book.path)
-                            ?: BookCoverLoader.load(book.path, book.extension)
-                        result[book.path] = bitmap
+                        result[book.bookKey()] = BookCoverLoader.loadFromBook(context, book)
                     }
                     result
                 }
@@ -230,17 +221,16 @@ fun AllBooksScreen(
         if (prevRefreshKey == refreshKey) return@LaunchedEffect
         prevRefreshKey = refreshKey
         val cached = BookCache.books ?: return@LaunchedEffect
-        val refreshed = withContext(Dispatchers.IO) { FileScanner.refreshBooks(cached) }
+        val refreshed = withContext(Dispatchers.IO) { FileScanner.refreshBooks(context, cached) }
+        withContext(Dispatchers.IO) { migrateBookPathsToUri(context, refreshed) }
         BookCache.books = refreshed
         books = refreshed
-        val booksNeedingCovers = refreshed.filter { it.path !in covers }
+        val booksNeedingCovers = refreshed.filter { it.bookKey() !in covers }
         if (booksNeedingCovers.isNotEmpty()) {
             val newCovers = withContext(Dispatchers.IO) {
                 val result = mutableMapOf<String, Bitmap?>()
                 booksNeedingCovers.forEach { book ->
-                    val bitmap = BookCoverLoader.getCached(book.path)
-                        ?: BookCoverLoader.load(book.path, book.extension)
-                    result[book.path] = bitmap
+                    result[book.bookKey()] = BookCoverLoader.loadFromBook(context, book)
                 }
                 result
             }
@@ -254,6 +244,7 @@ fun AllBooksScreen(
             searchQuery = searchQuery,
             sortPref = sortPref,
             filterMode = filterMode,
+            folders = folders,
             onSearchClick = { isSearchActive = true },
             onQueryChange = { searchQuery = it },
             onSearchClear = {
@@ -261,7 +252,15 @@ fun AllBooksScreen(
                 isSearchActive = false
             },
             onSortChange = { sortPref = it },
-            onFilterChange = { filterMode = it }
+            onFilterChange = { filterMode = it },
+            onAddFolder = { folderPickerLauncher.launch(null) },
+            onRemoveFolder = { uri ->
+                FolderUriStore.remove(context, uri)
+                folders = FolderUriStore.load(context)
+                hasFolders = FolderUriStore.hasAny(context)
+                // 폴더 제거 후 도서 목록 다시 스캔
+                BookCache.books = null
+            }
         )
 
         var currentPage by remember { mutableIntStateOf(0) }
@@ -275,25 +274,15 @@ fun AllBooksScreen(
 
         Box(modifier = Modifier.weight(1f).fillMaxSize()) {
             when {
-                !hasPermission -> {
+                !hasFolders -> {
                     Column(
                         modifier = Modifier.align(Alignment.Center).padding(EreaderSpacing.XL),
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(EreaderSpacing.M)
                     ) {
-                        Text(stringResource(R.string.permission_description))
-                        Button(onClick = {
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                                val intent = Intent(
-                                    Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
-                                    "package:${context.packageName}".toUri()
-                                )
-                                manageStorageLauncher.launch(intent)
-                            } else {
-                                permissionLauncher.launch(Manifest.permission.READ_EXTERNAL_STORAGE)
-                            }
-                        }) {
-                            Text(stringResource(R.string.grant_permission))
+                        Text(stringResource(R.string.folder_select_description))
+                        Button(onClick = { folderPickerLauncher.launch(null) }) {
+                            Text(stringResource(R.string.select_folder))
                         }
                     }
                 }
@@ -331,10 +320,8 @@ fun AllBooksScreen(
                         val newCovers = mutableMapOf<String, Bitmap?>()
                         for (i in tStart until tEnd) {
                             val book = processedBooks[i]
-                            if (book.path !in covers) {
-                                val bitmap = BookCoverLoader.getCached(book.path)
-                                    ?: BookCoverLoader.load(book.path, book.extension)
-                                newCovers[book.path] = bitmap
+                            if (book.bookKey() !in covers) {
+                                newCovers[book.bookKey()] = BookCoverLoader.loadFromBook(context, book)
                             }
                         }
                         if (newCovers.isNotEmpty()) {
@@ -346,33 +333,33 @@ fun AllBooksScreen(
                     Column(modifier = Modifier.fillMaxSize()) {
                         Column(modifier = Modifier.weight(1f)) {
                             pageItems.forEach { book ->
-                                val isHidden = book.path in hiddenBooks
-                                val isFavorite = book.path in favorites
+                                val isHidden = book.bookKey() in hiddenBooks
+                                val isFavorite = book.bookKey() in favorites
                                 BookItem(
                                     book = book,
-                                    cover = covers[book.path],
+                                    cover = covers[book.bookKey()],
                                     isFavorite = isFavorite,
                                     isHidden = isHidden,
-                                    readingProgress = readingProgressMap[book.path] ?: 0f,
+                                    readingProgress = readingProgressMap[book.bookKey()] ?: 0f,
                                     onClick = {
                                         val now = System.currentTimeMillis()
                                         scope.launch(Dispatchers.IO) {
-                                            dao.upsertLastReadAt(book.path, now)
+                                            dao.upsertLastReadAt(book.bookKey(), now)
                                         }
                                         onBookClick(book)
                                     },
                                     onToggleFavorite = if (isHidden && !isFavorite) null else {{
                                         val newValue = !isFavorite
-                                        favorites = if (newValue) favorites + book.path else favorites - book.path
+                                        favorites = if (newValue) favorites + book.bookKey() else favorites - book.bookKey()
                                         scope.launch(Dispatchers.IO) {
-                                            dao.upsertFavorite(book.path, newValue)
+                                            dao.upsertFavorite(book.bookKey(), newValue)
                                         }
                                     }},
                                     onToggleHidden = {
                                         val newValue = !isHidden
-                                        hiddenBooks = if (newValue) hiddenBooks + book.path else hiddenBooks - book.path
+                                        hiddenBooks = if (newValue) hiddenBooks + book.bookKey() else hiddenBooks - book.bookKey()
                                         scope.launch(Dispatchers.IO) {
-                                            dao.upsertHidden(book.path, newValue)
+                                            dao.upsertHidden(book.bookKey(), newValue)
                                         }
                                     }
                                 )
@@ -401,11 +388,14 @@ private fun TopBar(
     searchQuery: String,
     sortPref: SortPreference,
     filterMode: FilterMode,
+    folders: List<Uri>,
     onSearchClick: () -> Unit,
     onQueryChange: (String) -> Unit,
     onSearchClear: () -> Unit,
     onSortChange: (SortPreference) -> Unit,
-    onFilterChange: (FilterMode) -> Unit
+    onFilterChange: (FilterMode) -> Unit,
+    onAddFolder: () -> Unit,
+    onRemoveFolder: (Uri) -> Unit
 ) {
     val focusRequester = remember { FocusRequester() }
     LaunchedEffect(isSearchActive) {
@@ -418,7 +408,7 @@ private fun TopBar(
             .padding(top = 4.dp)
             .height(56.dp)
     ) {
-        // 베이스 레이어: 돋보기 아이콘 + 정렬 컨트롤
+        // 베이스 레이어: 돋보기 아이콘 + 정렬 컨트롤 + 케밥 메뉴
         Row(
             modifier = Modifier
                 .fillMaxSize()
@@ -451,37 +441,12 @@ private fun TopBar(
                 label = { stringResource(it.labelRes) },
             )
 
-            // 언어 선택 드롭다운
-            val appLocale = AppCompatDelegate.getApplicationLocales().get(0)?.language
-            val currentLocale = appLocale ?: java.util.Locale.getDefault().language
-            val languageOptions = listOf(
-                "en" to "English",
-                "ko" to "한국어",
-                "ja" to "日本語",
-                "zh" to "中文",
-                "es" to "Español",
+            // 케밥 메뉴 (설정)
+            KebabMenu(
+                folders = folders,
+                onAddFolder = onAddFolder,
+                onRemoveFolder = onRemoveFolder
             )
-            val currentLanguageCode = languageOptions.firstOrNull { it.first == currentLocale }?.first ?: languageOptions.first().first
-
-            EreaderDropdownMenu(
-                items = languageOptions,
-                selectedItem = languageOptions.first { it.first == currentLanguageCode },
-                onSelect = { (code, _) ->
-                    val localeList = LocaleListCompat.forLanguageTags(code)
-                    AppCompatDelegate.setApplicationLocales(localeList)
-                },
-                label = { it.second },
-                trigger = { onClick ->
-                    Text(
-                        text = stringResource(R.string.language),
-                        style = EreaderFontSize.M,
-                        modifier = Modifier
-                            .clickable { onClick() }
-                            .padding(horizontal = EreaderSpacing.M, vertical = EreaderSpacing.S)
-                    )
-                }
-            )
-
         }
 
         // 오버레이 레이어: 검색 활성 시 전체 행을 덮음
@@ -539,6 +504,186 @@ private fun TopBar(
     }
 
     HorizontalDivider(color = EreaderColors.Black)
+}
+
+/** 케밥 메뉴: 언어 설정 + 폴더 관리 */
+@Composable
+private fun KebabMenu(
+    folders: List<Uri>,
+    onAddFolder: () -> Unit,
+    onRemoveFolder: (Uri) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    var showLanguage by remember { mutableStateOf(false) }
+    var showFolders by remember { mutableStateOf(false) }
+
+    Box {
+        IconButton(onClick = { expanded = true }) {
+            Icon(
+                imageVector = Icons.Default.MoreVert,
+                contentDescription = stringResource(R.string.settings),
+                tint = EreaderColors.DarkGray
+            )
+        }
+
+        if (expanded) {
+            Popup(
+                alignment = Alignment.TopEnd,
+                onDismissRequest = {
+                    expanded = false
+                    showLanguage = false
+                    showFolders = false
+                },
+                properties = PopupProperties(focusable = true)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .width(220.dp)
+                        .background(EreaderColors.White)
+                        .border(1.dp, EreaderColors.Black)
+                ) {
+                    if (!showLanguage && !showFolders) {
+                        // 메인 메뉴
+                        KebabMenuItem(
+                            text = stringResource(R.string.language),
+                            onClick = { showLanguage = true }
+                        )
+                        HorizontalDivider(color = EreaderColors.Gray)
+                        KebabMenuItem(
+                            text = stringResource(R.string.manage_folders),
+                            onClick = { showFolders = true }
+                        )
+                    } else if (showLanguage) {
+                        // 언어 선택 서브메뉴
+                        KebabMenuItem(
+                            text = "← ${stringResource(R.string.language)}",
+                            onClick = { showLanguage = false }
+                        )
+                        HorizontalDivider(color = EreaderColors.Black)
+
+                        val appLocale = AppCompatDelegate.getApplicationLocales().get(0)?.language
+                        val currentLocale = appLocale ?: java.util.Locale.getDefault().language
+                        val languages = listOf(
+                            "en" to "English",
+                            "ko" to "한국어",
+                            "ja" to "日本語",
+                            "zh" to "中文",
+                            "es" to "Español",
+                        )
+                        languages.forEachIndexed { index, (code, name) ->
+                            val isSelected = code == currentLocale
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        val localeList = LocaleListCompat.forLanguageTags(code)
+                                        AppCompatDelegate.setApplicationLocales(localeList)
+                                        expanded = false
+                                        showLanguage = false
+                                    }
+                                    .padding(horizontal = EreaderSpacing.L, vertical = EreaderSpacing.M)
+                            ) {
+                                Text(
+                                    text = name,
+                                    style = EreaderFontSize.M,
+                                    color = EreaderColors.Black,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                if (isSelected) {
+                                    Icon(
+                                        imageVector = Icons.Default.Check,
+                                        contentDescription = null,
+                                        tint = EreaderColors.Black,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                            }
+                            if (index < languages.lastIndex) {
+                                HorizontalDivider(color = EreaderColors.Gray)
+                            }
+                        }
+                    } else if (showFolders) {
+                        // 폴더 관리 서브메뉴
+                        KebabMenuItem(
+                            text = "← ${stringResource(R.string.manage_folders)}",
+                            onClick = { showFolders = false }
+                        )
+                        HorizontalDivider(color = EreaderColors.Black)
+
+                        if (folders.isEmpty()) {
+                            Text(
+                                text = stringResource(R.string.no_folders),
+                                style = EreaderFontSize.S,
+                                color = EreaderColors.DarkGray,
+                                modifier = Modifier.padding(EreaderSpacing.L)
+                            )
+                        } else {
+                            folders.forEach { uri ->
+                                // URI에서 마지막 경로 세그먼트를 표시명으로 사용
+                                val displayName = uri.lastPathSegment
+                                    ?.substringAfterLast(':')
+                                    ?.substringAfterLast('/')
+                                    ?: uri.toString()
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(start = EreaderSpacing.L, end = EreaderSpacing.XS, top = EreaderSpacing.XS, bottom = EreaderSpacing.XS)
+                                ) {
+                                    Text(
+                                        text = displayName,
+                                        style = EreaderFontSize.S,
+                                        color = EreaderColors.Black,
+                                        modifier = Modifier.weight(1f),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    IconButton(
+                                        onClick = {
+                                            onRemoveFolder(uri)
+                                        },
+                                        modifier = Modifier.size(32.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Close,
+                                            contentDescription = stringResource(R.string.delete),
+                                            tint = EreaderColors.DarkGray,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+                                }
+                                HorizontalDivider(color = EreaderColors.Gray)
+                            }
+                        }
+
+                        // 폴더 추가 버튼
+                        KebabMenuItem(
+                            text = "+ ${stringResource(R.string.add_folder)}",
+                            onClick = {
+                                onAddFolder()
+                                expanded = false
+                                showFolders = false
+                            }
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun KebabMenuItem(text: String, onClick: () -> Unit) {
+    Text(
+        text = text,
+        style = EreaderFontSize.M,
+        color = EreaderColors.Black,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() }
+            .padding(horizontal = EreaderSpacing.L, vertical = EreaderSpacing.M)
+    )
 }
 
 @Composable

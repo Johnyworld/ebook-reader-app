@@ -119,13 +119,6 @@ $paragraphs
     return outFile.absolutePath
 }
 
-private fun grantStoragePermission() {
-    val packageName = instrumentation.targetContext.packageName
-    instrumentation.uiAutomation
-        .executeShellCommand("appops set $packageName MANAGE_EXTERNAL_STORAGE allow")
-        .close()
-}
-
 private fun str(resId: Int): String =
     instrumentation.targetContext.getString(resId)
 
@@ -139,7 +132,6 @@ class PageJumpDialogOpenCloseTest {
     private val testFilePath: String
 
     init {
-        grantStoragePermission()
         testFilePath = createTestEpubForPageJump()
         BookCache.books = listOf(
             BookFile(
@@ -156,13 +148,23 @@ class PageJumpDialogOpenCloseTest {
                 )
             )
         )
+        // SAF 폴더 선택 상태 시뮬레이션
+        instrumentation.targetContext
+            .getSharedPreferences("folder_uris", android.content.Context.MODE_PRIVATE)
+            .edit().putStringSet("selected_uris", setOf("content://test")).apply()
     }
 
     @get:Rule
     val rule = createAndroidComposeRule<MainActivity>()
 
     @After
-    fun cleanup() { BookCache.books = null }
+    fun cleanup() {
+        BookCache.books = null
+        // 더미 폴더 URI 정리
+        instrumentation.targetContext
+            .getSharedPreferences("folder_uris", android.content.Context.MODE_PRIVATE)
+            .edit().clear().apply()
+    }
 
     private fun enterReader() {
         rule.waitUntil(10000) {
@@ -247,7 +249,6 @@ class PageJumpStepButtonTest {
     private val testFilePath: String
 
     init {
-        grantStoragePermission()
         testFilePath = createTestEpubForPageJump()
         BookCache.books = listOf(
             BookFile(
@@ -264,13 +265,23 @@ class PageJumpStepButtonTest {
                 )
             )
         )
+        // SAF 폴더 선택 상태 시뮬레이션
+        instrumentation.targetContext
+            .getSharedPreferences("folder_uris", android.content.Context.MODE_PRIVATE)
+            .edit().putStringSet("selected_uris", setOf("content://test")).apply()
     }
 
     @get:Rule
     val rule = createAndroidComposeRule<MainActivity>()
 
     @After
-    fun cleanup() { BookCache.books = null }
+    fun cleanup() {
+        BookCache.books = null
+        // 더미 폴더 URI 정리
+        instrumentation.targetContext
+            .getSharedPreferences("folder_uris", android.content.Context.MODE_PRIVATE)
+            .edit().clear().apply()
+    }
 
     private fun enterReader() {
         rule.waitUntil(10000) {
@@ -368,7 +379,6 @@ class PageJumpNavigationTest {
     private val testFilePath: String
 
     init {
-        grantStoragePermission()
         testFilePath = createTestEpubForPageJump()
         BookCache.books = listOf(
             BookFile(
@@ -385,13 +395,23 @@ class PageJumpNavigationTest {
                 )
             )
         )
+        // SAF 폴더 선택 상태 시뮬레이션
+        instrumentation.targetContext
+            .getSharedPreferences("folder_uris", android.content.Context.MODE_PRIVATE)
+            .edit().putStringSet("selected_uris", setOf("content://test")).apply()
     }
 
     @get:Rule
     val rule = createAndroidComposeRule<MainActivity>()
 
     @After
-    fun cleanup() { BookCache.books = null }
+    fun cleanup() {
+        BookCache.books = null
+        // 더미 폴더 URI 정리
+        instrumentation.targetContext
+            .getSharedPreferences("folder_uris", android.content.Context.MODE_PRIVATE)
+            .edit().clear().apply()
+    }
 
     private fun enterReader() {
         rule.waitUntil(10000) {

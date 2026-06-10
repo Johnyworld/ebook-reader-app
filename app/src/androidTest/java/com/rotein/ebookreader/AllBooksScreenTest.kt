@@ -59,12 +59,11 @@ class AllBooksScreenTest {
     )
 
     init {
-        val instrumentation = InstrumentationRegistry.getInstrumentation()
-        val packageName = instrumentation.targetContext.packageName
-        instrumentation.uiAutomation
-            .executeShellCommand("appops set $packageName MANAGE_EXTERNAL_STORAGE allow")
-            .close()
         BookCache.books = dummyBooks
+        // SAF 폴더 선택 상태 시뮬레이션
+        InstrumentationRegistry.getInstrumentation().targetContext
+            .getSharedPreferences("folder_uris", android.content.Context.MODE_PRIVATE)
+            .edit().putStringSet("selected_uris", setOf("content://test")).apply()
     }
 
     @get:Rule
@@ -73,6 +72,10 @@ class AllBooksScreenTest {
     @After
     fun cleanup() {
         BookCache.books = null
+        // 더미 폴더 URI 정리
+        InstrumentationRegistry.getInstrumentation().targetContext
+            .getSharedPreferences("folder_uris", android.content.Context.MODE_PRIVATE)
+            .edit().clear().apply()
     }
 
     private fun waitForText(text: String, timeoutMillis: Long = 5000) {
@@ -163,12 +166,11 @@ class AllBooksScreenTest {
 class AllBooksScreenEmptyTest {
 
     init {
-        val instrumentation = InstrumentationRegistry.getInstrumentation()
-        val packageName = instrumentation.targetContext.packageName
-        instrumentation.uiAutomation
-            .executeShellCommand("appops set $packageName MANAGE_EXTERNAL_STORAGE allow")
-            .close()
         BookCache.books = emptyList()
+        // SAF 폴더 선택 상태 시뮬레이션
+        InstrumentationRegistry.getInstrumentation().targetContext
+            .getSharedPreferences("folder_uris", android.content.Context.MODE_PRIVATE)
+            .edit().putStringSet("selected_uris", setOf("content://test")).apply()
     }
 
     @get:Rule
@@ -177,6 +179,10 @@ class AllBooksScreenEmptyTest {
     @After
     fun cleanup() {
         BookCache.books = null
+        // 더미 폴더 URI 정리
+        InstrumentationRegistry.getInstrumentation().targetContext
+            .getSharedPreferences("folder_uris", android.content.Context.MODE_PRIVATE)
+            .edit().clear().apply()
     }
 
     @Test

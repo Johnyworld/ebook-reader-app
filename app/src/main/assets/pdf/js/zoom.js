@@ -6,13 +6,14 @@ _pdf.zoomOffsetY = 0;
 
 function _clampZoom() {
     var container = document.getElementById('pdf-container');
-    var canvas = document.getElementById('pdf-canvas');
-    if (!container || !canvas) return;
+    var wrapper = document.getElementById('pdf-wrapper');
+    if (!container || !wrapper) return;
 
     var cw = container.clientWidth;
     var ch = container.clientHeight;
-    var sw = canvas.offsetWidth * _pdf.zoomScale;
-    var sh = canvas.offsetHeight * _pdf.zoomScale;
+    // wrapper 전체 크기 기준 (두 쪽 보기 시 캔버스 2개 포함)
+    var sw = wrapper.offsetWidth * _pdf.zoomScale;
+    var sh = wrapper.offsetHeight * _pdf.zoomScale;
 
     if (sw <= cw) {
         _pdf.zoomOffsetX = (cw - sw) / 2;
@@ -36,10 +37,10 @@ function _applyZoom() {
 window._resetZoom = function() {
     _pdf.zoomScale = 1;
     var container = document.getElementById('pdf-container');
-    var canvas = document.getElementById('pdf-canvas');
-    if (container && canvas && canvas.offsetWidth > 0) {
-        _pdf.zoomOffsetX = (container.clientWidth - canvas.offsetWidth) / 2;
-        _pdf.zoomOffsetY = (container.clientHeight - canvas.offsetHeight) / 2;
+    var wrapper = document.getElementById('pdf-wrapper');
+    if (container && wrapper && wrapper.offsetWidth > 0) {
+        _pdf.zoomOffsetX = (container.clientWidth - wrapper.offsetWidth) / 2;
+        _pdf.zoomOffsetY = (container.clientHeight - wrapper.offsetHeight) / 2;
     } else {
         _pdf.zoomOffsetX = 0;
         _pdf.zoomOffsetY = 0;

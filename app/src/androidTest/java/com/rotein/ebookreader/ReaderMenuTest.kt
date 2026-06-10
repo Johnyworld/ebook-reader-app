@@ -108,13 +108,6 @@ $paragraphs
     return outFile.absolutePath
 }
 
-private fun grantStoragePermissionForMenu() {
-    val packageName = instrumentation.targetContext.packageName
-    instrumentation.uiAutomation
-        .executeShellCommand("appops set $packageName MANAGE_EXTERNAL_STORAGE allow")
-        .close()
-}
-
 private fun str(resId: Int): String =
     instrumentation.targetContext.getString(resId)
 
@@ -124,7 +117,6 @@ class ReaderMenuOpenCloseTest {
     private val testFilePath: String
 
     init {
-        grantStoragePermissionForMenu()
         testFilePath = createTestEpubForMenu()
         BookCache.books = listOf(
             BookFile(
@@ -141,15 +133,30 @@ class ReaderMenuOpenCloseTest {
                 )
             )
         )
+        // SAF 폴더 선택 상태 시뮬레이션
+        instrumentation.targetContext
+            .getSharedPreferences("folder_uris", android.content.Context.MODE_PRIVATE)
+            .edit().putStringSet("selected_uris", setOf("content://test")).apply()
     }
 
     @get:Rule
     val rule = createAndroidComposeRule<MainActivity>()
 
     @After
-    fun cleanup() { BookCache.books = null }
+    fun cleanup() {
+        BookCache.books = null
+        // 더미 폴더 URI 정리
+        instrumentation.targetContext
+            .getSharedPreferences("folder_uris", android.content.Context.MODE_PRIVATE)
+            .edit().clear().apply()
+    }
 
     private fun enterReader() {
+        // 가로모드에서 탭 좌표/페이지네이션 문제 방지
+        (rule.activity as? android.app.Activity)?.requestedOrientation =
+            android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        rule.waitForIdle()
+
         rule.waitUntil(10000) {
             rule.onAllNodesWithText("메뉴 테스트 도서").fetchSemanticsNodes().isNotEmpty()
         }
@@ -215,7 +222,6 @@ class ReaderProgressDisplayTest {
     private val testFilePath: String
 
     init {
-        grantStoragePermissionForMenu()
         testFilePath = createTestEpubForMenu()
         BookCache.books = listOf(
             BookFile(
@@ -232,15 +238,30 @@ class ReaderProgressDisplayTest {
                 )
             )
         )
+        // SAF 폴더 선택 상태 시뮬레이션
+        instrumentation.targetContext
+            .getSharedPreferences("folder_uris", android.content.Context.MODE_PRIVATE)
+            .edit().putStringSet("selected_uris", setOf("content://test")).apply()
     }
 
     @get:Rule
     val rule = createAndroidComposeRule<MainActivity>()
 
     @After
-    fun cleanup() { BookCache.books = null }
+    fun cleanup() {
+        BookCache.books = null
+        // 더미 폴더 URI 정리
+        instrumentation.targetContext
+            .getSharedPreferences("folder_uris", android.content.Context.MODE_PRIVATE)
+            .edit().clear().apply()
+    }
 
     private fun enterReader() {
+        // 가로모드에서 탭 좌표/페이지네이션 문제 방지
+        (rule.activity as? android.app.Activity)?.requestedOrientation =
+            android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        rule.waitForIdle()
+
         rule.waitUntil(10000) {
             rule.onAllNodesWithText("메뉴 테스트 도서").fetchSemanticsNodes().isNotEmpty()
         }
@@ -299,7 +320,6 @@ class ReaderNextPageTest {
     private val testFilePath: String
 
     init {
-        grantStoragePermissionForMenu()
         testFilePath = createTestEpubForMenu()
         BookCache.books = listOf(
             BookFile(
@@ -316,15 +336,30 @@ class ReaderNextPageTest {
                 )
             )
         )
+        // SAF 폴더 선택 상태 시뮬레이션
+        instrumentation.targetContext
+            .getSharedPreferences("folder_uris", android.content.Context.MODE_PRIVATE)
+            .edit().putStringSet("selected_uris", setOf("content://test")).apply()
     }
 
     @get:Rule
     val rule = createAndroidComposeRule<MainActivity>()
 
     @After
-    fun cleanup() { BookCache.books = null }
+    fun cleanup() {
+        BookCache.books = null
+        // 더미 폴더 URI 정리
+        instrumentation.targetContext
+            .getSharedPreferences("folder_uris", android.content.Context.MODE_PRIVATE)
+            .edit().clear().apply()
+    }
 
     private fun enterReader() {
+        // 가로모드에서 탭 좌표/페이지네이션 문제 방지
+        (rule.activity as? android.app.Activity)?.requestedOrientation =
+            android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        rule.waitForIdle()
+
         rule.waitUntil(10000) {
             rule.onAllNodesWithText("메뉴 테스트 도서").fetchSemanticsNodes().isNotEmpty()
         }

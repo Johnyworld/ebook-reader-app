@@ -1,8 +1,10 @@
 package com.rotein.ebookreader
 
+import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.pdf.PdfRenderer
+import android.net.Uri
 import android.os.ParcelFileDescriptor
 import android.util.LruCache
 import kotlinx.coroutines.Dispatchers
@@ -20,25 +22,45 @@ object BookCoverLoader {
         }
     }
 
-    fun getCached(path: String): Bitmap? = cache.get(path)
-
-    suspend fun load(path: String, extension: String): Bitmap? {
-        cache.get(path)?.let { return it }
+    /**
+     * content URI가 있는 BookFile의 커버를 로드한다.
+     * 임시 파일로 복사 → 커버 추출 → 즉시 삭제하여 디스크 사용을 최소화한다.
+     */
+    suspend fun loadFromBook(context: Context, book: BookFile): Bitmap? {
+        val key = book.bookKey()
+        cache.get(key)?.let { return it }
 
         return withContext(Dispatchers.IO) {
-            val bitmap = when (extension) {
-                "epub" -> EpubMetadataParser.extractCover(path)?.let {
-                    BitmapFactory.decodeByteArray(it, 0, it.size)
-                }
-                "mobi" -> MobiMetadataParser.extractCover(path)?.let {
-                    BitmapFactory.decodeByteArray(it, 0, it.size)
-                }
-                "pdf" -> renderPdfFirstPage(path)
-                else -> null
-            } ?: return@withContext null
+            val bitmap = if (book.contentUri.isNotEmpty()) {
+                // content URI: 임시 파일 복사 → 커버 추출 → 삭제
+                try {
+                    val temp = BookFileCache.copyToTemp(context, Uri.parse(book.contentUri), book.name)
+                    try {
+                        extractCoverFromPath(temp.absolutePath, book.extension)
+                    } finally {
+                        temp.delete()
+                    }
+                } catch (_: Exception) { null }
+            } else {
+                // 레거시 로컬 경로
+                try { extractCoverFromPath(book.path, book.extension) } catch (_: Exception) { null }
+            }
 
-            cache.put(path, bitmap)
-            bitmap
+            bitmap?.also { cache.put(key, it) }
+        }
+    }
+
+    /** 로컬 파일 경로에서 확장자에 맞는 커버를 추출한다 */
+    private fun extractCoverFromPath(path: String, extension: String): Bitmap? {
+        return when (extension) {
+            "epub" -> EpubMetadataParser.extractCover(path)?.let {
+                BitmapFactory.decodeByteArray(it, 0, it.size)
+            }
+            "mobi" -> MobiMetadataParser.extractCover(path)?.let {
+                BitmapFactory.decodeByteArray(it, 0, it.size)
+            }
+            "pdf" -> renderPdfFirstPage(path)
+            else -> null
         }
     }
 

@@ -11,6 +11,7 @@ import android.widget.FrameLayout
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.res.stringResource
 import com.rotein.ebookreader.R
 import androidx.compose.runtime.getValue
@@ -28,6 +29,7 @@ import java.io.File
 internal fun PdfViewer(
     path: String,
     savedPage: Int = 1,
+    dualPage: Boolean = false,
     pageFlip: ReaderPageFlip = ReaderPageFlip.LR_PREV_NEXT,
     onCenterTap: () -> Unit,
     onPageChanged: (currentPage: Int, totalPages: Int) -> Unit = { _, _ -> },
@@ -49,6 +51,11 @@ internal fun PdfViewer(
     val webViewRef = remember { java.util.concurrent.atomic.AtomicReference<WebView?>(null) }
     val pageFlipRef = remember { java.util.concurrent.atomic.AtomicReference(pageFlip) }
     pageFlipRef.set(pageFlip)
+
+    // 두 쪽 보기 설정 변경 시 JS에 반영
+    LaunchedEffect(dualPage) {
+        webViewRef.get()?.evaluateJavascript("window._setDualPage && window._setDualPage($dualPage)", null)
+    }
 
     Box(Modifier.fillMaxSize()) {
         AndroidView(
@@ -190,7 +197,7 @@ internal fun PdfViewer(
                     val webView = frameLayout.getChildAt(0) as WebView
                     webView.loadDataWithBaseURL(
                         "file:///android_asset/",
-                        buildPdfHtml(path, savedPage),
+                        buildPdfHtml(path, savedPage, dualPage),
                         "text/html",
                         "UTF-8",
                         null

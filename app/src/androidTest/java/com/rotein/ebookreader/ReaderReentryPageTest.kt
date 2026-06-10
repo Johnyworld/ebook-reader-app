@@ -37,7 +37,7 @@ class ReaderReentryPageTest {
 
     companion object {
         private const val TAG = "ReentryPageTest"
-        private const val EPUB_PATH = "/sdcard/Download/test_hailmary.epub"
+        private const val SOURCE_EPUB_PATH = "/sdcard/Download/test_hailmary.epub"
         private const val BOOK_TITLE = "프로젝트 헤일메리"
         private const val REPEAT_COUNT = 10
     }
@@ -45,23 +45,31 @@ class ReaderReentryPageTest {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
 
     init {
-        val packageName = instrumentation.targetContext.packageName
-        instrumentation.uiAutomation
-            .executeShellCommand("appops set $packageName MANAGE_EXTERNAL_STORAGE allow")
-            .close()
-
-        val file = File(EPUB_PATH)
-        require(file.exists()) {
-            "테스트용 EPUB 파일이 기기에 없습니다. 다음 명령어로 먼저 넣어주세요:\n" +
-            "adb push \"프로젝트 헤일메리 - 앤디 위어.epub\" $EPUB_PATH"
+        // 앱 내부 저장소에 캐시된 파일을 우선 사용 (저장소 권한 불필요)
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val internalFile = File(context.filesDir, "test_hailmary.epub")
+        if (!internalFile.exists()) {
+            // UiAutomation shell은 /sdcard/ 접근 가능 (앱 권한 무관)
+            val pfd = InstrumentationRegistry.getInstrumentation().uiAutomation
+                .executeShellCommand("cat $SOURCE_EPUB_PATH")
+            android.os.ParcelFileDescriptor.AutoCloseInputStream(pfd).use { input ->
+                internalFile.outputStream().use { output -> input.copyTo(output) }
+            }
+            // 빈/깨진 파일이 캐시로 남지 않도록 정리
+            if (internalFile.length() == 0L) internalFile.delete()
+            require(internalFile.exists() && internalFile.length() > 0) {
+                "테스트용 EPUB 파일이 기기에 없습니다. 다음 명령어로 먼저 넣어주세요:\n" +
+                "adb push \"프로젝트 헤일메리 - 앤디 위어.epub\" $SOURCE_EPUB_PATH"
+            }
         }
+        val epubPath = internalFile.absolutePath
 
         BookCache.books = listOf(
             BookFile(
                 name = "test_hailmary.epub",
-                path = EPUB_PATH,
+                path = epubPath,
                 extension = "epub",
-                size = file.length(),
+                size = internalFile.length(),
                 dateAdded = 1000L,
                 dateModified = 1000L,
                 metadata = BookMetadata(
@@ -71,13 +79,23 @@ class ReaderReentryPageTest {
                 )
             )
         )
+        // SAF 폴더 선택 상태 시뮬레이션
+        instrumentation.targetContext
+            .getSharedPreferences("folder_uris", android.content.Context.MODE_PRIVATE)
+            .edit().putStringSet("selected_uris", setOf("content://test")).apply()
     }
 
     @get:Rule
     val rule = createAndroidComposeRule<MainActivity>()
 
     @After
-    fun cleanup() { BookCache.books = null }
+    fun cleanup() {
+        BookCache.books = null
+        // 더미 폴더 URI 정리
+        instrumentation.targetContext
+            .getSharedPreferences("folder_uris", android.content.Context.MODE_PRIVATE)
+            .edit().clear().apply()
+    }
 
     // --- 유틸리티 함수 ---
 
@@ -130,6 +148,11 @@ class ReaderReentryPageTest {
 
     /** 도서 진입 후 로딩 완료까지 대기 */
     private fun enterBook() {
+        // 가로모드에서 탭 좌표/페이지네이션 문제 방지
+        (rule.activity as? android.app.Activity)?.requestedOrientation =
+            android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        rule.waitForIdle()
+
         rule.waitUntil(15000) {
             rule.onAllNodesWithText(BOOK_TITLE, substring = true).fetchSemanticsNodes().isNotEmpty()
         }

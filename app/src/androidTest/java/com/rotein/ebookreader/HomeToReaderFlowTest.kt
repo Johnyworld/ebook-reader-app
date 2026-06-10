@@ -53,13 +53,12 @@ class HomeToReaderFlowTest {
     )
 
     init {
-        // Activity 실행 전에 권한 부여 + BookCache 세팅
-        val instrumentation = InstrumentationRegistry.getInstrumentation()
-        val packageName = instrumentation.targetContext.packageName
-        instrumentation.uiAutomation
-            .executeShellCommand("appops set $packageName MANAGE_EXTERNAL_STORAGE allow")
-            .close()
+        // Activity 실행 전에 BookCache 세팅
         BookCache.books = dummyBooks
+        // SAF 폴더 선택 상태 시뮬레이션
+        InstrumentationRegistry.getInstrumentation().targetContext
+            .getSharedPreferences("folder_uris", android.content.Context.MODE_PRIVATE)
+            .edit().putStringSet("selected_uris", setOf("content://test")).apply()
     }
 
     @get:Rule
@@ -73,6 +72,10 @@ class HomeToReaderFlowTest {
     @After
     fun cleanup() {
         BookCache.books = null
+        // 더미 폴더 URI 정리
+        InstrumentationRegistry.getInstrumentation().targetContext
+            .getSharedPreferences("folder_uris", android.content.Context.MODE_PRIVATE)
+            .edit().clear().apply()
     }
 
     private fun waitForBookList() {

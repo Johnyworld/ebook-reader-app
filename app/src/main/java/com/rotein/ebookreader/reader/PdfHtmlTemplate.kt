@@ -2,11 +2,12 @@ package com.rotein.ebookreader.reader
 
 import org.json.JSONObject
 
-internal fun buildPdfHtml(pdfPath: String, startPage: Int): String {
+internal fun buildPdfHtml(pdfPath: String, startPage: Int, dualPage: Boolean = false): String {
     // JSONObject로 빌드하여 문자열 인젝션을 구조적으로 방지
     val config = JSONObject().apply {
         put("pdfPath", pdfPath)
         put("startPage", startPage)
+        put("dualPage", dualPage)
     }
     // JSON을 JS 작은따옴표 문자열 안에 안전하게 삽입
     // JSONObject.toString()이 이미 JSON 표준 이스케이프를 수행하므로,
@@ -28,8 +29,8 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: #fff; }
     overflow: hidden;
     position: relative;
 }
-#pdf-wrapper { position: absolute; top: 0; left: 0; transform-origin: 0 0; }
-#pdf-canvas { display: block; }
+#pdf-wrapper { position: absolute; top: 0; left: 0; transform-origin: 0 0; display: flex; align-items: center; }
+#pdf-wrapper canvas { display: block; }
 .search-hl-overlay {
     position: absolute; pointer-events: none;
     background: #FFFF00; opacity: 0.4;

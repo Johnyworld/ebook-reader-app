@@ -103,6 +103,14 @@ interface BookReadRecordDao {
         insertIfNotExists(BookReadRecord(bookPath = bookPath, lastReadAt = 0L))
         updateReadingProgress(bookPath, progress)
     }
+
+    /** 경로 마이그레이션용: 기존 레코드를 새 경로로 교체 삽입 */
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertReplace(record: BookReadRecord)
+
+    /** 경로 마이그레이션용: 구 경로 레코드 삭제 */
+    @Query("DELETE FROM book_read_records WHERE bookPath = :bookPath")
+    suspend fun deleteByPath(bookPath: String)
 }
 
 internal val MIGRATION_1_2 = object : Migration(1, 2) {
@@ -166,6 +174,10 @@ interface BookmarkDao {
 
     @Query("UPDATE bookmarks SET page = :page WHERE id = :id")
     suspend fun updatePage(id: Long, page: Int)
+
+    /** 경로 마이그레이션용: bookPath 일괄 변경 */
+    @Query("UPDATE bookmarks SET bookPath = :newPath WHERE bookPath = :oldPath")
+    suspend fun updateBookPath(oldPath: String, newPath: String)
 }
 
 internal val MIGRATION_5_6 = object : Migration(5, 6) {
@@ -214,6 +226,10 @@ interface HighlightDao {
 
     @Query("UPDATE highlights SET page = :page WHERE id = :id")
     suspend fun updatePage(id: Long, page: Int)
+
+    /** 경로 마이그레이션용: bookPath 일괄 변경 */
+    @Query("UPDATE highlights SET bookPath = :newPath WHERE bookPath = :oldPath")
+    suspend fun updateBookPath(oldPath: String, newPath: String)
 }
 
 internal val MIGRATION_8_9 = object : Migration(8, 9) {
@@ -263,6 +279,10 @@ interface MemoDao {
 
     @Query("UPDATE memos SET page = :page WHERE id = :id")
     suspend fun updatePage(id: Long, page: Int)
+
+    /** 경로 마이그레이션용: bookPath 일괄 변경 */
+    @Query("UPDATE memos SET bookPath = :newPath WHERE bookPath = :oldPath")
+    suspend fun updateBookPath(oldPath: String, newPath: String)
 }
 
 internal val MIGRATION_10_11 = object : Migration(10, 11) {

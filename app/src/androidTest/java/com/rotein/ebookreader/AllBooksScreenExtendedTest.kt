@@ -22,12 +22,11 @@ import org.junit.runner.RunWith
 private fun str(resId: Int): String =
     InstrumentationRegistry.getInstrumentation().targetContext.getString(resId)
 
-private fun grantPermission() {
-    val instrumentation = InstrumentationRegistry.getInstrumentation()
-    val packageName = instrumentation.targetContext.packageName
-    instrumentation.uiAutomation
-        .executeShellCommand("appops set $packageName MANAGE_EXTERNAL_STORAGE allow")
-        .close()
+/** 가로모드에서 페이지네이션으로 항목이 가려지는 것을 방지하기 위해 세로 고정 */
+private fun forcePortrait(rule: androidx.compose.ui.test.junit4.AndroidComposeTestRule<*, *>) {
+    val activity = rule.activity as? android.app.Activity ?: return
+    activity.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+    rule.waitForIdle()
 }
 
 /** 테스트 간 상태 오염을 방지하기 위해 DB와 SharedPreferences를 초기화한다. */
@@ -35,6 +34,20 @@ private fun resetTestState() {
     val context = InstrumentationRegistry.getInstrumentation().targetContext
     context.getSharedPreferences("sort_pref", Context.MODE_PRIVATE).edit().clear().apply()
     BookDatabase.getInstance(context).clearAllTables()
+}
+
+/** SAF 폴더 선택 상태 시뮬레이션 */
+private fun setupTestFolderUri() {
+    InstrumentationRegistry.getInstrumentation().targetContext
+        .getSharedPreferences("folder_uris", Context.MODE_PRIVATE)
+        .edit().putStringSet("selected_uris", setOf("content://test")).apply()
+}
+
+/** 더미 폴더 URI 정리 */
+private fun clearTestFolderUri() {
+    InstrumentationRegistry.getInstrumentation().targetContext
+        .getSharedPreferences("folder_uris", Context.MODE_PRIVATE)
+        .edit().clear().apply()
 }
 
 private val threeBooks = listOf(
@@ -80,8 +93,10 @@ private val threeBooks = listOf(
 )
 
 private fun waitForBookList(rule: androidx.compose.ui.test.junit4.AndroidComposeTestRule<*, *>) {
+    forcePortrait(rule)
+    // 책 목록이 렌더링될 때까지 대기 (메뉴 아이콘이 하나 이상 보이면 로딩 완료)
     rule.waitUntil(5000) {
-        rule.onAllNodesWithText("Alice in Wonderland").fetchSemanticsNodes().isNotEmpty()
+        rule.onAllNodesWithContentDescription(str(R.string.menu)).fetchSemanticsNodes().isNotEmpty()
     }
 }
 
@@ -91,9 +106,9 @@ private fun waitForBookList(rule: androidx.compose.ui.test.junit4.AndroidCompose
 class SearchByAuthorTest {
 
     init {
-        grantPermission()
         resetTestState()
         BookCache.books = threeBooks
+        setupTestFolderUri()
     }
 
     @get:Rule
@@ -103,6 +118,7 @@ class SearchByAuthorTest {
     fun cleanup() {
         BookCache.books = null
         resetTestState()
+        clearTestFolderUri()
     }
 
     /** 2.2.3 저자 이름으로 검색 */
@@ -122,9 +138,9 @@ class SearchByAuthorTest {
 class SearchNoResultsTest {
 
     init {
-        grantPermission()
         resetTestState()
         BookCache.books = threeBooks
+        setupTestFolderUri()
     }
 
     @get:Rule
@@ -134,6 +150,7 @@ class SearchNoResultsTest {
     fun cleanup() {
         BookCache.books = null
         resetTestState()
+        clearTestFolderUri()
     }
 
     /** 2.2.5 존재하지 않는 키워드로 검색 */
@@ -154,9 +171,9 @@ class SearchNoResultsTest {
 class SearchClearRestoresListTest {
 
     init {
-        grantPermission()
         resetTestState()
         BookCache.books = threeBooks
+        setupTestFolderUri()
     }
 
     @get:Rule
@@ -166,6 +183,7 @@ class SearchClearRestoresListTest {
     fun cleanup() {
         BookCache.books = null
         resetTestState()
+        clearTestFolderUri()
     }
 
     /** 2.2.6 검색어를 입력한 후 지운다 → 전체 도서 목록이 다시 표시된다 */
@@ -193,9 +211,9 @@ class SearchClearRestoresListTest {
 class SearchMixedCharactersTest {
 
     init {
-        grantPermission()
         resetTestState()
         BookCache.books = threeBooks
+        setupTestFolderUri()
     }
 
     @get:Rule
@@ -205,6 +223,7 @@ class SearchMixedCharactersTest {
     fun cleanup() {
         BookCache.books = null
         resetTestState()
+        clearTestFolderUri()
     }
 
     /** 2.2.7 한글, 영문, 특수문자를 포함한 검색어 입력 → 오류 없이 동작 */
@@ -227,9 +246,9 @@ class SearchMixedCharactersTest {
 class SortByTitleTest {
 
     init {
-        grantPermission()
         resetTestState()
         BookCache.books = threeBooks
+        setupTestFolderUri()
     }
 
     @get:Rule
@@ -239,6 +258,7 @@ class SortByTitleTest {
     fun cleanup() {
         BookCache.books = null
         resetTestState()
+        clearTestFolderUri()
     }
 
     /** 2.3.1 제목순 정렬 선택 → 가나다/ABC 순 */
@@ -266,9 +286,9 @@ class SortByTitleTest {
 class SortByDateAddedTest {
 
     init {
-        grantPermission()
         resetTestState()
         BookCache.books = threeBooks
+        setupTestFolderUri()
     }
 
     @get:Rule
@@ -278,6 +298,7 @@ class SortByDateAddedTest {
     fun cleanup() {
         BookCache.books = null
         resetTestState()
+        clearTestFolderUri()
     }
 
     /** 2.3.3 추가일순 정렬 선택 → 파일 추가일 기준 정렬(내림차순) */
@@ -305,9 +326,9 @@ class SortByDateAddedTest {
 class FilterAllTest {
 
     init {
-        grantPermission()
         resetTestState()
         BookCache.books = threeBooks
+        setupTestFolderUri()
     }
 
     @get:Rule
@@ -317,6 +338,7 @@ class FilterAllTest {
     fun cleanup() {
         BookCache.books = null
         resetTestState()
+        clearTestFolderUri()
     }
 
     /** 2.4.1 "전체" 필터 선택 → 숨김 제외 모든 도서 표시 */
@@ -333,9 +355,9 @@ class FilterAllTest {
 class FilterFavoriteEmptyTest {
 
     init {
-        grantPermission()
         resetTestState()
         BookCache.books = threeBooks
+        setupTestFolderUri()
     }
 
     @get:Rule
@@ -345,6 +367,7 @@ class FilterFavoriteEmptyTest {
     fun cleanup() {
         BookCache.books = null
         resetTestState()
+        clearTestFolderUri()
     }
 
     /** 2.4.4 즐겨찾기가 없는 상태에서 "즐겨찾기만" 필터 선택 → 빈 상태 안내 */
@@ -365,9 +388,9 @@ class FilterFavoriteEmptyTest {
 class FilterHiddenTest {
 
     init {
-        grantPermission()
         resetTestState()
         BookCache.books = threeBooks
+        setupTestFolderUri()
     }
 
     @get:Rule
@@ -377,6 +400,7 @@ class FilterHiddenTest {
     fun cleanup() {
         BookCache.books = null
         resetTestState()
+        clearTestFolderUri()
     }
 
     /** 2.4.3 "숨긴 도서" 필터 선택 → 숨김 도서만 표시 */
@@ -405,9 +429,9 @@ class FilterHiddenTest {
 class HideBookTest {
 
     init {
-        grantPermission()
         resetTestState()
         BookCache.books = threeBooks
+        setupTestFolderUri()
     }
 
     @get:Rule
@@ -417,6 +441,7 @@ class HideBookTest {
     fun cleanup() {
         BookCache.books = null
         resetTestState()
+        clearTestFolderUri()
     }
 
     /** 2.5.3 숨기기 선택 → 도서가 기본 목록에서 사라짐 */
@@ -439,9 +464,9 @@ class HideBookTest {
 class UnhideBookTest {
 
     init {
-        grantPermission()
         resetTestState()
         BookCache.books = threeBooks
+        setupTestFolderUri()
     }
 
     @get:Rule
@@ -451,6 +476,7 @@ class UnhideBookTest {
     fun cleanup() {
         BookCache.books = null
         resetTestState()
+        clearTestFolderUri()
     }
 
     /** 2.5.4 숨긴 도서에서 숨기기 해제 → 기본 목록에 복원 */

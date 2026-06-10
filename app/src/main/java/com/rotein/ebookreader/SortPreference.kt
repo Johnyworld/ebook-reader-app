@@ -164,7 +164,7 @@ data class FontFileMaps(
     val all: Map<String, String>
 )
 
-fun getFontFileMaps(): FontFileMaps {
+fun getFontFileMaps(context: Context): FontFileMaps {
     val system = mutableMapOf<String, String>()
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
         SystemFonts.getAvailableFonts().forEach { font ->
@@ -176,7 +176,7 @@ fun getFontFileMaps(): FontFileMaps {
         }
     }
     val device = mutableMapOf<String, String>()
-    FontScanner.scanDeviceFonts().forEach { (name, path) ->
+    FontScanner.scanDeviceFonts(context).forEach { (name, path) ->
         if (!system.containsKey(name) && !device.containsKey(name)) {
             device[name] = path
         }
