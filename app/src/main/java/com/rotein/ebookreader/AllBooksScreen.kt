@@ -90,6 +90,7 @@ fun AllBooksScreen(
 
     var hasFolders by remember { mutableStateOf(FolderUriStore.hasAny(context)) }
     var folders by remember { mutableStateOf(FolderUriStore.load(context)) }
+    var scanKey by remember { mutableIntStateOf(0) }  // 폴더 변경 시 재스캔 트리거
     val lifecycleOwner = LocalLifecycleOwner.current
     var books by remember { mutableStateOf(BookCache.books ?: emptyList()) }
     var isLoading by remember { mutableStateOf(false) }
@@ -152,13 +153,16 @@ fun AllBooksScreen(
     val folderPickerLauncher = rememberLauncherForActivityResult(OpenDocumentTree()) { uri: Uri? ->
         if (uri != null) {
             FolderUriStore.add(context, uri)
+            // 캐시 무효화 + 재스캔 트리거
+            BookCache.books = null
             hasFolders = true
             folders = FolderUriStore.load(context)
+            scanKey++
         }
     }
 
-    // 최초 로드: 캐시가 있으면 그대로 사용, 없으면 전체 스캔
-    LaunchedEffect(hasFolders) {
+    // 최초 로드 및 폴더 변경 시: 캐시가 있으면 그대로 사용, 없으면 전체 스캔
+    LaunchedEffect(hasFolders, scanKey) {
         if (hasFolders) {
             val cached = BookCache.books
             val bookList = if (cached != null) {
@@ -260,6 +264,7 @@ fun AllBooksScreen(
                 hasFolders = FolderUriStore.hasAny(context)
                 // 폴더 제거 후 도서 목록 다시 스캔
                 BookCache.books = null
+                scanKey++
             }
         )
 
