@@ -8,6 +8,7 @@ import android.view.ViewGroup
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.FrameLayout
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
@@ -22,6 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
 import com.rotein.ebookreader.CenteredMessage
 import com.rotein.ebookreader.ReaderPageFlip
+import com.rotein.ebookreader.ui.theme.EreaderColors
 import java.io.File
 
 @SuppressLint("ClickableViewAccessibility", "SetJavaScriptEnabled")
@@ -39,6 +41,7 @@ internal fun PdfViewer(
     onSearchResultsPartial: (resultsJson: String) -> Unit = {},
     onSearchComplete: () -> Unit = {},
     onNavigationComplete: () -> Unit = {},
+    onLoadError: () -> Unit = {},
     onWebViewCreated: (WebView) -> Unit = {}
 ) {
     val file = remember(path) { File(path) }
@@ -48,6 +51,8 @@ internal fun PdfViewer(
     }
 
     var contentLoaded by remember(path) { mutableStateOf(false) }
+    // 로드 실패 시 무한 로딩 대신 에러 메시지를 표시하기 위한 상태
+    var loadError by remember(path) { mutableStateOf(false) }
     val webViewRef = remember { java.util.concurrent.atomic.AtomicReference<WebView?>(null) }
     val pageFlipRef = remember { java.util.concurrent.atomic.AtomicReference(pageFlip) }
     pageFlipRef.set(pageFlip)
@@ -82,7 +87,15 @@ internal fun PdfViewer(
                             onTocLoadedCallback = onTocLoaded,
                             onSearchResultsPartialCallback = onSearchResultsPartial,
                             onSearchCompleteCallback = onSearchComplete,
-                            onNavigationCompleteCallback = onNavigationComplete
+                            onNavigationCompleteCallback = onNavigationComplete,
+                            onLoadErrorCallback = { message ->
+                                // 이미 표시된 뒤의 렌더링 실패는 화면을 유지한다
+                                if (!contentLoaded) {
+                                    android.util.Log.e("PdfViewer", "PDF load error: $message")
+                                    loadError = true
+                                    onLoadError()
+                                }
+                            }
                         ), "Android")
                     }
                     webViewRef.set(webView)
@@ -206,5 +219,10 @@ internal fun PdfViewer(
             },
             modifier = Modifier.fillMaxSize()
         )
+        if (loadError) {
+            Box(Modifier.fillMaxSize().background(EreaderColors.White)) {
+                CenteredMessage(stringResource(R.string.error_cannot_read))
+            }
+        }
     }
 }

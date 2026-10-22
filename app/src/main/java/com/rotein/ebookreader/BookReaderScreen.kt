@@ -394,6 +394,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                     onNavigationCompleteRef.value?.invoke()
                     onNavigationCompleteRef.value = null
                 },
+                onLoadError = { vm.setLoading(false) },
                 onWebViewCreated = { webView -> viewerWebView.value = webView }
             )
             "mobi" -> MobiViewer(currentPath, onCenterTap)

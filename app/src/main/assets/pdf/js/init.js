@@ -48,9 +48,16 @@ window.addEventListener('resize', function() {
 });
 
 function _initPdf() {
+    // 구형 WebView에서 pdf.min.js 파싱에 실패하면 pdfjsLib가 정의되지 않는다.
+    // 이 경우 무한 로딩 대신 에러를 Kotlin에 알린다.
+    if (typeof pdfjsLib === 'undefined') {
+        Android.onLoadError('pdfjsLib is not defined');
+        return;
+    }
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'file:///android_asset/pdfjs/pdf.worker.min.js';
 
-    pdfjsLib.getDocument(_pdfConfig.pdfPath).promise.then(function(pdf) {
+    // isEvalSupported: false — 악성 폰트를 통한 임의 JS 실행 취약점(CVE-2024-4367) 방지
+    pdfjsLib.getDocument({ url: _pdfConfig.pdfPath, isEvalSupported: false }).promise.then(function(pdf) {
         _pdf.pdfDoc = pdf;
         _pdf.totalPages = pdf.numPages;
         _pdf.currentPage = Math.max(1, Math.min(_pdfConfig.startPage, _pdf.totalPages));
@@ -59,6 +66,7 @@ function _initPdf() {
         _loadOutline();
     }).catch(function(error) {
         console.error('PDF load error:', error);
+        Android.onLoadError(String(error));
     });
 }
 
@@ -122,13 +130,17 @@ function _renderPage(pageNum) {
                         if (_pdf.searchHighlightQuery) {
                             _applySearchHighlights();
                         }
+                    }).catch(function(error) {
+                        // 텍스트 추출 실패는 검색 하이라이트에만 영향 — 페이지 표시는 유지
+                        console.error('getTextContent error:', error);
+                        _pdf.currentTextItems = [];
                     });
                 }
             });
             renderPromises.push(renderPromise);
         });
 
-        Promise.all(renderPromises).then(function() {
+        return Promise.all(renderPromises).then(function() {
             _pdf.rendering = false;
 
             // 스프레드의 마지막 페이지 기준으로 진행률 계산
@@ -152,6 +164,16 @@ function _renderPage(pageNum) {
                 _renderPage(next);
             }
         });
+    }).catch(function(error) {
+        // 렌더링 실패 시 rendering/navigating 플래그가 풀리지 않아 무한 로딩·이동 불가가 되는 것을 방지
+        _pdf.rendering = false;
+        _pdf.pendingPage = null;
+        if (_pdf.navigating) {
+            _pdf.navigating = false;
+            Android.onNavigationComplete();
+        }
+        console.error('PDF render error:', error);
+        Android.onLoadError(String(error));
     });
 }
 

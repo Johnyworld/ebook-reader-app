@@ -7,7 +7,8 @@ internal class PdfBridge(
     private val onTocLoadedCallback: (tocJson: String) -> Unit = {},
     private val onSearchResultsPartialCallback: (resultsJson: String) -> Unit = {},
     private val onSearchCompleteCallback: () -> Unit = {},
-    private val onNavigationCompleteCallback: () -> Unit = {}
+    private val onNavigationCompleteCallback: () -> Unit = {},
+    private val onLoadErrorCallback: (message: String) -> Unit = {}
 ) {
     private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
 
@@ -44,5 +45,11 @@ internal class PdfBridge(
     @android.webkit.JavascriptInterface
     fun onNavigationComplete() {
         mainHandler.post { onNavigationCompleteCallback() }
+    }
+
+    /** PDF.js 로드/렌더링 실패 (구형 WebView 문법 미지원, 손상된 파일 등) */
+    @android.webkit.JavascriptInterface
+    fun onLoadError(message: String) {
+        mainHandler.post { onLoadErrorCallback(message) }
     }
 }
