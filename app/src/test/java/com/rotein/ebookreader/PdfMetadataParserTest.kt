@@ -4,6 +4,7 @@ import org.junit.After
 import org.junit.Assert.*
 import org.junit.Test
 import java.io.File
+import java.io.RandomAccessFile
 
 class PdfMetadataParserTest {
 
@@ -192,5 +193,31 @@ class PdfMetadataParserTest {
         file.writeText(sb.toString())
 
         assertNull(PdfMetadataParser.parse(file.absolutePath))
+    }
+
+    // --- FileChannel 기반 (SAF 파일 디스크립터에서 복사 없이 읽기) ---
+
+    @Test
+    fun `parse(channel) - 작은 파일, 경로 기반과 같은 결과`() {
+        val file = createPdf(title = "Channel PDF", author = "Author")
+        val fromChannel = RandomAccessFile(file, "r").use { PdfMetadataParser.parse(it.channel) }
+        assertEquals(PdfMetadataParser.parse(file.absolutePath), fromChannel)
+        assertEquals("Channel PDF", fromChannel!!.title)
+    }
+
+    @Test
+    fun `parse(channel) - 앞뒤만 읽는 큰 파일, 경로 기반과 같은 결과`() {
+        val file = File.createTempFile("bigpdf_ch_", ".pdf").also { tempFiles.add(it) }
+        val sb = StringBuilder()
+        sb.append("%PDF-1.4\n")
+        sb.append("1 0 obj\n<< /Title (Front Title) /Author (Front Author) >>\nendobj\n")
+        sb.append("% ")
+        repeat(20000) { sb.append('X') }
+        sb.append("\ntrailer\n<< /Info 1 0 R >>\n%%EOF\n")
+        file.writeText(sb.toString())
+
+        val fromChannel = RandomAccessFile(file, "r").use { PdfMetadataParser.parse(it.channel) }
+        assertEquals(PdfMetadataParser.parse(file.absolutePath), fromChannel)
+        assertEquals("Front Title", fromChannel!!.title)
     }
 }

@@ -2,38 +2,75 @@ package com.rotein.ebookreader
 
 import android.util.Xml
 import org.xmlpull.v1.XmlPullParser
+import java.io.ByteArrayInputStream
+import java.nio.channels.FileChannel
 import java.util.zip.ZipFile
 
 object EpubMetadataParser {
 
+    /** EPUB 컨테이너 엔트리 접근 추상화 — 로컬 경로(ZipFile)와 FileChannel(ChannelZipReader) 공용 */
+    private interface EpubArchive {
+        fun size(name: String): Long?
+        fun read(name: String): ByteArray?
+    }
+
+    private class ZipFileArchive(private val zip: ZipFile) : EpubArchive {
+        override fun size(name: String): Long? = zip.getEntry(name)?.size
+        override fun read(name: String): ByteArray? =
+            zip.getEntry(name)?.let { entry -> zip.getInputStream(entry).use { it.readBytes() } }
+    }
+
+    private class ChannelArchive(private val reader: ChannelZipReader) : EpubArchive {
+        override fun size(name: String): Long? = reader.size(name)
+        override fun read(name: String): ByteArray? = reader.read(name)
+    }
+
     fun parse(path: String): BookMetadata? = try {
-        ZipFile(path).use { zip ->
-            val opfPath = findOpfPath(zip) ?: return null
-            parseOpf(zip, opfPath)
-        }
+        ZipFile(path).use { zip -> parse(ZipFileArchive(zip)) }
     } catch (e: Exception) {
         null
+    }
+
+    /** SAF 파일 디스크립터의 채널에서 파일 복사 없이 메타데이터를 읽는다 */
+    fun parse(channel: FileChannel): BookMetadata? = try {
+        parse(ChannelArchive(ChannelZipReader(channel)))
+    } catch (e: Exception) {
+        null
+    }
+
+    private fun parse(archive: EpubArchive): BookMetadata? {
+        val opfPath = findOpfPath(archive) ?: return null
+        return parseOpf(archive, opfPath)
     }
 
     private const val MAX_COVER_SIZE = 10L * 1024 * 1024 // 10MB — 비정상적으로 큰 이미지 방지
 
     fun extractCover(path: String): ByteArray? = try {
-        ZipFile(path).use { zip ->
-            val opfPath = findOpfPath(zip) ?: return null
-            val opfDir = opfPath.substringBeforeLast('/', "")
-            val coverHref = findCoverHref(zip, opfPath) ?: return null
-            val coverPath = if (opfDir.isEmpty()) coverHref else "$opfDir/$coverHref"
-            val entry = zip.getEntry(coverPath) ?: return null
-            if (entry.size > MAX_COVER_SIZE) return null
-            zip.getInputStream(entry).use { it.readBytes() }
-        }
+        ZipFile(path).use { zip -> extractCover(ZipFileArchive(zip)) }
     } catch (e: Exception) {
         null
     }
 
-    private fun findOpfPath(zip: ZipFile): String? {
-        val entry = zip.getEntry("META-INF/container.xml") ?: return null
-        return zip.getInputStream(entry).use { stream ->
+    /** SAF 파일 디스크립터의 채널에서 파일 복사 없이 커버 이미지를 읽는다 */
+    fun extractCover(channel: FileChannel): ByteArray? = try {
+        extractCover(ChannelArchive(ChannelZipReader(channel)))
+    } catch (e: Exception) {
+        null
+    }
+
+    private fun extractCover(archive: EpubArchive): ByteArray? {
+        val opfPath = findOpfPath(archive) ?: return null
+        val opfDir = opfPath.substringBeforeLast('/', "")
+        val coverHref = findCoverHref(archive, opfPath) ?: return null
+        val coverPath = if (opfDir.isEmpty()) coverHref else "$opfDir/$coverHref"
+        val size = archive.size(coverPath) ?: return null
+        if (size > MAX_COVER_SIZE) return null
+        return archive.read(coverPath)
+    }
+
+    private fun findOpfPath(archive: EpubArchive): String? {
+        val bytes = archive.read("META-INF/container.xml") ?: return null
+        return ByteArrayInputStream(bytes).use { stream ->
             val parser = Xml.newPullParser()
             parser.setInput(stream, null)
 
@@ -56,9 +93,9 @@ object EpubMetadataParser {
      *   3. id가 "cover"인 manifest item
      *   4. href에 "cover"가 포함된 이미지 파일
      */
-    private fun findCoverHref(zip: ZipFile, opfPath: String): String? {
-        val entry = zip.getEntry(opfPath) ?: return null
-        return zip.getInputStream(entry).use { stream ->
+    private fun findCoverHref(archive: EpubArchive, opfPath: String): String? {
+        val bytes = archive.read(opfPath) ?: return null
+        return ByteArrayInputStream(bytes).use { stream ->
         val parser = Xml.newPullParser()
         parser.setInput(stream, null)
 
@@ -99,9 +136,9 @@ object EpubMetadataParser {
         } // use
     }
 
-    private fun parseOpf(zip: ZipFile, opfPath: String): BookMetadata? {
-        val entry = zip.getEntry(opfPath) ?: return null
-        return zip.getInputStream(entry).use { stream ->
+    private fun parseOpf(archive: EpubArchive, opfPath: String): BookMetadata? {
+        val bytes = archive.read(opfPath) ?: return null
+        return ByteArrayInputStream(bytes).use { stream ->
         val parser = Xml.newPullParser()
         parser.setInput(stream, null)
 

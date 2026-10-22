@@ -2,13 +2,23 @@ package com.rotein.ebookreader
 
 import android.graphics.pdf.PdfRenderer
 import android.os.ParcelFileDescriptor
+import java.io.EOFException
 import java.io.File
 import java.io.RandomAccessFile
+import java.nio.ByteBuffer
+import java.nio.channels.FileChannel
 
 object PdfMetadataParser {
 
     fun parse(path: String): BookMetadata? = try {
-        val content = readHeadAndTail(path, 8192)
+        RandomAccessFile(path, "r").use { raf -> parse(raf.channel) }
+    } catch (_: Exception) {
+        null
+    }
+
+    /** SAF 파일 디스크립터의 채널에서 파일 복사 없이 메타데이터를 읽는다 (앞뒤 일부만 읽음) */
+    fun parse(channel: FileChannel): BookMetadata? = try {
+        val content = readHeadAndTail(channel, 8192)
         val info = findInfoDictionary(content)
         if (info != null) {
             BookMetadata(
@@ -27,25 +37,25 @@ object PdfMetadataParser {
     /**
      * 파일의 앞부분과 뒷부분을 합쳐서 읽는다.
      * Info dictionary가 파일 시작 부근에 있는 경우에도 찾을 수 있도록 한다.
+     * 위치 지정 읽기만 사용하므로 채널의 position은 바꾸지 않는다.
      */
-    private fun readHeadAndTail(path: String, maxBytes: Int): String {
-        RandomAccessFile(path, "r").use { raf ->
-            val len = raf.length()
-            if (len <= maxBytes * 2) {
-                // 파일이 충분히 작으면 전체를 읽는다
-                val buf = ByteArray(len.toInt())
-                raf.readFully(buf)
-                return String(buf, Charsets.ISO_8859_1)
-            }
-            // 앞부분 읽기
-            val head = ByteArray(maxBytes)
-            raf.readFully(head)
-            // 뒷부분 읽기
-            raf.seek(len - maxBytes)
-            val tail = ByteArray(maxBytes)
-            raf.readFully(tail)
-            return String(head, Charsets.ISO_8859_1) + String(tail, Charsets.ISO_8859_1)
+    private fun readHeadAndTail(channel: FileChannel, maxBytes: Int): String {
+        val len = channel.size()
+        if (len <= maxBytes * 2) {
+            // 파일이 충분히 작으면 전체를 읽는다
+            return String(readAt(channel, 0, len.toInt()), Charsets.ISO_8859_1)
         }
+        val head = readAt(channel, 0, maxBytes)
+        val tail = readAt(channel, len - maxBytes, maxBytes)
+        return String(head, Charsets.ISO_8859_1) + String(tail, Charsets.ISO_8859_1)
+    }
+
+    private fun readAt(channel: FileChannel, position: Long, length: Int): ByteArray {
+        val buffer = ByteBuffer.allocate(length)
+        while (buffer.hasRemaining()) {
+            if (channel.read(buffer, position + buffer.position()) < 0) throw EOFException()
+        }
+        return buffer.array()
     }
 
     /**

@@ -7,6 +7,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import java.io.File
+import java.io.RandomAccessFile
 
 @RunWith(RobolectricTestRunner::class)
 class EpubMetadataParserTest {
@@ -67,5 +68,35 @@ class EpubMetadataParserTest {
         val epub = createEpub(includeCover = false)
         val cover = EpubMetadataParser.extractCover(epub.absolutePath)
         assertNull(cover)
+    }
+
+    // --- FileChannel 기반 (SAF 파일 디스크립터에서 복사 없이 읽기) ---
+
+    @Test
+    fun `parse(channel) - 경로 기반과 같은 메타데이터`() {
+        val epub = createEpub(title = "채널 책", author = "홍길동")
+        val fromChannel = RandomAccessFile(epub, "r").use { EpubMetadataParser.parse(it.channel) }
+        assertEquals(EpubMetadataParser.parse(epub.absolutePath), fromChannel)
+        assertEquals("채널 책", fromChannel!!.title)
+    }
+
+    @Test
+    fun `extractCover(channel) - 경로 기반과 같은 커버 바이트`() {
+        val epub = createEpub(includeCover = true)
+        val fromChannel = RandomAccessFile(epub, "r").use { EpubMetadataParser.extractCover(it.channel) }
+        assertArrayEquals(EpubMetadataParser.extractCover(epub.absolutePath), fromChannel)
+    }
+
+    @Test
+    fun `extractCover(channel) - 커버 없는 EPUB`() {
+        val epub = createEpub(includeCover = false)
+        assertNull(RandomAccessFile(epub, "r").use { EpubMetadataParser.extractCover(it.channel) })
+    }
+
+    @Test
+    fun `parse(channel) - zip이 아닌 파일이면 null`() {
+        val file = File.createTempFile("broken_", ".epub").also { tempFiles.add(it) }
+        file.writeText("not a zip")
+        assertNull(RandomAccessFile(file, "r").use { EpubMetadataParser.parse(it.channel) })
     }
 }

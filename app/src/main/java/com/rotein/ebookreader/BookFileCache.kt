@@ -2,7 +2,10 @@ package com.rotein.ebookreader
 
 import android.content.Context
 import android.net.Uri
+import android.os.ParcelFileDescriptor
 import java.io.File
+import java.io.FileInputStream
+import java.nio.channels.FileChannel
 import java.security.MessageDigest
 
 /**
@@ -40,6 +43,21 @@ object BookFileCache {
     }
 
     /**
+     * content URI를 복사하지 않고 읽기 전용 파일 디스크립터로 연다.
+     * 위치 지정 읽기가 가능한 일반 파일일 때만 반환하고, 파이프 등(클라우드 프로바이더)이면 null을 반환한다.
+     * → null이면 호출자는 copyToTemp 방식으로 대체한다. 반환된 디스크립터는 호출자가 닫아야 한다.
+     */
+    fun openSeekable(context: Context, contentUri: Uri): ParcelFileDescriptor? {
+        val pfd = context.contentResolver.openFileDescriptor(contentUri, "r") ?: return null
+        // statSize: 일반 파일이 아니면 -1
+        if (pfd.statSize < 0) {
+            pfd.close()
+            return null
+        }
+        return pfd
+    }
+
+    /**
      * 메타데이터 파싱용 임시 파일 복사. 사용 후 삭제 필요.
      */
     fun copyToTemp(context: Context, contentUri: Uri, fileName: String): File {
@@ -51,3 +69,9 @@ object BookFileCache {
         return temp
     }
 }
+
+/**
+ * 디스크립터 위의 FileChannel. 위치 지정 읽기 전용으로 사용한다.
+ * Android의 FileInputStream(FileDescriptor)는 fd를 소유하지 않으므로, fd는 ParcelFileDescriptor를 닫을 때 닫힌다.
+ */
+fun ParcelFileDescriptor.channel(): FileChannel = FileInputStream(fileDescriptor).channel

@@ -253,6 +253,38 @@ class MigrationTest {
     }
 
     @Test
+    fun `migration 17 to 18 - book_catalog 추가 후 Room 스키마 검증 통과 및 기존 데이터 보존`() {
+        // v17 스키마 (Room 생성 코드 기준) 그대로 생성
+        val db = createDatabase(17) { db ->
+            db.execSQL("CREATE TABLE IF NOT EXISTS `book_read_records` (`bookPath` TEXT NOT NULL, `lastReadAt` INTEGER NOT NULL, `lastCfi` TEXT NOT NULL, `tocJson` TEXT NOT NULL, `cachedTotalPages` INTEGER NOT NULL, `cachedSpinePageOffsetsJson` TEXT NOT NULL, `cachedSpineCharPageBreaksJson` TEXT NOT NULL, `cachedSettingsFingerprint` TEXT NOT NULL, `isFavorite` INTEGER NOT NULL, `isHidden` INTEGER NOT NULL, `readingProgress` REAL NOT NULL, PRIMARY KEY(`bookPath`))")
+            db.execSQL("CREATE TABLE IF NOT EXISTS `bookmarks` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `bookPath` TEXT NOT NULL, `cfi` TEXT NOT NULL, `chapterTitle` TEXT NOT NULL, `excerpt` TEXT NOT NULL, `page` INTEGER NOT NULL, `createdAt` INTEGER NOT NULL)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_bookmarks_bookPath` ON `bookmarks` (`bookPath`)")
+            db.execSQL("CREATE TABLE IF NOT EXISTS `highlights` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `bookPath` TEXT NOT NULL, `cfi` TEXT NOT NULL, `text` TEXT NOT NULL, `chapterTitle` TEXT NOT NULL, `page` INTEGER NOT NULL, `createdAt` INTEGER NOT NULL)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_highlights_bookPath` ON `highlights` (`bookPath`)")
+            db.execSQL("CREATE TABLE IF NOT EXISTS `memos` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `bookPath` TEXT NOT NULL, `cfi` TEXT NOT NULL, `text` TEXT NOT NULL, `note` TEXT NOT NULL, `chapterTitle` TEXT NOT NULL, `page` INTEGER NOT NULL, `createdAt` INTEGER NOT NULL)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_memos_bookPath` ON `memos` (`bookPath`)")
+        }
+        db.execSQL("INSERT INTO book_read_records VALUES ('content://a', 7000, '', '', 0, '', '', '', 1, 0, 0.5)")
+        db.close()
+
+        // Room으로 열면 17 → 18 마이그레이션 후 전체 스키마 검증이 수행된다
+        val room = Room.databaseBuilder(context, BookDatabase::class.java, TEST_DB_NAME)
+            .addMigrations(*ALL_MIGRATIONS)
+            .allowMainThreadQueries()
+            .build()
+        val cursor = room.openHelper.writableDatabase.query("SELECT * FROM book_read_records")
+        assertTrue(cursor.moveToFirst())
+        assertEquals("content://a", cursor.getString(cursor.getColumnIndexOrThrow("bookPath")))
+        assertEquals(1, cursor.getInt(cursor.getColumnIndexOrThrow("isFavorite")))
+        cursor.close()
+        val catalog = room.openHelper.writableDatabase.query("SELECT COUNT(*) FROM book_catalog")
+        assertTrue(catalog.moveToFirst())
+        assertEquals(0, catalog.getInt(0))
+        catalog.close()
+        room.close()
+    }
+
+    @Test
     fun `전체 마이그레이션 v1 to v15 - Room DB 정상 오픈`() {
         val db = Room.databaseBuilder(context, BookDatabase::class.java, TEST_DB_NAME)
             .addMigrations(*ALL_MIGRATIONS)

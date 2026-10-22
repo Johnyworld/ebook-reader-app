@@ -20,7 +20,6 @@ object FileScanner {
 
     /**
      * 전체 스캔 — 선택된 폴더들의 전자책 파일을 탐색하고 메타데이터를 추출한다.
-     * 각 파일을 임시 복사 → 메타데이터 파싱 → 임시 파일 삭제 순으로 처리.
      */
     fun scanBooks(context: Context): List<BookFile> {
         val folderUris = FolderUriStore.load(context)
@@ -147,7 +146,8 @@ object FileScanner {
 
     /**
      * SAF URI에서 메타데이터 추출.
-     * 임시 파일로 복사 → 기존 파서로 파싱 → 임시 파일 삭제.
+     * 파일 디스크립터에서 필요한 부분만 직접 읽고(파일 복사 없음),
+     * 일반 파일이 아닌 경우에만 임시 파일로 복사 → 기존 파서로 파싱 → 임시 파일 삭제.
      */
     private fun extractMetadataFromUri(
         context: Context,
@@ -157,15 +157,34 @@ object FileScanner {
     ): BookMetadata? {
         if (extension !in setOf("epub", "pdf")) return null
         return try {
-            val temp = BookFileCache.copyToTemp(context, uri, fileName)
-            try {
-                when (extension) {
-                    "epub" -> EpubMetadataParser.parse(temp.absolutePath)
-                    "pdf" -> PdfMetadataParser.parse(temp.absolutePath)
-                    else -> null
+            // 1) 파일 디스크립터에서 필요한 부분만 직접 읽기 (파일 복사 없음)
+            val pfd = BookFileCache.openSeekable(context, uri)
+            val fromChannel = pfd?.use {
+                it.channel().use { channel ->
+                    when (extension) {
+                        "epub" -> EpubMetadataParser.parse(channel)
+                        "pdf" -> PdfMetadataParser.parse(channel)
+                        else -> null
+                    }
                 }
-            } finally {
-                temp.delete()
+            }
+            // 2) 채널 방식 결과가 없으면 임시 파일 복사 후 경로 기반 파서로 재시도
+            //    - 일반 파일이 아닌 경우(클라우드 프로바이더 등)
+            //    - EPUB은 메타데이터가 없어도 빈 객체를 반환하므로 null은 파싱 실패(ZIP64 등 미지원 형식) → 재시도
+            //    - PDF는 두 방식의 파싱 로직이 같으므로 재시도하지 않음
+            if (fromChannel != null || (extension == "pdf" && pfd != null)) {
+                fromChannel
+            } else {
+                val temp = BookFileCache.copyToTemp(context, uri, fileName)
+                try {
+                    when (extension) {
+                        "epub" -> EpubMetadataParser.parse(temp.absolutePath)
+                        "pdf" -> PdfMetadataParser.parse(temp.absolutePath)
+                        else -> null
+                    }
+                } finally {
+                    temp.delete()
+                }
             }
         } catch (_: Exception) {
             null

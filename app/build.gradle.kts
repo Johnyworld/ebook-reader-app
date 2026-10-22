@@ -39,6 +39,10 @@ android {
     }
 
     buildTypes {
+        // 디버그 빌드는 별도 패키지로 설치하여 Play 스토어 버전과 나란히 테스트할 수 있게 한다
+        debug {
+            applicationIdSuffix = ".debug"
+        }
         release {
             isMinifyEnabled = true
             isShrinkResources = true

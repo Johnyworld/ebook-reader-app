@@ -87,6 +87,12 @@ fun AllBooksScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val dao = remember { BookDatabase.getInstance(context).bookReadRecordDao() }
+    val catalogDao = remember { BookDatabase.getInstance(context).bookCatalogDao() }
+
+    // 스캔 결과를 DB에 저장 — 다음 콜드 스타트 시 전체 재스캔 없이 즉시 표시하기 위함
+    suspend fun saveCatalog(list: List<BookFile>) = withContext(Dispatchers.IO) {
+        catalogDao.replaceAll(list.map { it.toCatalogEntry() })
+    }
 
     var hasFolders by remember { mutableStateOf(FolderUriStore.hasAny(context)) }
     var folders by remember { mutableStateOf(FolderUriStore.load(context)) }
@@ -161,34 +167,43 @@ fun AllBooksScreen(
         }
     }
 
-    // 최초 로드 및 폴더 변경 시: 캐시가 있으면 그대로 사용, 없으면 전체 스캔
+    // 최초 로드 및 폴더 변경 시: 메모리 캐시 → DB에 저장된 목록 → 전체 스캔 순으로 사용
+    // 스플래시는 스캔/커버 로드 완료를 기다리지 않고 바로 내린다 (스캔 중에는 로딩 문구 표시)
     LaunchedEffect(hasFolders, scanKey) {
         if (hasFolders) {
             val cached = BookCache.books
-            val bookList = if (cached != null) {
-                cached
+            if (cached != null) {
+                books = cached
+                onLoadComplete()
+                return@LaunchedEffect
+            }
+            // 앱 프로세스가 새로 뜬 경우(scanKey == 0): DB에 저장된 목록을 즉시 표시하고 변경분만 diff 스캔
+            // 폴더 추가/제거(scanKey > 0)는 저장된 목록이 폴더 구성과 맞지 않으므로 전체 스캔
+            val saved = if (scanKey == 0) {
+                withContext(Dispatchers.IO) { catalogDao.getAll().map { it.toBookFile() } }
+            } else emptyList()
+            if (saved.isNotEmpty()) {
+                // 저장된 목록은 아직 diff 확인 전이므로 화면에만 표시하고 BookCache에는 넣지 않는다
+                // (BookCache가 null인 동안 onResume/재진입 diff 스캔이 중복 실행되지 않고,
+                //  Activity 재생성 시에도 다시 diff 스캔이 수행됨)
+                books = saved
+                onLoadComplete()
+                val refreshed = withContext(Dispatchers.IO) { FileScanner.refreshBooks(context, saved) }
+                withContext(Dispatchers.IO) { migrateBookPathsToUri(context, refreshed) }
+                BookCache.books = refreshed
+                books = refreshed
+                saveCatalog(refreshed)
             } else {
                 isLoading = true
+                onLoadComplete()
                 val scanned = withContext(Dispatchers.IO) { FileScanner.scanBooks(context) }
                 // 기존 절대 경로 레코드를 SAF URI로 마이그레이션
                 withContext(Dispatchers.IO) { migrateBookPathsToUri(context, scanned) }
                 BookCache.books = scanned
+                books = scanned
                 isLoading = false
-                scanned
+                saveCatalog(scanned)
             }
-            books = bookList
-            val booksNeedingCovers = bookList.filter { it.bookKey() !in covers }
-            if (booksNeedingCovers.isNotEmpty()) {
-                val newCovers = withContext(Dispatchers.IO) {
-                    val result = mutableMapOf<String, Bitmap?>()
-                    booksNeedingCovers.forEach { book ->
-                        result[book.bookKey()] = BookCoverLoader.loadFromBook(context, book)
-                    }
-                    result
-                }
-                covers = covers + newCovers
-            }
-            onLoadComplete()
         } else {
             onLoadComplete()
         }
@@ -200,22 +215,15 @@ fun AllBooksScreen(
         lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
             if (isFirstResume) { isFirstResume = false; return@repeatOnLifecycle }
             val cached = BookCache.books ?: return@repeatOnLifecycle
+            val startScanKey = scanKey
             val refreshed = withContext(Dispatchers.IO) { FileScanner.refreshBooks(context, cached) }
+            // 스캔 도중 폴더가 추가/제거되었으면 이전 폴더 구성의 결과이므로 버린다
+            if (startScanKey != scanKey) return@repeatOnLifecycle
             // 미마이그레이션 레코드가 남아있으면 재시도
             withContext(Dispatchers.IO) { migrateBookPathsToUri(context, refreshed) }
             BookCache.books = refreshed
             books = refreshed
-            val booksNeedingCovers = refreshed.filter { it.bookKey() !in covers }
-            if (booksNeedingCovers.isNotEmpty()) {
-                val newCovers = withContext(Dispatchers.IO) {
-                    val result = mutableMapOf<String, Bitmap?>()
-                    booksNeedingCovers.forEach { book ->
-                        result[book.bookKey()] = BookCoverLoader.loadFromBook(context, book)
-                    }
-                    result
-                }
-                covers = covers + newCovers
-            }
+            saveCatalog(refreshed)
         }
     }
 
@@ -225,21 +233,14 @@ fun AllBooksScreen(
         if (prevRefreshKey == refreshKey) return@LaunchedEffect
         prevRefreshKey = refreshKey
         val cached = BookCache.books ?: return@LaunchedEffect
+        val startScanKey = scanKey
         val refreshed = withContext(Dispatchers.IO) { FileScanner.refreshBooks(context, cached) }
+        // 스캔 도중 폴더가 추가/제거되었으면 이전 폴더 구성의 결과이므로 버린다
+        if (startScanKey != scanKey) return@LaunchedEffect
         withContext(Dispatchers.IO) { migrateBookPathsToUri(context, refreshed) }
         BookCache.books = refreshed
         books = refreshed
-        val booksNeedingCovers = refreshed.filter { it.bookKey() !in covers }
-        if (booksNeedingCovers.isNotEmpty()) {
-            val newCovers = withContext(Dispatchers.IO) {
-                val result = mutableMapOf<String, Bitmap?>()
-                booksNeedingCovers.forEach { book ->
-                    result[book.bookKey()] = BookCoverLoader.loadFromBook(context, book)
-                }
-                result
-            }
-            covers = covers + newCovers
-        }
+        saveCatalog(refreshed)
     }
 
     Column(modifier = modifier.fillMaxSize()) {
@@ -316,6 +317,17 @@ fun AllBooksScreen(
                         startIndex,
                         (startIndex + itemsPerPage).coerceAtMost(processedBooks.size)
                     )
+
+                    // 현재 페이지에 보이는 책 중 커버가 아직 없는 것만 로드 (전체 책 커버를 미리 로드하지 않음)
+                    LaunchedEffect(pageItems) {
+                        val missing = pageItems.filter { it.bookKey() !in covers }
+                        if (missing.isEmpty()) return@LaunchedEffect
+                        val newCovers = mutableMapOf<String, Bitmap?>()
+                        missing.forEach { book ->
+                            newCovers[book.bookKey()] = BookCoverLoader.loadFromBook(context, book)
+                        }
+                        covers = covers + newCovers
+                    }
 
                     // targetPage 변경 시 커버를 먼저 로드한 뒤 페이지 전환
                     LaunchedEffect(targetPage, itemsPerPage, processedBooks) {
