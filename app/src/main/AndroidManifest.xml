@@ -1,7 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- enableOnBackInvokedCallback=false: targetSdk 36에서 기본 활성화되는 예측형 뒤로가기를 끄고 기존 뒤로가기 방식 유지
+         (e-ink 기기에서 시스템 뒤로가기 애니메이션 방지, WebView 텍스트 선택 중 뒤로가기 동작 유지) -->
     <application
+        android:enableOnBackInvokedCallback="false"
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"

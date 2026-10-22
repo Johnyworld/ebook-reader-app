@@ -16,7 +16,7 @@ val keystoreProperties = Properties().apply {
 
 android {
     namespace = "com.rotein.ebookreader"
-    compileSdk = 35
+    compileSdk = 36
 
     if (keystorePropertiesFile.exists()) {
         signingConfigs {
@@ -32,7 +32,7 @@ android {
     defaultConfig {
         applicationId = "com.eera"
         minSdk = 26
-        targetSdk = 35
+        targetSdk = 36
         versionCode = 12
         versionName = "1.0.11"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
