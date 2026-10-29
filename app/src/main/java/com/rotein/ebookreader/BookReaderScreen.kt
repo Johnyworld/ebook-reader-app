@@ -256,7 +256,8 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
         }
     }
 
-    Box(modifier = modifier.fillMaxSize().clipToBounds().testTag("bookReaderScreen")) {
+    // 흰 배경 — 책 파일 준비 중에도 뒤의 목록(재정렬·페이지 이동)이 비쳐 보이지 않게 한다
+    Box(modifier = modifier.fillMaxSize().background(EreaderColors.White).clipToBounds().testTag("bookReaderScreen")) {
         // 뷰어 콘텐츠 영역 — 상태바가 있는 기기에서 콘텐츠가 가려지지 않도록 패딩 적용
         Box(modifier = Modifier.fillMaxSize().statusBarsPadding()) {
         val currentPath = localPath
