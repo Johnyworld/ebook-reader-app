@@ -40,7 +40,6 @@ import com.rotein.ebookreader.FONT_WEIGHT_STEP
 import com.rotein.ebookreader.ImportedFontStore
 import com.rotein.ebookreader.READER_BUILTIN_FONT_NAMES
 import com.rotein.ebookreader.ReaderBottomInfo
-import com.rotein.ebookreader.ReaderPageFlip
 import com.rotein.ebookreader.ReaderSettings
 import com.rotein.ebookreader.VolumeKeyAction
 import com.rotein.ebookreader.availableFontWeightLevels
@@ -242,13 +241,7 @@ private fun ReaderMarginTab(settings: ReaderSettings, onSettingsChange: (ReaderS
 private fun ReaderViewerTab(settings: ReaderSettings, onSettingsChange: (ReaderSettings) -> Unit) {
     Column(modifier = Modifier.fillMaxWidth()) {
         ReaderSettingRow(stringResource(R.string.setting_page_flip)) {
-            ReaderCycleSelectorField(
-                options = ReaderPageFlip.entries,
-                selected = settings.pageFlip,
-                onSelect = { onSettingsChange(settings.copy(pageFlip = it)) },
-                labelFor = { stringResource(it.labelRes) },
-                forceAbove = true
-            )
+            PageFlipSelectorField(settings, onSettingsChange)
         }
         HorizontalDivider(color = EreaderColors.Gray)
         ReaderSettingRow(stringResource(R.string.setting_left_info)) {

@@ -68,6 +68,10 @@
     <string name="page_flip_lr_next_prev">左右\n下页/上页</string>
     <string name="page_flip_tb_prev_next">上下\n上页/下页</string>
     <string name="page_flip_tb_next_prev">上下\n下页/上页</string>
+    <string name="page_flip_split_two">2分区</string>
+    <string name="page_flip_split_four">4分区</string>
+    <string name="page_flip_prev">上页</string>
+    <string name="page_flip_next">下页</string>
 
     <!-- ReaderBottomInfo -->
     <string name="bottom_info_none">无</string>

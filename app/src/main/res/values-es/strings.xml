@@ -68,6 +68,10 @@
     <string name="page_flip_lr_next_prev">Izq/Der\nSiguiente/Anterior</string>
     <string name="page_flip_tb_prev_next">Arr/Abj\nAnterior/Siguiente</string>
     <string name="page_flip_tb_next_prev">Arr/Abj\nSiguiente/Anterior</string>
+    <string name="page_flip_split_two">2 zonas</string>
+    <string name="page_flip_split_four">4 zonas</string>
+    <string name="page_flip_prev">Ant.</string>
+    <string name="page_flip_next">Sig.</string>
 
     <!-- ReaderBottomInfo -->
     <string name="bottom_info_none">Ninguno</string>

@@ -35,7 +35,9 @@ import com.rotein.ebookreader.CenteredMessage
 import com.rotein.ebookreader.FONT_EPUB_ORIGINAL
 import com.rotein.ebookreader.ImportedFontStore
 import com.rotein.ebookreader.LoadingIndicator
-import com.rotein.ebookreader.ReaderPageFlip
+import com.rotein.ebookreader.PageTapAction
+import com.rotein.ebookreader.QuadPageFlip
+import com.rotein.ebookreader.resolvePageTap
 import com.rotein.ebookreader.ReaderSettings
 import com.rotein.ebookreader.escapeForJs
 import com.rotein.ebookreader.fontFamilyForJs
@@ -101,6 +103,9 @@ internal fun EpubViewer(
     onMemoLongPressRef.set(onMemoLongPress)
     val pageFlipRef = remember { java.util.concurrent.atomic.AtomicReference(readerSettings.pageFlip) }
     pageFlipRef.set(readerSettings.pageFlip)
+    // 4분할이 아니면 null (2분할 pageFlip 기준으로 판정)
+    val quadPageFlipRef = remember { java.util.concurrent.atomic.AtomicReference<QuadPageFlip?>(null) }
+    quadPageFlipRef.set(readerSettings.quadPageFlip.takeIf { readerSettings.pageFlipQuad })
     val clearSelection: () -> Unit = {
         selectionActive.set(false)
         selectionState = null
@@ -401,27 +406,10 @@ internal fun EpubViewer(
                                         } catch (_: Exception) {}
                                     } else {
                                         // 링크가 아니면 기존 페이지 플립 처리
-                                        when (pageFlipRef.get()) {
-                                            ReaderPageFlip.LR_PREV_NEXT -> when {
-                                                x < w / 3f -> doPrev()
-                                                x > w * 2f / 3f -> doNext()
-                                                else -> onCenterTap()
-                                            }
-                                            ReaderPageFlip.LR_NEXT_PREV -> when {
-                                                x < w / 3f -> doNext()
-                                                x > w * 2f / 3f -> doPrev()
-                                                else -> onCenterTap()
-                                            }
-                                            ReaderPageFlip.TB_PREV_NEXT -> when {
-                                                y < h / 3f -> doPrev()
-                                                y > h * 2f / 3f -> doNext()
-                                                else -> onCenterTap()
-                                            }
-                                            ReaderPageFlip.TB_NEXT_PREV -> when {
-                                                y < h / 3f -> doNext()
-                                                y > h * 2f / 3f -> doPrev()
-                                                else -> onCenterTap()
-                                            }
+                                        when (resolvePageTap(x, y, w, h, pageFlipRef.get(), quadPageFlipRef.get())) {
+                                            PageTapAction.PREV -> doPrev()
+                                            PageTapAction.NEXT -> doNext()
+                                            PageTapAction.CENTER -> onCenterTap()
                                         }
                                     }
                                 }
