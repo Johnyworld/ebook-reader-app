@@ -7,6 +7,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import com.rotein.ebookreader.ui.theme.EreaderFontSize
+import java.io.File
 
 internal fun cfiToPage(cfi: String, spinePageOffsets: Map<Int, Int>, cfiPageMap: Map<String, Int> = emptyMap()): Int {
     if (cfi.isEmpty()) return 0
@@ -38,6 +39,17 @@ internal fun fontFamilyForJs(fontName: String): String = when (fontName) {
     FONT_EPUB_ORIGINAL -> FONT_EPUB_ORIGINAL
     FONT_SYSTEM -> ""
     else -> fontName
+}
+
+/**
+ * JS에 넘길 두께 정보: (적용할 단계, 가변 글꼴 wght 범위 "최소 최대")
+ * 가변 글꼴이 아니면 범위는 빈 문자열이고, JS는 text-stroke로 굵게 처리한다.
+ */
+internal fun fontWeightForJs(settings: ReaderSettings, fontFilePath: String): Pair<Int, String> {
+    val axis = if (fontFilePath.isNotEmpty()) readWeightAxis(File(fontFilePath)) else null
+    val level = effectiveFontWeightLevel(settings.fontWeightLevel, availableFontWeightLevels(axis))
+    val range = axis?.let { "${it.min.toInt()} ${it.max.toInt()}" } ?: ""
+    return level to range
 }
 
 internal fun String.escapeCfiForJs(): String =

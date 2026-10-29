@@ -2,12 +2,14 @@ package com.rotein.ebookreader.reader
 
 import com.rotein.ebookreader.ReaderSettings
 import com.rotein.ebookreader.fontFamilyForJs
+import com.rotein.ebookreader.fontWeightForJs
 import org.json.JSONObject
 
 /** 하단 정보 영역을 위한 추가 여백 (px) */
 internal const val BOTTOM_INFO_HEIGHT = 32
 
 internal fun buildEpubJsHtml(opfPath: String, savedCfi: String, settings: ReaderSettings, fontFilePath: String = ""): String {
+    val (fontWeightLevel, fontWeightRange) = fontWeightForJs(settings, fontFilePath)
     // JSONObject로 빌드하여 문자열 인젝션을 구조적으로 방지
     val config = JSONObject().apply {
         put("opfPath", opfPath)
@@ -22,6 +24,8 @@ internal fun buildEpubJsHtml(opfPath: String, savedCfi: String, settings: Reader
         put("paddingHorizontal", settings.paddingHorizontal)
         put("fontFilePath", fontFilePath)
         put("fontFamilyForJs", fontFamilyForJs(settings.fontName))
+        put("fontWeightLevel", fontWeightLevel)
+        put("fontWeightRange", fontWeightRange)
         put("bottomInfoHeight", BOTTOM_INFO_HEIGHT)
     }
     // JSON을 JS 작은따옴표 문자열 안에 안전하게 삽입

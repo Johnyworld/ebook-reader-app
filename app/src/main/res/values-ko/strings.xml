@@ -84,6 +84,8 @@
     <string name="tab_viewer">뷰어</string>
     <string name="close">닫기</string>
     <string name="setting_font_size">글자 크기</string>
+    <string name="setting_font_weight">글꼴 두께</string>
+    <string name="font_weight_default">기본</string>
     <string name="setting_line_height">줄 간격</string>
     <string name="setting_paragraph_spacing">문단 간격</string>
     <string name="setting_padding_vertical">상하 여백</string>

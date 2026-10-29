@@ -39,6 +39,7 @@ import com.rotein.ebookreader.ReaderPageFlip
 import com.rotein.ebookreader.ReaderSettings
 import com.rotein.ebookreader.escapeForJs
 import com.rotein.ebookreader.fontFamilyForJs
+import com.rotein.ebookreader.fontWeightForJs
 import com.rotein.ebookreader.R
 import com.rotein.ebookreader.ui.components.ActionItem
 import com.rotein.ebookreader.ui.components.ActionPopup
@@ -144,6 +145,7 @@ internal fun EpubViewer(
         }
         val fontFamily = fontFamilyForJs(readerSettings.fontName)
         val fontFilePath = ImportedFontStore.load(context).find { it.name == readerSettings.fontName }?.filePath ?: ""
+        val (fontWeightLevel, fontWeightRange) = fontWeightForJs(readerSettings, fontFilePath)
         // 재스캔 전에 최신 annotation CFI 목록을 전달하여 정확한 페이지 계산 보장
         val cfis = latestAnnotationCfis.value
         val cfiListJs = if (cfis.isNotEmpty()) {
@@ -159,7 +161,9 @@ internal fun EpubViewer(
             ${readerSettings.paragraphSpacing},
             ${readerSettings.paddingVertical},
             ${readerSettings.paddingHorizontal},
-            ${readerSettings.dualPage}
+            ${readerSettings.dualPage},
+            $fontWeightLevel,
+            "${fontWeightRange.escapeForJs()}"
         )"""
         webViewRef.get()?.evaluateJavascript(js, null)
     }
