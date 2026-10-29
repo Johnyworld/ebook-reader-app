@@ -83,6 +83,8 @@
     <string name="tab_viewer">ビューア</string>
     <string name="close">閉じる</string>
     <string name="setting_font_size">文字サイズ</string>
+    <string name="setting_font_weight">文字の太さ</string>
+    <string name="font_weight_default">標準</string>
     <string name="setting_line_height">行間</string>
     <string name="setting_paragraph_spacing">段落間隔</string>
     <string name="setting_padding_vertical">上下の余白</string>

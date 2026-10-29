@@ -96,6 +96,8 @@
     <string name="tab_viewer">Viewer</string>
     <string name="close">Close</string>
     <string name="setting_font_size">Font size</string>
+    <string name="setting_font_weight">Font weight</string>
+    <string name="font_weight_default">Default</string>
     <string name="setting_line_height">Line height</string>
     <string name="setting_paragraph_spacing">Paragraph spacing</string>
     <string name="setting_padding_vertical">Vertical margin</string>

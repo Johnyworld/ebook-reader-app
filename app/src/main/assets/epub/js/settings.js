@@ -7,7 +7,9 @@ window._readerSettings = {
     lineHeight: _config.lineHeight,
     paragraphSpacing: _config.paragraphSpacing,
     paddingVertical: _config.paddingVertical,
-    paddingHorizontal: _config.paddingHorizontal
+    paddingHorizontal: _config.paddingHorizontal,
+    fontWeightLevel: _config.fontWeightLevel,
+    fontWeightRange: _config.fontWeightRange
 };
 
 function _buildReaderCss(s) {
@@ -19,21 +21,42 @@ function _buildReaderCss(s) {
     var paragraphRule = s.paragraphSpacing > 0 ? 'p { margin-bottom: ' + s.paragraphSpacing + 'px !important; }' : '';
     // 이미지가 컬럼 너비를 초과하여 텍스트와 겹치는 것을 방지한다.
     var imgRule = 'img, svg, image { max-width: 100% !important; height: auto !important; break-inside: avoid; box-sizing: border-box; }';
+    // 글꼴 두께: 가변 글꼴(wght 범위 있음)은 실제 font-weight, 그 외에는 text-stroke로 획을 덧그려 굵게 한다.
+    // font-weight는 font-family와 같이 본문 요소 전체에 !important로 적용한다.
+    // 인디자인 EPUB 등은 문단 클래스마다 font-weight: normal을 지정하므로 상속만으로는 적용되지 않는다.
+    // 소제목(h1~h6)과 b/strong은 본문보다 300 굵게 따로 지정해 굵은 글씨 구분을 유지한다.
+    // (클래스로 굵게 만든 문단·span은 본문과 같은 굵기가 된다)
+    // text-stroke는 상속되고 EPUB이 지정하지 않는 속성이므로 html, body에만 지정하면 되며 레이아웃(글자 폭)은 바뀌지 않는다.
+    var weightRule = '';
+    if (s.fontWeightLevel) {
+        if (s.fontWeightRange) {
+            var weight = 400 + 100 * s.fontWeightLevel;
+            var boldWeight = Math.min(900, weight + 300);
+            weightRule = 'html, body, p, div, span, li, td, blockquote { font-weight: ' + weight + ' !important; }' +
+                // 하위 선택자(명시도 0,0,2)로 <h1><span>, <b><span> 같은 구조의 span(0,0,1)보다 우선 적용한다
+                'h1, h2, h3, h4, h5, h6, b, strong, h1 *, h2 *, h3 *, h4 *, h5 *, h6 *, b *, strong * { font-weight: ' + boldWeight + ' !important; }';
+        } else {
+            weightRule = 'html, body { -webkit-text-stroke: ' + (0.02 * s.fontWeightLevel).toFixed(2) + 'em currentColor !important; }';
+        }
+    }
     if (s.fontFamily === 'epub_original') {
-        return bodyRule + lineHeightRule + paragraphRule + imgRule;
+        return bodyRule + lineHeightRule + paragraphRule + imgRule + weightRule;
     }
     var fontFaceDecl = '';
     var ff;
     if (s.fontFilePath) {
         // CSS url() 인젝션 방지를 위해 특수문자 이스케이프
         var safePath = s.fontFilePath.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\)/g, '\\)');
-        fontFaceDecl = '@font-face { font-family: "_imported_"; src: url("' + safePath + '"); }';
+        // 가변 글꼴은 font-weight 범위를 선언해야 wght 축이 font-weight 값을 따라간다.
+        // 기본(0)일 때는 선언하지 않아 기존 렌더링·페이지 수 캐시와 동일하게 유지한다.
+        var weightDesc = (s.fontWeightRange && s.fontWeightLevel) ? ' font-weight: ' + s.fontWeightRange + ';' : '';
+        fontFaceDecl = '@font-face { font-family: "_imported_"; src: url("' + safePath + '");' + weightDesc + ' }';
         ff = "'_imported_', sans-serif";
     } else {
         ff = s.fontFamily ? ("'" + s.fontFamily + "', sans-serif") : 'sans-serif';
     }
     // 폰트 패밀리는 모든 요소에 적용한다.
-    return fontFaceDecl + allElements + ' {font-family: ' + ff + ' !important; }' + bodyRule + lineHeightRule + paragraphRule + imgRule;
+    return fontFaceDecl + allElements + ' {font-family: ' + ff + ' !important; }' + bodyRule + lineHeightRule + paragraphRule + imgRule + weightRule;
 }
 
 function _injectReaderStyle(doc) {
@@ -189,8 +212,8 @@ function _finishWithCfi(m, cfi, onComplete) {
     }
 }
 
-window._applyReaderSettings = function(fontFamily, fontFilePath, fontSize, textAlign, lineHeight, paragraphSpacing, paddingVertical, paddingHorizontal, dualPage) {
-    window._readerSettings = { fontFamily: fontFamily, fontFilePath: fontFilePath, fontSize: fontSize, textAlign: textAlign, lineHeight: lineHeight, paragraphSpacing: paragraphSpacing, paddingVertical: paddingVertical, paddingHorizontal: paddingHorizontal };
+window._applyReaderSettings = function(fontFamily, fontFilePath, fontSize, textAlign, lineHeight, paragraphSpacing, paddingVertical, paddingHorizontal, dualPage, fontWeightLevel, fontWeightRange) {
+    window._readerSettings = { fontFamily: fontFamily, fontFilePath: fontFilePath, fontSize: fontSize, textAlign: textAlign, lineHeight: lineHeight, paragraphSpacing: paragraphSpacing, paddingVertical: paddingVertical, paddingHorizontal: paddingHorizontal, fontWeightLevel: fontWeightLevel, fontWeightRange: fontWeightRange };
     _epub.dualPage = !!dualPage;
     // 위치 복원용 문자 비율 정보 + CFI를 저장한다 (최초 1회만).
     // display(cfi)는 긴 챕터에서 CSS column lazy rendering으로 실패하므로

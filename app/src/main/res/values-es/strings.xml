@@ -83,6 +83,8 @@
     <string name="tab_viewer">Visor</string>
     <string name="close">Cerrar</string>
     <string name="setting_font_size">Tamaño de fuente</string>
+    <string name="setting_font_weight">Grosor de fuente</string>
+    <string name="font_weight_default">Normal</string>
     <string name="setting_line_height">Interlineado</string>
     <string name="setting_paragraph_spacing">Espaciado de párrafo</string>
     <string name="setting_padding_vertical">Margen vertical</string>

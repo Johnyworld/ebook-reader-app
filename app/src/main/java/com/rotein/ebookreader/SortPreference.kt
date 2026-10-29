@@ -250,11 +250,15 @@ data class ReaderSettings(
     val leftInfo: ReaderBottomInfo = ReaderBottomInfo.NONE,
     val rightInfo: ReaderBottomInfo = ReaderBottomInfo.PAGE,
     val dualPage: Boolean = false,
-    val volumeKey: VolumeKeyAction = VolumeKeyAction.UP_PREV_DOWN_NEXT
+    val volumeKey: VolumeKeyAction = VolumeKeyAction.UP_PREV_DOWN_NEXT,
+    // 글꼴 이름별 두께 단계 (기본 0인 글꼴은 저장하지 않음)
+    val fontWeights: Map<String, Int> = emptyMap()
 )
 
 fun ReaderSettings.layoutFingerprint(): String =
-    "$fontName|$fontSize|$lineHeight|$paragraphSpacing|$paddingVertical|$paddingHorizontal|$dualPage|${textAlign.name}"
+    "$fontName|$fontSize|$lineHeight|$paragraphSpacing|$paddingVertical|$paddingHorizontal|$dualPage|${textAlign.name}" +
+        // 두께는 가변 글꼴에서 글자 폭을 바꾸므로 포함한다. 기본이면 기존 캐시와 호환되도록 생략.
+        (if (fontWeightLevel != 0) "|w$fontWeightLevel" else "")
 
 object ReaderSettingsStore {
     private const val PREF_NAME = "reader_settings"
@@ -273,7 +277,8 @@ object ReaderSettingsStore {
             leftInfo = ReaderBottomInfo.entries.firstOrNull { it.name == prefs.getString("leftInfo", null) } ?: ReaderBottomInfo.NONE,
             rightInfo = ReaderBottomInfo.entries.firstOrNull { it.name == prefs.getString("rightInfo", null) } ?: ReaderBottomInfo.PAGE,
             dualPage = prefs.getBoolean("dualPage", false),
-            volumeKey = VolumeKeyAction.entries.firstOrNull { it.name == prefs.getString("volumeKey", null) } ?: VolumeKeyAction.UP_PREV_DOWN_NEXT
+            volumeKey = VolumeKeyAction.entries.firstOrNull { it.name == prefs.getString("volumeKey", null) } ?: VolumeKeyAction.UP_PREV_DOWN_NEXT,
+            fontWeights = decodeFontWeights(prefs.getString("fontWeights", null))
         )
     }
 
@@ -291,6 +296,7 @@ object ReaderSettingsStore {
             .putString("rightInfo", settings.rightInfo.name)
             .putBoolean("dualPage", settings.dualPage)
             .putString("volumeKey", settings.volumeKey.name)
+            .putString("fontWeights", encodeFontWeights(settings.fontWeights))
             .apply()
     }
 }

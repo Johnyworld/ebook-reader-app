@@ -79,7 +79,9 @@ fun <T> ReaderCycleSelectorField(
     selected: T,
     onSelect: (T) -> Unit,
     labelFor: @Composable (T) -> String,
-    forceAbove: Boolean = false
+    forceAbove: Boolean = false,
+    // false면 양 끝에서 반대편으로 넘어가지 않고 화살표가 비활성화된다
+    wrap: Boolean = true
 ) {
     val currentIndex = options.indexOf(selected)
 
@@ -89,7 +91,8 @@ fun <T> ReaderCycleSelectorField(
     ) {
         IconButton(
             onClick = { onSelect(options[(currentIndex - 1 + options.size) % options.size]) },
-            modifier = Modifier.size(40.dp)
+            modifier = Modifier.size(40.dp),
+            enabled = wrap || currentIndex > 0
         ) {
             Icon(
                 Icons.AutoMirrored.Filled.ArrowBack,
@@ -110,7 +113,8 @@ fun <T> ReaderCycleSelectorField(
         }
         IconButton(
             onClick = { onSelect(options[(currentIndex + 1) % options.size]) },
-            modifier = Modifier.size(40.dp)
+            modifier = Modifier.size(40.dp),
+            enabled = wrap || currentIndex < options.size - 1
         ) {
             Icon(
                 Icons.AutoMirrored.Filled.ArrowForward,

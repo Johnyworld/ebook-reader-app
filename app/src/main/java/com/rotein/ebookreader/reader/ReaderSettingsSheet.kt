@@ -37,13 +37,21 @@ import androidx.compose.ui.unit.dp
 import com.rotein.ebookreader.R
 import com.rotein.ebookreader.FONT_EPUB_ORIGINAL
 import com.rotein.ebookreader.FONT_SYSTEM
+import com.rotein.ebookreader.FONT_WEIGHT_BASE
+import com.rotein.ebookreader.FONT_WEIGHT_STEP
 import com.rotein.ebookreader.ImportedFontStore
 import com.rotein.ebookreader.READER_BUILTIN_FONT_NAMES
 import com.rotein.ebookreader.ReaderBottomInfo
 import com.rotein.ebookreader.ReaderPageFlip
 import com.rotein.ebookreader.ReaderSettings
 import com.rotein.ebookreader.VolumeKeyAction
+import com.rotein.ebookreader.availableFontWeightLevels
+import com.rotein.ebookreader.effectiveFontWeightLevel
 import com.rotein.ebookreader.fontDisplayName
+import com.rotein.ebookreader.fontWeightLevel
+import com.rotein.ebookreader.readWeightAxis
+import com.rotein.ebookreader.withFontWeightLevel
+import java.io.File
 import com.rotein.ebookreader.ui.components.EreaderTabBar
 import com.rotein.ebookreader.ui.components.ReaderCycleSelectorField
 import com.rotein.ebookreader.ui.components.ReaderSettingRow
@@ -124,6 +132,12 @@ private fun ReaderGlyphTab(
         listOf(FONT_EPUB_ORIGINAL, FONT_SYSTEM) + READER_BUILTIN_FONT_NAMES + importedFonts.map { it.name }
     }
     val currentIndex = allFonts.indexOf(settings.fontName).coerceAtLeast(0)
+    // 현재 글꼴의 wght 축 (가져온 가변 글꼴만 존재) 과 지원하는 두께 단계.
+    // 시트가 열린 상태에서 글꼴을 새로 가져올 수 있으므로 importedFonts 대신 매번 저장소에서 다시 읽는다.
+    val fontWeightAxis = remember(settings.fontName) {
+        ImportedFontStore.load(context).find { it.name == settings.fontName }?.filePath?.let { readWeightAxis(File(it)) }
+    }
+    val fontWeightLevels = remember(fontWeightAxis) { availableFontWeightLevels(fontWeightAxis) }
 
     Column(modifier = Modifier.fillMaxWidth()) {
         ReaderSettingRow(stringResource(R.string.font_label)) {
@@ -160,6 +174,26 @@ private fun ReaderGlyphTab(
                 onDecrement = { if (settings.fontSize > 8) onSettingsChange(settings.copy(fontSize = settings.fontSize - 1)) },
                 onIncrement = { if (settings.fontSize < 32) onSettingsChange(settings.copy(fontSize = settings.fontSize + 1)) },
                 tag = "fontSize"
+            )
+        }
+        HorizontalDivider(color = EreaderColors.Gray)
+        ReaderSettingRow(stringResource(R.string.setting_font_weight)) {
+            ReaderCycleSelectorField(
+                options = fontWeightLevels,
+                selected = effectiveFontWeightLevel(settings.fontWeightLevel, fontWeightLevels),
+                onSelect = { onSettingsChange(settings.withFontWeightLevel(it)) },
+                labelFor = { level ->
+                    val defaultLabel = stringResource(R.string.font_weight_default)
+                    if (fontWeightAxis != null) {
+                        // 가변 글꼴: 실제 CSS 굵기 (100~900), 400에만 기본 표시
+                        val weight = FONT_WEIGHT_BASE + FONT_WEIGHT_STEP * level
+                        if (level == 0) "$weight($defaultLabel)" else "$weight"
+                    } else {
+                        // 일반 글꼴: text-stroke 굵게 단계
+                        if (level == 0) defaultLabel else "+$level"
+                    }
+                },
+                wrap = false
             )
         }
     }
