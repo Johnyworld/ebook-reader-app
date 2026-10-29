@@ -1,7 +1,9 @@
 package com.rotein.ebookreader.ui.components
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -14,12 +16,22 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.rotein.ebookreader.ui.theme.EreaderColors
 import com.rotein.ebookreader.ui.theme.EreaderFontSize
 import com.rotein.ebookreader.ui.theme.EreaderSpacing
 
@@ -109,6 +121,7 @@ fun <T> ReaderCycleSelectorField(
                 popupWidth = 160.dp,
                 popupAlignment = Alignment.TopStart,
                 forceAbove = forceAbove,
+                trigger = { onClick -> ReaderClickableValue(labelFor(selected), onClick, Modifier.fillMaxWidth(), maxLines = 2) }
             )
         }
         IconButton(
@@ -122,5 +135,52 @@ fun <T> ReaderCycleSelectorField(
                 modifier = Modifier.size(16.dp)
             )
         }
+    }
+}
+
+/**
+ * 눌러서 목록·팝업을 여는 설정 값. 숫자 스텝퍼 값과 구분되도록 글자 아래에 점선 밑줄을 긋는다.
+ * 여러 줄로 표시될 때는 줄마다 글자 폭만큼 밑줄을 긋는다.
+ */
+@Composable
+fun ReaderClickableValue(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    maxLines: Int = 1
+) {
+    var layout by remember { mutableStateOf<TextLayoutResult?>(null) }
+    Box(
+        // 탭 영역은 최소 48dp 높이를 보장한다 (밑줄 좌표는 Text가 내용 폭일 때를 전제로 하므로 Text에는 폭을 주지 않는다)
+        modifier = modifier
+            .clickable(role = Role.Button, onClick = onClick)
+            .defaultMinSize(minHeight = 48.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text,
+            style = EreaderFontSize.M,
+            color = EreaderColors.Black,
+            textAlign = TextAlign.Center,
+            maxLines = maxLines,
+            overflow = TextOverflow.Ellipsis,
+            onTextLayout = { layout = it },
+            modifier = Modifier.drawBehind {
+                val l = layout ?: return@drawBehind
+                val dash = PathEffect.dashPathEffect(floatArrayOf(3.dp.toPx(), 2.dp.toPx()))
+                val stroke = 1.dp.toPx()
+                for (line in 0 until l.lineCount) {
+                    // 글자 기준선보다 살짝 아래에 긋는다
+                    val y = l.getLineBaseline(line) + 3.dp.toPx()
+                    drawLine(
+                        color = EreaderColors.Black,
+                        start = Offset(l.getLineLeft(line), y),
+                        end = Offset(l.getLineRight(line), y),
+                        strokeWidth = stroke,
+                        pathEffect = dash
+                    )
+                }
+            }
+        )
     }
 }

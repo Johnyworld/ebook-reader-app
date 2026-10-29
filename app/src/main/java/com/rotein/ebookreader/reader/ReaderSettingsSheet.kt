@@ -31,8 +31,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.rotein.ebookreader.R
 import com.rotein.ebookreader.FONT_EPUB_ORIGINAL
@@ -53,6 +51,7 @@ import com.rotein.ebookreader.readWeightAxis
 import com.rotein.ebookreader.withFontWeightLevel
 import java.io.File
 import com.rotein.ebookreader.ui.components.EreaderTabBar
+import com.rotein.ebookreader.ui.components.ReaderClickableValue
 import com.rotein.ebookreader.ui.components.ReaderCycleSelectorField
 import com.rotein.ebookreader.ui.components.ReaderSettingRow
 import com.rotein.ebookreader.ui.components.ReaderStepperField
@@ -151,13 +150,10 @@ private fun ReaderGlyphTab(
                 ) {
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, modifier = Modifier.size(16.dp))
                 }
-                Text(
+                ReaderClickableValue(
                     fontDisplayName(settings.fontName),
-                    modifier = Modifier.weight(1f).clickable { onOpenFontPopup() },
-                    style = EreaderFontSize.M,
-                    textAlign = TextAlign.Center,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    onClick = onOpenFontPopup,
+                    modifier = Modifier.weight(1f)
                 )
                 IconButton(
                     onClick = { onSettingsChange(settings.copy(fontName = allFonts[(currentIndex + 1) % allFonts.size])) },
