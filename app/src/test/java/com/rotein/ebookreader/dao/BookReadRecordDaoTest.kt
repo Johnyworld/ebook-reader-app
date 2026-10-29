@@ -124,4 +124,34 @@ class BookReadRecordDaoTest {
         assertEquals("""{"0":[0,100]}""", record.cachedSpineCharPageBreaksJson)
         assertEquals("font|16|1.5", record.cachedSettingsFingerprint)
     }
+
+    @Test
+    fun `resetContentCache - TOC와 페이지 캐시를 비우고 파일 버전을 기록, 읽기 위치와 즐겨찾기는 유지`() = runTest {
+        dao.upsertCfi("/a.epub", "epubcfi(/6/4!/4/2)")
+        dao.upsertTocJson("/a.epub", """[{"label":"Ch1"}]""")
+        dao.upsertPageScanCache("/a.epub", 150, """{"0":0}""", """{"0":[0]}""", "font|16|1.5")
+        dao.upsertFavorite("/a.epub", true)
+
+        dao.resetContentCache("/a.epub", "2048:1700000000")
+
+        val record = dao.getByPath("/a.epub")!!
+        assertEquals("", record.tocJson)
+        assertEquals(0, record.cachedTotalPages)
+        assertEquals("", record.cachedSpinePageOffsetsJson)
+        assertEquals("", record.cachedSpineCharPageBreaksJson)
+        assertEquals("", record.cachedSettingsFingerprint)
+        assertEquals("2048:1700000000", record.fileVersion)
+        // 사용자 데이터는 유지
+        assertEquals("epubcfi(/6/4!/4/2)", record.lastCfi)
+        assertTrue(record.isFavorite)
+    }
+
+    @Test
+    fun `resetContentCache - 레코드가 없으면 파일 버전만 담아 생성`() = runTest {
+        dao.resetContentCache("/a.epub", "2048:1700000000")
+
+        val record = dao.getByPath("/a.epub")!!
+        assertEquals("2048:1700000000", record.fileVersion)
+        assertEquals(0L, record.lastReadAt)
+    }
 }

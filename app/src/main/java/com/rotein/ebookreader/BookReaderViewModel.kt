@@ -138,7 +138,7 @@ class BookReaderViewModel(application: Application) : AndroidViewModel(applicati
         }
     }
 
-    fun loadBook(path: String, isEpub: Boolean) {
+    fun loadBook(path: String, isEpub: Boolean, fileVersion: String) {
         bookPath = path
         _readingState.value = ReadingState()
         _contentState.value = ContentState(isLoading = true)
@@ -147,7 +147,15 @@ class BookReaderViewModel(application: Application) : AndroidViewModel(applicati
         _searchState.value = SearchState()
 
         viewModelScope.launch {
-            val record = withContext(Dispatchers.IO) { dao.getByPath(path) }
+            val record = withContext(Dispatchers.IO) {
+                val saved = dao.getByPath(path)
+                // 같은 경로에 다른 파일이 들어왔으면(버전 불일치) 이전 파일의 TOC·페이지 캐시를 버린다
+                if (saved?.fileVersion == fileVersion) saved
+                else {
+                    dao.resetContentCache(path, fileVersion)
+                    dao.getByPath(path)
+                }
+            }
             _readingState.update { it.copy(savedCfi = record?.lastCfi ?: "") }
 
             if (isEpub) {
