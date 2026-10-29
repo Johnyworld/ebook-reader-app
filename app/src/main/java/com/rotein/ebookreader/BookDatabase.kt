@@ -27,7 +27,8 @@ data class BookReadRecord(
     val cachedSettingsFingerprint: String = "",
     val isFavorite: Boolean = false,
     val isHidden: Boolean = false,
-    val readingProgress: Float = 0f
+    val readingProgress: Float = 0f,
+    val fileVersion: String = ""  // tocJson·페이지 캐시를 만든 파일의 버전 (BookFile.fileVersion)
 )
 
 @Dao
@@ -75,6 +76,19 @@ interface BookReadRecordDao {
     suspend fun upsertPageScanCache(bookPath: String, totalPages: Int, spinePageOffsetsJson: String, spineCharPageBreaksJson: String, fingerprint: String) {
         insertIfNotExists(BookReadRecord(bookPath = bookPath, lastReadAt = 0L))
         updatePageScanCache(bookPath, totalPages, spinePageOffsetsJson, spineCharPageBreaksJson, fingerprint)
+    }
+
+    @Query("UPDATE book_read_records SET tocJson = '', cachedTotalPages = 0, cachedSpinePageOffsetsJson = '', cachedSpineCharPageBreaksJson = '', cachedSettingsFingerprint = '', fileVersion = :fileVersion WHERE bookPath = :bookPath")
+    suspend fun updateClearContentCache(bookPath: String, fileVersion: String)
+
+    /**
+     * 파일 내용이 바뀌었을 때 내용에서 파생된 캐시(TOC, 페이지 스캔 결과)를 비우고 새 파일 버전을 기록한다.
+     * 읽기 위치·즐겨찾기 등 사용자 데이터는 유지한다.
+     */
+    @Transaction
+    suspend fun resetContentCache(bookPath: String, fileVersion: String) {
+        insertIfNotExists(BookReadRecord(bookPath = bookPath, lastReadAt = 0L))
+        updateClearContentCache(bookPath, fileVersion)
     }
 
     @Query("UPDATE book_read_records SET isFavorite = :isFavorite WHERE bookPath = :bookPath")
@@ -362,15 +376,22 @@ internal val MIGRATION_17_18 = object : Migration(17, 18) {
     }
 }
 
+internal val MIGRATION_18_19 = object : Migration(18, 19) {
+    override fun migrate(database: SupportSQLiteDatabase) {
+        // 파일 교체 시 TOC·페이지 캐시 무효화를 위한 파일 버전 컬럼
+        database.execSQL("ALTER TABLE book_read_records ADD COLUMN fileVersion TEXT NOT NULL DEFAULT ''")
+    }
+}
+
 internal val ALL_MIGRATIONS = arrayOf(
     MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5,
     MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9,
     MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13,
     MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17,
-    MIGRATION_17_18
+    MIGRATION_17_18, MIGRATION_18_19
 )
 
-@Database(entities = [BookReadRecord::class, Bookmark::class, Highlight::class, Memo::class, BookCatalogEntry::class], version = 18)
+@Database(entities = [BookReadRecord::class, Bookmark::class, Highlight::class, Memo::class, BookCatalogEntry::class], version = 19)
 abstract class BookDatabase : RoomDatabase() {
     abstract fun bookReadRecordDao(): BookReadRecordDao
     abstract fun bookmarkDao(): BookmarkDao

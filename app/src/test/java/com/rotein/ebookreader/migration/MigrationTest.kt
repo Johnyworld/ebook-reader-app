@@ -12,6 +12,7 @@ import com.rotein.ebookreader.MIGRATION_11_12
 import com.rotein.ebookreader.MIGRATION_4_5
 import com.rotein.ebookreader.MIGRATION_5_6
 import com.rotein.ebookreader.MIGRATION_16_17
+import com.rotein.ebookreader.MIGRATION_18_19
 import com.rotein.ebookreader.MIGRATION_9_10
 import org.junit.After
 import org.junit.Assert.*
@@ -282,6 +283,25 @@ class MigrationTest {
         assertEquals(0, catalog.getInt(0))
         catalog.close()
         room.close()
+    }
+
+    @Test
+    fun `migration 18 to 19 - fileVersion 컬럼 추가 및 기존 데이터 보존`() {
+        val db = createDatabase(18) { db ->
+            db.execSQL("CREATE TABLE IF NOT EXISTS `book_read_records` (`bookPath` TEXT NOT NULL, `lastReadAt` INTEGER NOT NULL, `lastCfi` TEXT NOT NULL, `tocJson` TEXT NOT NULL, `cachedTotalPages` INTEGER NOT NULL, `cachedSpinePageOffsetsJson` TEXT NOT NULL, `cachedSpineCharPageBreaksJson` TEXT NOT NULL, `cachedSettingsFingerprint` TEXT NOT NULL, `isFavorite` INTEGER NOT NULL, `isHidden` INTEGER NOT NULL, `readingProgress` REAL NOT NULL, PRIMARY KEY(`bookPath`))")
+        }
+        db.execSQL("INSERT INTO book_read_records VALUES ('content://a', 7000, 'epubcfi(/6/4)', '[]', 10, '', '', 'fp', 1, 0, 0.5)")
+
+        MIGRATION_18_19.migrate(db)
+
+        val cursor = db.query("SELECT * FROM book_read_records")
+        assertTrue(cursor.moveToFirst())
+        assertEquals("epubcfi(/6/4)", cursor.getString(cursor.getColumnIndexOrThrow("lastCfi")))
+        assertEquals(10, cursor.getInt(cursor.getColumnIndexOrThrow("cachedTotalPages")))
+        // 기존 레코드는 파일 버전을 모르므로 빈 문자열 → 다음 열기 때 캐시가 한 번 무효화된다
+        assertEquals("", cursor.getString(cursor.getColumnIndexOrThrow("fileVersion")))
+        cursor.close()
+        db.close()
     }
 
     @Test

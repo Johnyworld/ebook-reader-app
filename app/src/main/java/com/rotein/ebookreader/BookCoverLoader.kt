@@ -32,7 +32,8 @@ object BookCoverLoader {
      * 새로 추출한 썸네일은 디스크에 저장해 다음 실행부터 재추출하지 않는다.
      */
     suspend fun loadFromBook(context: Context, book: BookFile): Bitmap? {
-        val key = book.bookKey()
+        // 파일 크기·수정 시각을 포함해, 같은 경로의 파일이 교체되면 메모리 캐시도 새로 로드한다
+        val key = CoverThumbnail.diskCacheKey(book.bookKey(), book.size, book.dateModified)
         cache.get(key)?.let { return it }
 
         return withContext(Dispatchers.IO) {

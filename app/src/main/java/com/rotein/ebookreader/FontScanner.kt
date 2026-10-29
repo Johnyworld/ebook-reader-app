@@ -33,7 +33,7 @@ object FontScanner {
                         // 폰트는 로컬 경로가 필요하므로 캐시 복사
                         try {
                             val localPath = BookFileCache.ensureCached(
-                                context, file.uri, name, file.length()
+                                context, file.uri, name, fileVersionOf(file.length(), file.lastModified() / 1000)
                             )
                             result[displayName] = localPath
                         } catch (_: Exception) { }

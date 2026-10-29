@@ -204,7 +204,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
         val resolved = if (book.contentUri.isNotEmpty()) {
             withContext(Dispatchers.IO) {
                 BookFileCache.ensureCached(
-                    context, Uri.parse(book.contentUri), book.name, book.size
+                    context, Uri.parse(book.contentUri), book.name, book.fileVersion()
                 )
             }
         } else {
@@ -212,7 +212,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
         }
         localPath = resolved
         // DB 키로는 bookKey()(SAF URI 또는 기존 경로)를 사용
-        vm.loadBook(book.bookKey(), book.extension.lowercase() == "epub")
+        vm.loadBook(book.bookKey(), book.extension.lowercase() == "epub", book.fileVersion())
     }
 
     LaunchedEffect(contentState.isContentRendered) {

@@ -587,13 +587,20 @@ private fun extractEpub(context: Context, epubPath: String): Pair<String, String
         .take(16)
     val outDir = File(context.cacheDir, "epub/$hash")
     val opfMarker = File(outDir, ".opf_path")
+    // 압축 해제한 EPUB 파일의 크기·수정 시각. 같은 경로의 파일이 교체되면 달라진다
+    val sourceFile = File(epubPath)
+    val sourceVersion = "${sourceFile.length()}:${sourceFile.lastModified()}"
+    val versionMarker = File(outDir, ".source_version")
 
-    if (outDir.exists() && opfMarker.exists() && File(outDir, "epub.min.js").exists() && File(outDir, "js/init.js").exists()) {
+    if (outDir.exists() && opfMarker.exists() && File(outDir, "epub.min.js").exists() && File(outDir, "js/init.js").exists()
+        && versionMarker.exists() && versionMarker.readText() == sourceVersion) {
         // JS 모듈 파일은 항상 최신 assets로 덮어쓴다 (코드 수정 반영)
         copyJsModules(context, outDir)
         return Pair(outDir.absolutePath, opfMarker.readText())
     }
 
+    // 파일이 교체되었거나 이전 압축 해제가 불완전하면 이전 내용이 남지 않도록 지우고 새로 푼다
+    outDir.deleteRecursively()
     outDir.mkdirs()
 
     ZipFile(epubPath).use { zip ->
@@ -614,6 +621,7 @@ private fun extractEpub(context: Context, epubPath: String): Pair<String, String
 
     val opfPath = findOpfPath(outDir) ?: return null
     opfMarker.writeText(opfPath)
+    versionMarker.writeText(sourceVersion)
     return Pair(outDir.absolutePath, opfPath)
 }
 

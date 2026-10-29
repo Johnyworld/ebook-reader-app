@@ -18,9 +18,10 @@ object BookFileCache {
 
     /**
      * content URI를 로컬 캐시 파일로 복사하고 경로를 반환한다.
-     * 이미 캐시된 파일이 있고 크기가 동일하면 재사용한다.
+     * 이미 캐시된 파일이 있고 원본의 파일 버전([fileVersionOf])이 같으면 재사용한다.
+     * 같은 URI에 다른 파일이 들어와 버전이 바뀌면 다시 복사한다.
      */
-    fun ensureCached(context: Context, contentUri: Uri, fileName: String, fileSize: Long): String {
+    fun ensureCached(context: Context, contentUri: Uri, fileName: String, fileVersion: String): String {
         val cacheDir = File(context.filesDir, CACHE_DIR).also { it.mkdirs() }
         // URI의 SHA-256 해시로 충돌 안전한 파일명 생성
         val ext = fileName.substringAfterLast('.', "bin")
@@ -28,16 +29,20 @@ object BookFileCache {
         val hash = digest.digest(contentUri.toString().toByteArray())
             .take(8).joinToString("") { "%02x".format(it) }
         val cached = File(cacheDir, "$hash.$ext")
+        // 캐시 파일을 만든 원본의 버전을 기록하는 사이드카 파일
+        val versionFile = File(cacheDir, "$hash.$ext.version")
 
-        // 캐시 히트: 크기가 같으면 재사용
-        if (cached.exists() && cached.length() == fileSize) {
+        // 캐시 히트: 원본 버전이 같으면 재사용
+        if (cached.exists() && versionFile.exists() && versionFile.readText() == fileVersion) {
             return cached.absolutePath
         }
 
-        // 캐시 미스: 복사
+        // 캐시 미스: 복사. 복사 도중 종료되어도 불완전한 파일을 재사용하지 않도록 버전 기록은 복사 후에 한다
+        versionFile.delete()
         context.contentResolver.openInputStream(contentUri)?.use { input ->
             cached.outputStream().use { output -> input.copyTo(output) }
         } ?: throw IllegalStateException("Cannot open URI: $contentUri")
+        versionFile.writeText(fileVersion)
 
         return cached.absolutePath
     }
