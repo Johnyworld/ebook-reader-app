@@ -118,10 +118,15 @@ fun AllBooksScreen(
 
     var readingProgressMap by remember { mutableStateOf<Map<String, Float>>(emptyMap()) }
 
+    // 페이지를 이동해 보여줘야 할 책 — 책을 열 때 설정되고, 페이지 이동 후 비운다
+    var jumpToBookKey by remember { mutableStateOf<String?>(null) }
+
     // DB에서 읽은 시각 + 즐겨찾기/숨기기/진행률 로드
     LaunchedEffect(refreshKey) {
         val records = withContext(Dispatchers.IO) { dao.getAll() }
-        lastReadTimes = records.associate { it.bookPath to it.lastReadAt }
+        // 책을 열 때 화면에 먼저 반영한 읽은 시각이 DB 저장보다 앞설 수 있으므로 더 최근 값을 유지한다
+        val dbLastReadTimes = records.associate { it.bookPath to it.lastReadAt }
+        lastReadTimes = dbLastReadTimes + lastReadTimes.filter { (key, time) -> time > (dbLastReadTimes[key] ?: 0L) }
         favorites = records.filter { it.isFavorite }.map { it.bookPath }.toSet()
         hiddenBooks = records.filter { it.isHidden }.map { it.bookPath }.toSet()
         readingProgressMap = records.filter { it.readingProgress > 0f }.associate { it.bookPath to it.readingProgress }
@@ -347,6 +352,19 @@ fun AllBooksScreen(
                         currentPage = targetPage
                     }
 
+                    // 방금 연 책이 재정렬된 목록에서 있는 페이지로 이동
+                    // 리더가 목록을 가리고 있는 동안 처리되므로, 돌아왔을 때 이동 과정이 보이지 않는다
+                    // (목록에 없으면 — 검색/필터로 제외된 경우 등 — 현재 페이지 유지)
+                    LaunchedEffect(jumpToBookKey, processedBooks, itemsPerPage) {
+                        val key = jumpToBookKey ?: return@LaunchedEffect
+                        jumpToBookKey = null
+                        val index = processedBooks.indexOfFirst { it.bookKey() == key }
+                        if (index < 0) return@LaunchedEffect
+                        val page = index / itemsPerPage
+                        currentPage = page
+                        targetPage = page
+                    }
+
                     Column(modifier = Modifier.fillMaxSize()) {
                         Column(modifier = Modifier.weight(1f)) {
                             pageItems.forEach { book ->
@@ -363,6 +381,10 @@ fun AllBooksScreen(
                                         scope.launch(Dispatchers.IO) {
                                             dao.upsertLastReadAt(book.bookKey(), now)
                                         }
+                                        // DB 저장을 기다리지 않고 읽은 시각을 바로 반영해 재정렬하고,
+                                        // 방금 연 책이 있는 페이지로 이동시킨다 (리더가 덮은 뒤에 적용됨)
+                                        lastReadTimes = lastReadTimes + (book.bookKey() to now)
+                                        jumpToBookKey = book.bookKey()
                                         onBookClick(book)
                                     },
                                     onToggleFavorite = if (isHidden && !isFavorite) null else {{
