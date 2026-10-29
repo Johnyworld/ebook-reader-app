@@ -64,12 +64,17 @@ class ChannelZipReader(private val channel: FileChannel) {
         // EOCD는 파일 끝에서 [22, 22 + 최대 주석 길이] 범위에 있다
         val tailLength = minOf(fileSize, (EOCD_SIZE + MAX_COMMENT_LENGTH).toLong()).toInt()
         val tail = readAt(fileSize - tailLength, tailLength)
-        // 주석 안에 시그니처 바이트가 있을 수 있으므로, 주석 길이가 파일 끝과 정확히 맞는 위치만 EOCD로 인정
+        // 주석 안에 시그니처 바이트가 있을 수 있으므로 EOCD 후보는 다음 중 하나를 만족해야 한다
+        //   1. 주석 길이가 파일 끝과 정확히 맞는다 (정상 파일)
+        //   2. 복호화 패딩 등 쓰레기 바이트가 EOCD 뒤에 붙은 경우: 주석이 파일 안에 들어가고,
+        //      중앙 디렉터리가 이 EOCD 바로 앞에서 끝난다 (주석 안 가짜 시그니처는 이 조건을 맞출 수 없다)
         var eocd = -1
         for (i in tailLength - EOCD_SIZE downTo 0) {
-            if (tail.getInt(i) == EOCD_SIG &&
-                i + EOCD_SIZE + tail.getShort(i + 20).toUnsigned() == tailLength
-            ) { eocd = i; break }
+            if (tail.getInt(i) != EOCD_SIG) continue
+            val end = i + EOCD_SIZE + tail.getShort(i + 20).toUnsigned()
+            val eocdPosition = fileSize - tailLength + i
+            val cdEnd = tail.getInt(i + 16).toUnsignedLong() + tail.getInt(i + 12).toUnsignedLong()
+            if (end == tailLength || (end < tailLength && cdEnd == eocdPosition)) { eocd = i; break }
         }
         if (eocd < 0) throw IOException("Not a zip file (EOCD not found)")
 
