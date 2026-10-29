@@ -118,6 +118,49 @@ class ChannelZipReaderTest {
         withReader(file) { assertArrayEquals(data, it.read("a.txt")) }
     }
 
+    @Test
+    fun `EOCD 뒤에 쓰레기 바이트(복호화 패딩 등)가 붙어 있어도 읽는다`() {
+        val data = "cover".toByteArray()
+        // 실제 제보 파일: 복호화 후 남은 PKCS#7 패딩(04 04 04 04, 0b x 11)이 파일 끝에 붙어 있음
+        for (padding in listOf(ByteArray(4) { 4 }, ByteArray(11) { 11 })) {
+            val zip = createZip(listOf(Triple("OEBPS/Images/cover.jpg", data, true)))
+            zip.appendBytes(padding)
+            withReader(zip) { assertArrayEquals(data, it.read("OEBPS/Images/cover.jpg")) }
+        }
+    }
+
+    @Test
+    fun `주석 안 EOCD 시그니처와 파일 끝 쓰레기 바이트가 함께 있어도 진짜 EOCD를 찾는다`() {
+        val data = "content".toByteArray()
+        val file = File.createTempFile("comment_trailing_zip_", ".zip").also { tempFiles.add(it) }
+        ZipOutputStream(file.outputStream()).use { zos ->
+            // 주석 길이 필드가 0인 가짜 EOCD처럼 보이도록 시그니처 뒤를 NUL로 채운다
+            zos.setComment("PK\u0005\u0006" + "\u0000".repeat(18))
+            zos.putNextEntry(ZipEntry("a.txt"))
+            zos.write(data)
+            zos.closeEntry()
+        }
+        file.appendBytes(ByteArray(4) { 4 })
+        withReader(file) { assertArrayEquals(data, it.read("a.txt")) }
+    }
+
+    @Test
+    fun `엔트리가 없는 빈 zip은 예외 없이 null을 반환한다`() {
+        val zip = createZip(emptyList())
+        withReader(zip) { assertNull(it.read("mimetype")) }
+    }
+
+    @Test(expected = IOException::class)
+    fun `ZIP64 표식이 있는 zip은 IOException`() {
+        val zip = createZip(listOf(Triple("a.txt", "a".toByteArray(), true)))
+        // 주석 없는 zip의 EOCD는 마지막 22바이트. cdOffset(+16)을 ZIP64 표식 0xFFFFFFFF로 조작
+        val bytes = zip.readBytes()
+        val eocd = bytes.size - 22
+        for (i in 0 until 4) bytes[eocd + 16 + i] = 0xFF.toByte()
+        zip.writeBytes(bytes)
+        withReader(zip) { it.read("a.txt") }
+    }
+
     @Test(expected = IOException::class)
     fun `중앙 디렉터리에 비정상적으로 큰 크기가 적혀 있으면 할당하지 않고 IOException`() {
         val zip = createZip(listOf(Triple("a.txt", "a".toByteArray(), true)))
