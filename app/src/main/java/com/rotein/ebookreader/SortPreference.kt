@@ -222,6 +222,81 @@ enum class ReaderPageFlip(@StringRes val labelRes: Int) {
     TB_NEXT_PREV(R.string.page_flip_tb_next_prev)
 }
 
+/**
+ * 4분할 페이지 넘김: 각 칸을 탭했을 때 다음 페이지(true)로 넘길지, 이전 페이지(false)로 넘길지.
+ * 저장·순환을 위해 좌상/우상/좌하/우하 순서의 4비트 마스크(다음=1)로 변환할 수 있다.
+ */
+data class QuadPageFlip(
+    val topLeft: Boolean,
+    val topRight: Boolean,
+    val bottomLeft: Boolean,
+    val bottomRight: Boolean
+) {
+    fun toMask(): Int =
+        (if (topLeft) 8 else 0) or (if (topRight) 4 else 0) or (if (bottomLeft) 2 else 0) or (if (bottomRight) 1 else 0)
+
+    // 설정 행의 좌우 화살표로 16개 조합을 순환한다
+    fun next(): QuadPageFlip = fromMask(toMask() + 1)
+    fun prev(): QuadPageFlip = fromMask(toMask() - 1)
+
+    companion object {
+        // 기본값: 이전/다음, 다음/다음
+        val DEFAULT = QuadPageFlip(topLeft = false, topRight = true, bottomLeft = true, bottomRight = true)
+
+        // 하위 4비트만 사용하므로 음수·16 이상도 순환된 값으로 해석된다
+        fun fromMask(mask: Int): QuadPageFlip {
+            val m = mask and 0xF
+            return QuadPageFlip(
+                topLeft = m and 8 != 0,
+                topRight = m and 4 != 0,
+                bottomLeft = m and 2 != 0,
+                bottomRight = m and 1 != 0
+            )
+        }
+    }
+}
+
+enum class PageTapAction { PREV, NEXT, CENTER }
+
+/**
+ * 화면 탭 위치(x, y)를 페이지 넘김 동작으로 변환한다.
+ * quad가 null이면 2분할(pageFlip) 기준, 아니면 4분할 기준으로 판정한다.
+ * 4분할은 가로 가운데 1/3을 메뉴 영역으로 두고, 좌우 1/3 영역을 세로 절반으로 나눈다.
+ */
+fun resolvePageTap(x: Float, y: Float, w: Float, h: Float, pageFlip: ReaderPageFlip, quad: QuadPageFlip?): PageTapAction {
+    val toAction = { isNext: Boolean -> if (isNext) PageTapAction.NEXT else PageTapAction.PREV }
+    if (quad != null) {
+        val top = y < h / 2f
+        return when {
+            x < w / 3f -> toAction(if (top) quad.topLeft else quad.bottomLeft)
+            x > w * 2f / 3f -> toAction(if (top) quad.topRight else quad.bottomRight)
+            else -> PageTapAction.CENTER
+        }
+    }
+    return when (pageFlip) {
+        ReaderPageFlip.LR_PREV_NEXT -> when {
+            x < w / 3f -> PageTapAction.PREV
+            x > w * 2f / 3f -> PageTapAction.NEXT
+            else -> PageTapAction.CENTER
+        }
+        ReaderPageFlip.LR_NEXT_PREV -> when {
+            x < w / 3f -> PageTapAction.NEXT
+            x > w * 2f / 3f -> PageTapAction.PREV
+            else -> PageTapAction.CENTER
+        }
+        ReaderPageFlip.TB_PREV_NEXT -> when {
+            y < h / 3f -> PageTapAction.PREV
+            y > h * 2f / 3f -> PageTapAction.NEXT
+            else -> PageTapAction.CENTER
+        }
+        ReaderPageFlip.TB_NEXT_PREV -> when {
+            y < h / 3f -> PageTapAction.NEXT
+            y > h * 2f / 3f -> PageTapAction.PREV
+            else -> PageTapAction.CENTER
+        }
+    }
+}
+
 // 볼륨 키로 페이지 넘기기 설정
 enum class VolumeKeyAction(@StringRes val labelRes: Int) {
     UP_PREV_DOWN_NEXT(R.string.volume_key_up_prev),
@@ -247,6 +322,9 @@ data class ReaderSettings(
     val paddingVertical: Int = 20,
     val paddingHorizontal: Int = 20,
     val pageFlip: ReaderPageFlip = ReaderPageFlip.LR_PREV_NEXT,
+    // true면 2분할(pageFlip) 대신 4분할(quadPageFlip)로 페이지를 넘긴다
+    val pageFlipQuad: Boolean = false,
+    val quadPageFlip: QuadPageFlip = QuadPageFlip.DEFAULT,
     val leftInfo: ReaderBottomInfo = ReaderBottomInfo.NONE,
     val rightInfo: ReaderBottomInfo = ReaderBottomInfo.PAGE,
     val dualPage: Boolean = false,
@@ -274,6 +352,8 @@ object ReaderSettingsStore {
             paddingVertical = prefs.getInt("paddingVertical", 20),
             paddingHorizontal = prefs.getInt("paddingHorizontal", 20),
             pageFlip = ReaderPageFlip.entries.firstOrNull { it.name == prefs.getString("pageFlip", null) } ?: ReaderPageFlip.LR_PREV_NEXT,
+            pageFlipQuad = prefs.getBoolean("pageFlipQuad", false),
+            quadPageFlip = QuadPageFlip.fromMask(prefs.getInt("quadPageFlip", QuadPageFlip.DEFAULT.toMask())),
             leftInfo = ReaderBottomInfo.entries.firstOrNull { it.name == prefs.getString("leftInfo", null) } ?: ReaderBottomInfo.NONE,
             rightInfo = ReaderBottomInfo.entries.firstOrNull { it.name == prefs.getString("rightInfo", null) } ?: ReaderBottomInfo.PAGE,
             dualPage = prefs.getBoolean("dualPage", false),
@@ -292,6 +372,8 @@ object ReaderSettingsStore {
             .putInt("paddingVertical", settings.paddingVertical)
             .putInt("paddingHorizontal", settings.paddingHorizontal)
             .putString("pageFlip", settings.pageFlip.name)
+            .putBoolean("pageFlipQuad", settings.pageFlipQuad)
+            .putInt("quadPageFlip", settings.quadPageFlip.toMask())
             .putString("leftInfo", settings.leftInfo.name)
             .putString("rightInfo", settings.rightInfo.name)
             .putBoolean("dualPage", settings.dualPage)

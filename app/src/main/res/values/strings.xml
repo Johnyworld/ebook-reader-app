@@ -81,6 +81,10 @@
     <string name="page_flip_lr_next_prev">L/R\nNext/Prev</string>
     <string name="page_flip_tb_prev_next">T/B\nPrev/Next</string>
     <string name="page_flip_tb_next_prev">T/B\nNext/Prev</string>
+    <string name="page_flip_split_two">2 zones</string>
+    <string name="page_flip_split_four">4 zones</string>
+    <string name="page_flip_prev">Prev</string>
+    <string name="page_flip_next">Next</string>
 
     <!-- ReaderBottomInfo -->
     <string name="bottom_info_none">None</string>

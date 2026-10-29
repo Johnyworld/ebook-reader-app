@@ -375,6 +375,7 @@ fun BookReaderScreen(book: BookFile, onClose: () -> Unit, modifier: Modifier = M
                     ?.removePrefix("pdf-page:")?.toIntOrNull() ?: 1,
                 dualPage = readerSettings.dualPage,
                 pageFlip = readerSettings.pageFlip,
+                quadPageFlip = readerSettings.quadPageFlip.takeIf { readerSettings.pageFlipQuad },
                 onCenterTap = onCenterTap,
                 onPageChanged = { page, total ->
                     vm.updatePageInfo(page, total)

@@ -69,6 +69,8 @@ class SortPreferenceTest {
         assertEquals(20, s.paddingVertical)
         assertEquals(20, s.paddingHorizontal)
         assertEquals(ReaderPageFlip.LR_PREV_NEXT, s.pageFlip)
+        assertFalse(s.pageFlipQuad)
+        assertEquals(QuadPageFlip.DEFAULT, s.quadPageFlip)
         assertEquals(ReaderBottomInfo.NONE, s.leftInfo)
         assertEquals(ReaderBottomInfo.PAGE, s.rightInfo)
         assertFalse(s.dualPage)

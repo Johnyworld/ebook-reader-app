@@ -69,6 +69,10 @@
     <string name="page_flip_lr_next_prev">좌우\n다음/이전</string>
     <string name="page_flip_tb_prev_next">상하\n이전/다음</string>
     <string name="page_flip_tb_next_prev">상하\n다음/이전</string>
+    <string name="page_flip_split_two">2분할</string>
+    <string name="page_flip_split_four">4분할</string>
+    <string name="page_flip_prev">이전</string>
+    <string name="page_flip_next">다음</string>
 
     <!-- ReaderBottomInfo -->
     <string name="bottom_info_none">없음</string>

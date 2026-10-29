@@ -22,7 +22,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
 import com.rotein.ebookreader.CenteredMessage
+import com.rotein.ebookreader.PageTapAction
+import com.rotein.ebookreader.QuadPageFlip
 import com.rotein.ebookreader.ReaderPageFlip
+import com.rotein.ebookreader.resolvePageTap
 import com.rotein.ebookreader.ui.theme.EreaderColors
 import java.io.File
 
@@ -33,6 +36,8 @@ internal fun PdfViewer(
     savedPage: Int = 1,
     dualPage: Boolean = false,
     pageFlip: ReaderPageFlip = ReaderPageFlip.LR_PREV_NEXT,
+    // 4분할 페이지 넘김 설정. null이면 2분할(pageFlip) 기준
+    quadPageFlip: QuadPageFlip? = null,
     onCenterTap: () -> Unit,
     onPageChanged: (currentPage: Int, totalPages: Int) -> Unit = { _, _ -> },
     onLocationUpdate: (progress: Float, pageNum: Int) -> Unit = { _, _ -> },
@@ -56,6 +61,8 @@ internal fun PdfViewer(
     val webViewRef = remember { java.util.concurrent.atomic.AtomicReference<WebView?>(null) }
     val pageFlipRef = remember { java.util.concurrent.atomic.AtomicReference(pageFlip) }
     pageFlipRef.set(pageFlip)
+    val quadPageFlipRef = remember { java.util.concurrent.atomic.AtomicReference(quadPageFlip) }
+    quadPageFlipRef.set(quadPageFlip)
 
     // 두 쪽 보기 설정 변경 시 JS에 반영
     LaunchedEffect(dualPage) {
@@ -134,27 +141,10 @@ internal fun PdfViewer(
                                 val h = this@apply.height.toFloat()
                                 val doPrev = { webView.evaluateJavascript("window._prevPage()", null) }
                                 val doNext = { webView.evaluateJavascript("window._nextPage()", null) }
-                                when (pageFlipRef.get()) {
-                                    ReaderPageFlip.LR_PREV_NEXT -> when {
-                                        x < w / 3f -> doPrev()
-                                        x > w * 2f / 3f -> doNext()
-                                        else -> onCenterTap()
-                                    }
-                                    ReaderPageFlip.LR_NEXT_PREV -> when {
-                                        x < w / 3f -> doNext()
-                                        x > w * 2f / 3f -> doPrev()
-                                        else -> onCenterTap()
-                                    }
-                                    ReaderPageFlip.TB_PREV_NEXT -> when {
-                                        y < h / 3f -> doPrev()
-                                        y > h * 2f / 3f -> doNext()
-                                        else -> onCenterTap()
-                                    }
-                                    ReaderPageFlip.TB_NEXT_PREV -> when {
-                                        y < h / 3f -> doNext()
-                                        y > h * 2f / 3f -> doPrev()
-                                        else -> onCenterTap()
-                                    }
+                                when (resolvePageTap(x, y, w, h, pageFlipRef.get(), quadPageFlipRef.get())) {
+                                    PageTapAction.PREV -> doPrev()
+                                    PageTapAction.NEXT -> doNext()
+                                    PageTapAction.CENTER -> onCenterTap()
                                 }
                                 this@apply.performClick()
                                 return true

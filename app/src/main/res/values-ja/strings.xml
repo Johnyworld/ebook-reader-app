@@ -68,6 +68,10 @@
     <string name="page_flip_lr_next_prev">左右\n次/前</string>
     <string name="page_flip_tb_prev_next">上下\n前/次</string>
     <string name="page_flip_tb_next_prev">上下\n次/前</string>
+    <string name="page_flip_split_two">2分割</string>
+    <string name="page_flip_split_four">4分割</string>
+    <string name="page_flip_prev">前</string>
+    <string name="page_flip_next">次</string>
 
     <!-- ReaderBottomInfo -->
     <string name="bottom_info_none">なし</string>
