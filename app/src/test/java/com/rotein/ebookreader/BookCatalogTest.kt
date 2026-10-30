@@ -56,4 +56,16 @@ class BookCatalogTest {
         assertEquals("/storage/emulated/0/Books/a.epub", entry.bookKey)
         assertEquals(legacy, entry.toBookFile())
     }
+
+    @Test
+    fun `폴더 정보 - 엔트리로 변환 후 복원하면 rootUri와 folderPath가 유지된다`() {
+        val book = safBook.copy(
+            rootUri = "content://com.android.externalstorage.documents/tree/primary%3ABooks",
+            folderPath = "SF/고전"
+        )
+        val entry = book.toCatalogEntry()
+        assertEquals(book.rootUri, entry.rootUri)
+        assertEquals("SF/고전", entry.folderPath)
+        assertEquals(book, entry.toBookFile())
+    }
 }

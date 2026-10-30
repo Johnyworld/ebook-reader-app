@@ -29,7 +29,9 @@ data class BookCatalogEntry(
     val language: String?,
     val publisher: String?,
     val publishedDate: String?,
-    val description: String?
+    val description: String?,
+    val rootUri: String = "",     // BookFile.rootUri
+    val folderPath: String = ""   // BookFile.folderPath
 )
 
 @Dao
@@ -66,7 +68,9 @@ fun BookFile.toCatalogEntry(): BookCatalogEntry = BookCatalogEntry(
     language = metadata?.language,
     publisher = metadata?.publisher,
     publishedDate = metadata?.publishedDate,
-    description = metadata?.description
+    description = metadata?.description,
+    rootUri = rootUri,
+    folderPath = folderPath
 )
 
 fun BookCatalogEntry.toBookFile(): BookFile = BookFile(
@@ -79,5 +83,7 @@ fun BookCatalogEntry.toBookFile(): BookFile = BookFile(
     dateModified = dateModified,
     metadata = if (hasMetadata) {
         BookMetadata(title, author, language, publisher, publishedDate, description)
-    } else null
+    } else null,
+    rootUri = rootUri,
+    folderPath = folderPath
 )

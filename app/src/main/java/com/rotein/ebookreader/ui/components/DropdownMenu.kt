@@ -55,6 +55,8 @@ fun <T> EreaderDropdownMenu(
     popupAlignment: Alignment = Alignment.TopEnd,
     forceAbove: Boolean = false,
     trigger: (@Composable (onClick: () -> Unit) -> Unit)? = null,
+    // 항목 목록 아래에 붙는 추가 영역(설정 섹션 등). 안에서 눌러도 드롭다운은 닫히지 않는다
+    footer: (@Composable () -> Unit)? = null,
 ) {
     var expanded by remember { mutableStateOf(false) }
     var currentPage by remember { mutableStateOf(0) }
@@ -194,6 +196,11 @@ fun <T> EreaderDropdownMenu(
                                 )
                             }
                         }
+                    }
+                    if (footer != null) {
+                        // 항목 목록과 구분되는 섹션임을 보이도록 검정 구분선을 쓴다
+                        HorizontalDivider(color = EreaderColors.Black)
+                        footer()
                     }
                 }
             }

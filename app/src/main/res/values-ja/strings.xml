@@ -3,7 +3,7 @@
     <!-- AllBooksScreen -->
     <string name="folder_select_description">電子書籍が入っているフォルダを選択してください。</string>
     <string name="select_folder">フォルダ選択</string>
-    <string name="manage_folders">フォルダ管理</string>
+    <string name="manage_folders">本を読み込むフォルダ</string>
     <string name="add_folder">フォルダ追加</string>
     <string name="no_folders">フォルダが選択されていません。</string>
     <string name="loading_files">ファイルを検索中…</string>
@@ -32,6 +32,12 @@
     <string name="sort_author">著者順</string>
     <string name="sort_date_added">追加日順</string>
     <string name="sort_last_read">最近読んだ順</string>
+    <string name="view_list">リスト</string>
+    <string name="view_folder">フォルダ</string>
+    <string name="folder_book_count">%1$d冊</string>
+    <string name="go_up">上へ</string>
+    <string name="folder_settings">フォルダ設定</string>
+    <string name="folders_first">フォルダを先頭に表示</string>
     <string name="filter_all">すべて</string>
     <string name="filter_favorite">お気に入り</string>
     <string name="filter_hidden">非表示</string>

@@ -52,6 +52,44 @@ enum class FilterMode(@StringRes val labelRes: Int) {
     HIDDEN(R.string.filter_hidden)
 }
 
+/** 홈 목록 보기 방식: 전체 평면 목록 / 실제 폴더 구조 */
+enum class ViewMode(@StringRes val labelRes: Int) {
+    LIST(R.string.view_list),
+    FOLDER(R.string.view_folder)
+}
+
+/** 보기 방식을 기기에 저장 — 다음 실행에도 유지 (폴더 위치는 저장하지 않음) */
+object ViewModeStore {
+    private const val PREF_NAME = "view_mode_pref"
+    private const val KEY_MODE = "view_mode"
+
+    fun load(context: Context): ViewMode {
+        val prefs = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
+        return ViewMode.entries.firstOrNull { it.name == prefs.getString(KEY_MODE, null) } ?: ViewMode.LIST
+    }
+
+    fun save(context: Context, mode: ViewMode) {
+        context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE).edit()
+            .putString(KEY_MODE, mode.name)
+            .apply()
+    }
+}
+
+/** 폴더 보기 설정 — 폴더를 맨 위로 정렬할지 (기본: 맨 위, 끄면 폴더와 책을 섞어 정렬) */
+object FolderSettingsStore {
+    private const val PREF_NAME = "folder_settings_pref"
+    private const val KEY_FOLDERS_FIRST = "folders_first"
+
+    fun loadFoldersFirst(context: Context): Boolean =
+        context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE).getBoolean(KEY_FOLDERS_FIRST, true)
+
+    fun saveFoldersFirst(context: Context, foldersFirst: Boolean) {
+        context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE).edit()
+            .putBoolean(KEY_FOLDERS_FIRST, foldersFirst)
+            .apply()
+    }
+}
+
 data class SortPreference(
     val field: SortField = SortField.LAST_READ
 )

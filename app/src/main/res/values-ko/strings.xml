@@ -3,7 +3,7 @@
     <!-- AllBooksScreen -->
     <string name="folder_select_description">전자책이 있는 폴더를 선택해주세요.</string>
     <string name="select_folder">폴더 선택</string>
-    <string name="manage_folders">폴더 관리</string>
+    <string name="manage_folders">책 불러올 폴더</string>
     <string name="add_folder">폴더 추가</string>
     <string name="no_folders">선택된 폴더가 없습니다.</string>
     <string name="loading_files">파일 검색 중…</string>
@@ -33,6 +33,12 @@
     <string name="sort_author">작가순</string>
     <string name="sort_date_added">담은순</string>
     <string name="sort_last_read">읽은순</string>
+    <string name="view_list">목록</string>
+    <string name="view_folder">폴더</string>
+    <string name="folder_book_count">%1$d권</string>
+    <string name="go_up">상위 폴더</string>
+    <string name="folder_settings">폴더 설정</string>
+    <string name="folders_first">폴더를 맨 위로 정렬</string>
     <string name="filter_all">전체보기</string>
     <string name="filter_favorite">즐겨찾기</string>
     <string name="filter_hidden">숨김보기</string>

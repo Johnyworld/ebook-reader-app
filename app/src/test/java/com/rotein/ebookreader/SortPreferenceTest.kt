@@ -32,6 +32,15 @@ class SortPreferenceTest {
         assertEquals(R.string.filter_hidden, FilterMode.HIDDEN.labelRes)
     }
 
+    // --- ViewMode ---
+
+    @Test
+    fun `ViewMode - 목록과 폴더 두 가지, labelRes 매핑 확인`() {
+        assertEquals(listOf(ViewMode.LIST, ViewMode.FOLDER), ViewMode.entries.toList())
+        assertEquals(R.string.view_list, ViewMode.LIST.labelRes)
+        assertEquals(R.string.view_folder, ViewMode.FOLDER.labelRes)
+    }
+
     // --- BookmarkSortOrder ---
 
     @Test
