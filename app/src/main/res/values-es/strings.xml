@@ -3,7 +3,7 @@
     <!-- AllBooksScreen -->
     <string name="folder_select_description">Selecciona la carpeta que contiene tus libros electrónicos.</string>
     <string name="select_folder">Seleccionar carpeta</string>
-    <string name="manage_folders">Gestionar carpetas</string>
+    <string name="manage_folders">Carpetas de libros</string>
     <string name="add_folder">Añadir carpeta</string>
     <string name="no_folders">No hay carpetas seleccionadas.</string>
     <string name="loading_files">Buscando archivos…</string>
@@ -32,6 +32,12 @@
     <string name="sort_author">Por autor</string>
     <string name="sort_date_added">Fecha de adición</string>
     <string name="sort_last_read">Últimos leídos</string>
+    <string name="view_list">Lista</string>
+    <string name="view_folder">Carpetas</string>
+    <string name="folder_book_count">%1$d libros</string>
+    <string name="go_up">Subir</string>
+    <string name="folder_settings">Ajustes de carpetas</string>
+    <string name="folders_first">Carpetas primero</string>
     <string name="filter_all">Todos</string>
     <string name="filter_favorite">Favoritos</string>
     <string name="filter_hidden">Ocultos</string>

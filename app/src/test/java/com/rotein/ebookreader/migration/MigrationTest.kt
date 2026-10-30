@@ -13,6 +13,7 @@ import com.rotein.ebookreader.MIGRATION_4_5
 import com.rotein.ebookreader.MIGRATION_5_6
 import com.rotein.ebookreader.MIGRATION_16_17
 import com.rotein.ebookreader.MIGRATION_18_19
+import com.rotein.ebookreader.MIGRATION_19_20
 import com.rotein.ebookreader.MIGRATION_9_10
 import org.junit.After
 import org.junit.Assert.*
@@ -300,6 +301,25 @@ class MigrationTest {
         assertEquals(10, cursor.getInt(cursor.getColumnIndexOrThrow("cachedTotalPages")))
         // 기존 레코드는 파일 버전을 모르므로 빈 문자열 → 다음 열기 때 캐시가 한 번 무효화된다
         assertEquals("", cursor.getString(cursor.getColumnIndexOrThrow("fileVersion")))
+        cursor.close()
+        db.close()
+    }
+
+    @Test
+    fun `migration 19 to 20 - book_catalog에 폴더 컬럼 추가 및 기존 데이터 보존`() {
+        val db = createDatabase(19) { db ->
+            db.execSQL("CREATE TABLE IF NOT EXISTS `book_catalog` (`bookKey` TEXT NOT NULL, `name` TEXT NOT NULL, `path` TEXT NOT NULL, `contentUri` TEXT NOT NULL, `extension` TEXT NOT NULL, `size` INTEGER NOT NULL, `dateAdded` INTEGER NOT NULL, `dateModified` INTEGER NOT NULL, `hasMetadata` INTEGER NOT NULL, `title` TEXT, `author` TEXT, `language` TEXT, `publisher` TEXT, `publishedDate` TEXT, `description` TEXT, PRIMARY KEY(`bookKey`))")
+        }
+        db.execSQL("INSERT INTO book_catalog VALUES ('content://a', 'a.epub', '', 'content://a', 'epub', 100, 1, 2, 1, '제목', NULL, NULL, NULL, NULL, NULL)")
+
+        MIGRATION_19_20.migrate(db)
+
+        val cursor = db.query("SELECT * FROM book_catalog")
+        assertTrue(cursor.moveToFirst())
+        assertEquals("제목", cursor.getString(cursor.getColumnIndexOrThrow("title")))
+        // 기존 항목은 폴더를 모르므로 빈 문자열 → 다음 diff 스캔에서 채워진다
+        assertEquals("", cursor.getString(cursor.getColumnIndexOrThrow("rootUri")))
+        assertEquals("", cursor.getString(cursor.getColumnIndexOrThrow("folderPath")))
         cursor.close()
         db.close()
     }

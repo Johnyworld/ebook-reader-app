@@ -2,6 +2,7 @@ package com.rotein.ebookreader
 
 import android.graphics.Bitmap
 import android.net.Uri
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.result.contract.ActivityResultContracts.OpenDocumentTree
@@ -24,6 +25,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.MoreVert
@@ -49,6 +51,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.foundation.Canvas
 import com.rotein.ebookreader.ui.theme.EreaderColors
 import com.rotein.ebookreader.ui.theme.EreaderFontSize
@@ -105,10 +108,24 @@ fun AllBooksScreen(
     var sortPref by remember { mutableStateOf(SortPreferenceStore.load(context)) }
     var filterMode by remember { mutableStateOf(FilterMode.ALL) }
     var lastReadTimes by remember { mutableStateOf<Map<String, Long>>(emptyMap()) }
+    var viewMode by remember { mutableStateOf(ViewModeStore.load(context)) }
+    // 폴더 보기에서 현재 보고 있는 위치 — 메모리에만 두어 앱 재시작 시 최상위에서 시작한다
+    var location by remember { mutableStateOf<FolderLocation>(FolderLocation.Top) }
 
     // 정렬 설정 변경 시 기기에 저장
     LaunchedEffect(sortPref) {
         SortPreferenceStore.save(context, sortPref)
+    }
+
+    // 폴더 보기에서 폴더를 맨 위로 정렬할지 (끄면 폴더와 책을 섞어 정렬)
+    var foldersFirst by remember { mutableStateOf(FolderSettingsStore.loadFoldersFirst(context)) }
+    LaunchedEffect(foldersFirst) {
+        FolderSettingsStore.saveFoldersFirst(context, foldersFirst)
+    }
+
+    // 보기 방식 변경 시 기기에 저장
+    LaunchedEffect(viewMode) {
+        ViewModeStore.save(context, viewMode)
     }
 
     var favorites by remember { mutableStateOf<Set<String>>(emptySet()) }
@@ -132,33 +149,53 @@ fun AllBooksScreen(
         readingProgressMap = records.filter { it.readingProgress > 0f }.associate { it.bookPath to it.readingProgress }
     }
 
-    val processedBooks = remember(books, searchQuery, sortPref, lastReadTimes, hiddenBooks, favorites, filterMode) {
-        // 0) 필터 모드 적용
-        val visible = when (filterMode) {
+    // 0) 필터 모드 적용 — 폴더 보기도 이 결과를 쓴다
+    val visibleBooks = remember(books, hiddenBooks, favorites, filterMode) {
+        when (filterMode) {
             FilterMode.ALL -> books.filter { it.bookKey() !in hiddenBooks }
             FilterMode.FAVORITE -> books.filter { it.bookKey() in favorites && it.bookKey() !in hiddenBooks }
             FilterMode.HIDDEN -> books.filter { it.bookKey() in hiddenBooks }
         }
+    }
+
+    val processedBooks = remember(visibleBooks, searchQuery, sortPref, lastReadTimes) {
         // 1) 검색 필터
-        val filtered = if (searchQuery.isBlank()) visible
+        val filtered = if (searchQuery.isBlank()) visibleBooks
         else {
             val q = searchQuery.trim().lowercase()
-            visible.filter { book ->
+            visibleBooks.filter { book ->
                 val title = (book.metadata?.title ?: book.name).lowercase()
                 val author = book.metadata?.author?.lowercase() ?: ""
                 title.contains(q) || author.contains(q) || book.name.lowercase().contains(q)
             }
         }
         // 2) 정렬 (방향은 필드별 기본값 적용)
-        val comparator: Comparator<BookFile> = when (sortPref.field) {
-            SortField.TITLE -> compareBy { (it.metadata?.title ?: it.name).lowercase() }
-            SortField.AUTHOR -> compareBy { it.metadata?.author?.lowercase() ?: "\uFFFF" }
-            SortField.DATE_ADDED -> compareBy { it.dateAdded }
-            SortField.LAST_READ -> compareBy { lastReadTimes[it.bookKey()] ?: 0L }
-        }
-        val sorted = filtered.sortedWith(comparator)
-        if (sortPref.field.defaultDescending) sorted.reversed() else sorted
+        sortBooks(filtered, sortPref.field, lastReadTimes)
     }
+
+    // 루트는 필터와 무관하게 전체 책에서 도출 — 필터를 바꿔도 최상위 구조가 바뀌지 않게 한다
+    val rootUris = remember(books) { rootUrisOf(books) }
+    val rootNames = remember(rootUris) { rootUris.associateWith { rootDisplayName(it) } }
+    // 검색어가 있으면 폴더와 무관하게 전체 결과를 평면 목록으로 보여준다
+    val inFolderView = viewMode == ViewMode.FOLDER && searchQuery.isBlank()
+
+    // 재스캔·필터 변경으로 현재 폴더가 비면 책이 남은 가장 가까운 상위로 보정
+    // 그리는 시점에 바로 계산해, 빈 화면이 한 프레임 그려지는 것(e-ink 추가 새로고침)을 막는다
+    val effectiveLocation = remember(location, visibleBooks, rootUris) {
+        resolveLocation(location, visibleBooks, rootUris)
+    }
+    // 상태도 보정값으로 맞춘다
+    LaunchedEffect(effectiveLocation) {
+        location = effectiveLocation
+    }
+
+    // 화면에 그릴 항목 — 목록 보기는 책만, 폴더 보기는 하위 폴더 + 직속 책
+    val entries: List<FolderEntry> = remember(inFolderView, processedBooks, visibleBooks, effectiveLocation, rootUris, rootNames, sortPref, lastReadTimes, foldersFirst) {
+        if (inFolderView) buildFolderEntries(visibleBooks, effectiveLocation, rootUris, rootNames, sortPref.field, lastReadTimes, foldersFirst)
+        else processedBooks.map { FolderEntry.Book(it) }
+    }
+    // 한 단계 위 위치 — null이면 경로 줄과 뒤로가기 처리를 하지 않는다
+    val parentLocation = if (inFolderView) parentOf(effectiveLocation, rootUris) else null
 
     // SAF 폴더 선택 런처
     val folderPickerLauncher = rememberLauncherForActivityResult(OpenDocumentTree()) { uri: Uri? ->
@@ -249,11 +286,16 @@ fun AllBooksScreen(
     }
 
     Column(modifier = modifier.fillMaxSize()) {
+        var currentPage by remember { mutableIntStateOf(0) }
+        var targetPage by remember { mutableIntStateOf(0) }
+
         TopBar(
             isSearchActive = isSearchActive,
             searchQuery = searchQuery,
             sortPref = sortPref,
             filterMode = filterMode,
+            viewMode = viewMode,
+            foldersFirst = foldersFirst,
             folders = folders,
             onSearchClick = { isSearchActive = true },
             onQueryChange = { searchQuery = it },
@@ -263,6 +305,13 @@ fun AllBooksScreen(
             },
             onSortChange = { sortPref = it },
             onFilterChange = { filterMode = it },
+            onViewModeChange = {
+                viewMode = it
+                // 보기 방식이 바뀌면 항목 수가 같아도 첫 페이지부터 보여준다
+                currentPage = 0
+                targetPage = 0
+            },
+            onFoldersFirstToggle = { foldersFirst = !foldersFirst },
             onAddFolder = { folderPickerLauncher.launch(null) },
             onRemoveFolder = { uri ->
                 FolderUriStore.remove(context, uri)
@@ -274,13 +323,29 @@ fun AllBooksScreen(
             }
         )
 
-        var currentPage by remember { mutableIntStateOf(0) }
-        var targetPage by remember { mutableIntStateOf(0) }
-
-        // 필터/검색 변경 시 페이지 초기화
-        LaunchedEffect(processedBooks.size) {
+        // 필터/검색/폴더 이동으로 항목 수가 바뀌면 페이지 초기화
+        LaunchedEffect(entries.size) {
             currentPage = 0
             targetPage = 0
+        }
+
+        // 폴더 이동 — 항목 수가 같아도 첫 페이지부터 보이도록 페이지를 직접 초기화한다
+        fun moveTo(newLocation: FolderLocation) {
+            location = newLocation
+            currentPage = 0
+            targetPage = 0
+        }
+
+        // 폴더 안에서는 상위로 가는 경로 줄을 보여주고, 시스템 뒤로가기도 한 단계 위로 보낸다
+        // (리더 화면은 이 화면보다 나중에 BackHandler를 등록하므로 리더가 열려 있을 때는 리더가 우선)
+        if (parentLocation != null) {
+            FolderPathBar(
+                path = breadcrumb(effectiveLocation, rootUris, rootNames),
+                onUp = { moveTo(parentLocation) }
+            )
+        }
+        BackHandler(enabled = parentLocation != null) {
+            parentLocation?.let { moveTo(it) }
         }
 
         Box(modifier = Modifier.weight(1f).fillMaxSize()) {
@@ -302,7 +367,7 @@ fun AllBooksScreen(
                     Text(stringResource(R.string.loading_files), modifier = Modifier.align(Alignment.Center))
                 }
 
-                processedBooks.isEmpty() -> {
+                entries.isEmpty() -> {
                     Text(
                         stringResource(R.string.empty),
                         modifier = Modifier.align(Alignment.Center)
@@ -315,17 +380,18 @@ fun AllBooksScreen(
                     val paginationBarHeightDp = 56
                     val availableHeightDp = this.maxHeight.value.toInt() - paginationBarHeightDp
                     val itemsPerPage = (availableHeightDp / itemHeightDp).coerceAtLeast(1)
-                    val totalPages = ((processedBooks.size + itemsPerPage - 1) / itemsPerPage).coerceAtLeast(1)
+                    val totalPages = ((entries.size + itemsPerPage - 1) / itemsPerPage).coerceAtLeast(1)
                     val safePage = currentPage.coerceIn(0, totalPages - 1)
                     val startIndex = safePage * itemsPerPage
-                    val pageItems = processedBooks.subList(
+                    val pageItems = entries.subList(
                         startIndex,
-                        (startIndex + itemsPerPage).coerceAtMost(processedBooks.size)
+                        (startIndex + itemsPerPage).coerceAtMost(entries.size)
                     )
 
                     // 현재 페이지에 보이는 책 중 커버가 아직 없는 것만 로드 (전체 책 커버를 미리 로드하지 않음)
                     LaunchedEffect(pageItems) {
-                        val missing = pageItems.filter { it.bookKey() !in covers }
+                        val missing = pageItems.filterIsInstance<FolderEntry.Book>().map { it.book }
+                            .filter { it.bookKey() !in covers }
                         if (missing.isEmpty()) return@LaunchedEffect
                         val newCovers = mutableMapOf<String, Bitmap?>()
                         missing.forEach { book ->
@@ -335,13 +401,14 @@ fun AllBooksScreen(
                     }
 
                     // targetPage 변경 시 커버를 먼저 로드한 뒤 페이지 전환
-                    LaunchedEffect(targetPage, itemsPerPage, processedBooks) {
+                    LaunchedEffect(targetPage, itemsPerPage, entries) {
                         if (targetPage == currentPage) return@LaunchedEffect
-                        val tStart = (targetPage * itemsPerPage).coerceAtMost(processedBooks.size)
-                        val tEnd = ((targetPage + 1) * itemsPerPage).coerceAtMost(processedBooks.size)
+                        val tStart = (targetPage * itemsPerPage).coerceAtMost(entries.size)
+                        val tEnd = ((targetPage + 1) * itemsPerPage).coerceAtMost(entries.size)
                         val newCovers = mutableMapOf<String, Bitmap?>()
                         for (i in tStart until tEnd) {
-                            val book = processedBooks[i]
+                            // 폴더 항목은 표지가 없으므로 건너뛴다
+                            val book = (entries[i] as? FolderEntry.Book)?.book ?: continue
                             if (book.bookKey() !in covers) {
                                 newCovers[book.bookKey()] = BookCoverLoader.loadFromBook(context, book)
                             }
@@ -355,10 +422,18 @@ fun AllBooksScreen(
                     // 방금 연 책이 재정렬된 목록에서 있는 페이지로 이동
                     // 리더가 목록을 가리고 있는 동안 처리되므로, 돌아왔을 때 이동 과정이 보이지 않는다
                     // (목록에 없으면 — 검색/필터로 제외된 경우 등 — 현재 페이지 유지)
-                    LaunchedEffect(jumpToBookKey, processedBooks, itemsPerPage) {
+                    LaunchedEffect(jumpToBookKey, entries, itemsPerPage, location) {
                         val key = jumpToBookKey ?: return@LaunchedEffect
+                        // 폴더 보기: 먼저 그 책이 있는 폴더로 이동하고, 항목이 다시 계산된 뒤 페이지를 찾는다
+                        if (inFolderView) {
+                            val target = visibleBooks.firstOrNull { it.bookKey() == key }?.let { locationOf(it) }
+                            if (target != null && normalizeLocation(target, rootUris) != normalizeLocation(effectiveLocation, rootUris)) {
+                                location = target
+                                return@LaunchedEffect
+                            }
+                        }
                         jumpToBookKey = null
-                        val index = processedBooks.indexOfFirst { it.bookKey() == key }
+                        val index = entries.indexOfFirst { it is FolderEntry.Book && it.book.bookKey() == key }
                         if (index < 0) return@LaunchedEffect
                         val page = index / itemsPerPage
                         currentPage = page
@@ -367,41 +442,51 @@ fun AllBooksScreen(
 
                     Column(modifier = Modifier.fillMaxSize()) {
                         Column(modifier = Modifier.weight(1f)) {
-                            pageItems.forEach { book ->
-                                val isHidden = book.bookKey() in hiddenBooks
-                                val isFavorite = book.bookKey() in favorites
-                                BookItem(
-                                    book = book,
-                                    cover = covers[book.bookKey()],
-                                    isFavorite = isFavorite,
-                                    isHidden = isHidden,
-                                    readingProgress = readingProgressMap[book.bookKey()] ?: 0f,
-                                    onClick = {
-                                        val now = System.currentTimeMillis()
-                                        scope.launch(Dispatchers.IO) {
-                                            dao.upsertLastReadAt(book.bookKey(), now)
-                                        }
-                                        // DB 저장을 기다리지 않고 읽은 시각을 바로 반영해 재정렬하고,
-                                        // 방금 연 책이 있는 페이지로 이동시킨다 (리더가 덮은 뒤에 적용됨)
-                                        lastReadTimes = lastReadTimes + (book.bookKey() to now)
-                                        jumpToBookKey = book.bookKey()
-                                        onBookClick(book)
-                                    },
-                                    onToggleFavorite = if (isHidden && !isFavorite) null else {{
-                                        val newValue = !isFavorite
-                                        favorites = if (newValue) favorites + book.bookKey() else favorites - book.bookKey()
-                                        scope.launch(Dispatchers.IO) {
-                                            dao.upsertFavorite(book.bookKey(), newValue)
-                                        }
-                                    }},
-                                    onToggleHidden = {
-                                        val newValue = !isHidden
-                                        hiddenBooks = if (newValue) hiddenBooks + book.bookKey() else hiddenBooks - book.bookKey()
-                                        scope.launch(Dispatchers.IO) {
-                                            dao.upsertHidden(book.bookKey(), newValue)
-                                        }
+                            pageItems.forEach { entry ->
+                                when (entry) {
+                                    is FolderEntry.Folder -> FolderItem(
+                                        name = entry.name,
+                                        bookCount = entry.bookCount,
+                                        onClick = { moveTo(entry.location) }
+                                    )
+                                    is FolderEntry.Book -> {
+                                        val book = entry.book
+                                        val isHidden = book.bookKey() in hiddenBooks
+                                        val isFavorite = book.bookKey() in favorites
+                                        BookItem(
+                                            book = book,
+                                            cover = covers[book.bookKey()],
+                                            isFavorite = isFavorite,
+                                            isHidden = isHidden,
+                                            readingProgress = readingProgressMap[book.bookKey()] ?: 0f,
+                                            onClick = {
+                                                val now = System.currentTimeMillis()
+                                                scope.launch(Dispatchers.IO) {
+                                                    dao.upsertLastReadAt(book.bookKey(), now)
+                                                }
+                                                // DB 저장을 기다리지 않고 읽은 시각을 바로 반영해 재정렬하고,
+                                                // 방금 연 책이 있는 페이지로 이동시킨다 (리더가 덮은 뒤에 적용됨)
+                                                lastReadTimes = lastReadTimes + (book.bookKey() to now)
+                                                jumpToBookKey = book.bookKey()
+                                                onBookClick(book)
+                                            },
+                                            onToggleFavorite = if (isHidden && !isFavorite) null else {{
+                                                val newValue = !isFavorite
+                                                favorites = if (newValue) favorites + book.bookKey() else favorites - book.bookKey()
+                                                scope.launch(Dispatchers.IO) {
+                                                    dao.upsertFavorite(book.bookKey(), newValue)
+                                                }
+                                            }},
+                                            onToggleHidden = {
+                                                val newValue = !isHidden
+                                                hiddenBooks = if (newValue) hiddenBooks + book.bookKey() else hiddenBooks - book.bookKey()
+                                                scope.launch(Dispatchers.IO) {
+                                                    dao.upsertHidden(book.bookKey(), newValue)
+                                                }
+                                            }
+                                        )
                                     }
-                                )
+                                }
                                 HorizontalDivider(color = EreaderColors.Gray)
                             }
                         }
@@ -409,7 +494,7 @@ fun AllBooksScreen(
                         PaginationBar(
                             currentPage = safePage,
                             totalPages = totalPages,
-                            centerText = stringResource(R.string.pagination_books_format, safePage + 1, totalPages, processedBooks.size),
+                            centerText = stringResource(R.string.pagination_books_format, safePage + 1, totalPages, entries.size),
                             onPrevious = { targetPage = safePage - 1 },
                             onNext = { targetPage = safePage + 1 }
                         )
@@ -427,12 +512,16 @@ private fun TopBar(
     searchQuery: String,
     sortPref: SortPreference,
     filterMode: FilterMode,
+    viewMode: ViewMode,
+    foldersFirst: Boolean,
     folders: List<Uri>,
     onSearchClick: () -> Unit,
     onQueryChange: (String) -> Unit,
     onSearchClear: () -> Unit,
     onSortChange: (SortPreference) -> Unit,
     onFilterChange: (FilterMode) -> Unit,
+    onViewModeChange: (ViewMode) -> Unit,
+    onFoldersFirstToggle: () -> Unit,
     onAddFolder: () -> Unit,
     onRemoveFolder: (Uri) -> Unit
 ) {
@@ -464,6 +553,14 @@ private fun TopBar(
 
             Box(modifier = Modifier.weight(1f))
 
+            // 보기 방식 드롭다운 (목록 / 폴더)
+            EreaderDropdownMenu(
+                items = ViewMode.entries.toList(),
+                selectedItem = viewMode,
+                onSelect = { onViewModeChange(it) },
+                label = { stringResource(it.labelRes) },
+            )
+
             // 필터 드롭다운
             EreaderDropdownMenu(
                 items = FilterMode.entries.toList(),
@@ -472,12 +569,15 @@ private fun TopBar(
                 label = { stringResource(it.labelRes) },
             )
 
-            // 정렬 필드 드롭다운
+            // 정렬 필드 드롭다운 — 폴더 보기에서는 맨 아래에 "폴더 설정" 섹션을 붙인다
             EreaderDropdownMenu(
                 items = SortField.entries.toList(),
                 selectedItem = sortPref.field,
                 onSelect = { onSortChange(sortPref.copy(field = it)) },
                 label = { stringResource(it.labelRes) },
+                footer = if (viewMode == ViewMode.FOLDER) {
+                    { FolderSortSettings(foldersFirst = foldersFirst, onToggle = onFoldersFirstToggle) }
+                } else null,
             )
 
             // 케밥 메뉴 (설정)
@@ -723,6 +823,132 @@ private fun KebabMenuItem(text: String, onClick: () -> Unit) {
             .clickable { onClick() }
             .padding(horizontal = EreaderSpacing.L, vertical = EreaderSpacing.M)
     )
+}
+
+/** 정렬 드롭다운 맨 아래의 "폴더 설정" 섹션 — 폴더를 맨 위로 정렬할지 토글한다 (드롭다운은 열린 채 유지) */
+@Composable
+private fun FolderSortSettings(foldersFirst: Boolean, onToggle: () -> Unit) {
+    Column {
+        Text(
+            text = stringResource(R.string.folder_settings),
+            style = EreaderFontSize.S,
+            color = EreaderColors.DarkGray,
+            modifier = Modifier.padding(start = EreaderSpacing.L, end = EreaderSpacing.M, top = EreaderSpacing.S)
+        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { onToggle() }
+                .testTag("foldersFirstToggle")
+                .padding(start = EreaderSpacing.L, end = EreaderSpacing.M, top = EreaderSpacing.M, bottom = EreaderSpacing.M),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = stringResource(R.string.folders_first),
+                style = EreaderFontSize.M,
+                color = EreaderColors.Black,
+                modifier = Modifier.weight(1f)
+            )
+            // Material Checkbox는 체크 애니메이션이 있어 테두리 상자 + 체크 아이콘으로 직접 그린다
+            Box(
+                modifier = Modifier
+                    .padding(start = EreaderSpacing.L)
+                    .size(18.dp)
+                    .border(1.5.dp, EreaderColors.Black),
+                contentAlignment = Alignment.Center
+            ) {
+                if (foldersFirst) {
+                    Icon(
+                        imageVector = Icons.Default.Check,
+                        contentDescription = null,
+                        tint = EreaderColors.Black,
+                        modifier = Modifier.size(14.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** 폴더 보기에서 현재 경로와 상위 이동 버튼을 보여주는 줄. 줄 전체가 상위 이동 터치 영역 */
+@Composable
+private fun FolderPathBar(path: String, onUp: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(48.dp)
+            .clickable { onUp() }
+            .testTag("folderPathBar")
+            .padding(horizontal = EreaderSpacing.S),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(EreaderSpacing.S)
+    ) {
+        Icon(
+            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+            contentDescription = stringResource(R.string.go_up),
+            tint = EreaderColors.Black
+        )
+        // Compose 1.7에는 앞쪽 말줄임(StartEllipsis)이 없어 끝쪽 말줄임을 쓴다
+        Text(
+            text = path,
+            style = EreaderFontSize.M,
+            color = EreaderColors.Black,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+    HorizontalDivider(color = EreaderColors.Gray)
+}
+
+/** 폴더 항목 — 페이지당 항목 수 계산이 맞도록 BookItem과 같은 80dp 높이 */
+@Composable
+private fun FolderItem(name: String, bookCount: Int, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(80.dp)
+            .clickable { onClick() }
+            .testTag("folderItem_$name")
+            .padding(start = EreaderSpacing.L, end = EreaderSpacing.XS),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(EreaderSpacing.M)
+    ) {
+        // BookItem의 표지 자리와 같은 크기로 맞춰 제목 열이 정렬되게 한다
+        Box(modifier = Modifier.size(width = 44.dp, height = 60.dp), contentAlignment = Alignment.Center) {
+            // Material Outlined 폴더와 같은 모양을 24칸 격자에 직접 그린다
+            // (벡터 아이콘은 선 두께를 바꿀 수 없어서, 원본 두께 2의 절반인 1로 그리기 위함)
+            Canvas(modifier = Modifier.size(36.dp)) {
+                val unit = size.width / 24f
+                val folderPath = Path().apply {
+                    moveTo(3f * unit, 5f * unit)
+                    lineTo(9.6f * unit, 5f * unit)   // 탭 윗변
+                    lineTo(11.6f * unit, 7f * unit)  // 탭 사선
+                    lineTo(21f * unit, 7f * unit)
+                    lineTo(21f * unit, 19f * unit)
+                    lineTo(3f * unit, 19f * unit)
+                    close()
+                }
+                drawPath(
+                    path = folderPath,
+                    color = EreaderColors.Black,
+                    style = Stroke(width = 1f * unit, join = StrokeJoin.Round)
+                )
+            }
+        }
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = name,
+                style = EreaderFontSize.L,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = stringResource(R.string.folder_book_count, bookCount),
+                style = EreaderFontSize.M,
+                color = EreaderColors.DarkGray
+            )
+        }
+    }
 }
 
 @Composable

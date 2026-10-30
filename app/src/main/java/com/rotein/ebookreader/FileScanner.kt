@@ -15,7 +15,9 @@ object FileScanner {
         val uri: String,
         val name: String,
         val size: Long,
-        val lastModified: Long
+        val lastModified: Long,
+        val rootUri: String,     // 속한 루트 URI
+        val folderPath: String   // 루트 기준 상대 폴더 경로
     )
 
     /**
@@ -26,7 +28,7 @@ object FileScanner {
         val books = mutableListOf<BookFile>()
         for (folderUri in folderUris) {
             val tree = DocumentFile.fromTreeUri(context, folderUri) ?: continue
-            scanDirectory(context, tree, books, 0)
+            scanDirectory(context, tree, folderUri.toString(), "", books, 0)
         }
         return books
     }
@@ -42,7 +44,7 @@ object FileScanner {
         val snapshots = mutableListOf<FileSnapshot>()
         for (folderUri in folderUris) {
             val tree = DocumentFile.fromTreeUri(context, folderUri) ?: continue
-            scanDirectoryLightweight(tree, snapshots, 0)
+            scanDirectoryLightweight(tree, folderUri.toString(), "", snapshots, 0)
         }
         val snapshotByUri = snapshots.associateBy { it.uri }
 
@@ -55,7 +57,8 @@ object FileScanner {
         for (book in existing) {
             val snapshot = snapshotByUri[book.contentUri] ?: continue // 삭제된 파일은 skip
             if (book.size == snapshot.size && book.dateModified == snapshot.lastModified / 1000) {
-                kept.add(book)
+                // 폴더 정보는 스냅샷 기준으로 갱신 — DB v20 이전 캐시(빈 경로)도 재스캔 없이 채워진다
+                kept.add(book.copy(rootUri = snapshot.rootUri, folderPath = snapshot.folderPath))
             } else {
                 modifiedUris.add(book.contentUri)
             }
@@ -78,17 +81,21 @@ object FileScanner {
                 size = snapshot.size,
                 dateAdded = snapshot.lastModified / 1000,
                 dateModified = snapshot.lastModified / 1000,
-                metadata = metadata
+                metadata = metadata,
+                rootUri = snapshot.rootUri,
+                folderPath = snapshot.folderPath
             )
         }
 
         return kept + added
     }
 
-    /** DocumentFile 기반 재귀 디렉토리 탐색 — 전체 스캔용 */
+    /** DocumentFile 기반 재귀 디렉토리 탐색 — 전체 스캔용. folderPath는 루트 기준 현재 폴더 경로 */
     private fun scanDirectory(
         context: Context,
         dir: DocumentFile,
+        rootUri: String,
+        folderPath: String,
         result: MutableList<BookFile>,
         depth: Int
     ) {
@@ -97,7 +104,7 @@ object FileScanner {
             if (file.isDirectory) {
                 val name = file.name ?: continue
                 if (name.startsWith(".")) continue
-                scanDirectory(context, file, result, depth + 1)
+                scanDirectory(context, file, rootUri, childFolderPath(folderPath, name), result, depth + 1)
             } else {
                 val name = file.name ?: continue
                 val ext = name.substringAfterLast('.', "").lowercase()
@@ -114,7 +121,9 @@ object FileScanner {
                             size = file.length(),
                             dateAdded = file.lastModified() / 1000,
                             dateModified = file.lastModified() / 1000,
-                            metadata = metadata
+                            metadata = metadata,
+                            rootUri = rootUri,
+                            folderPath = folderPath
                         )
                     )
                 }
@@ -122,9 +131,11 @@ object FileScanner {
         }
     }
 
-    /** 경량 디렉토리 탐색 — diff 스캔용 */
+    /** 경량 디렉토리 탐색 — diff 스캔용. folderPath는 루트 기준 현재 폴더 경로 */
     private fun scanDirectoryLightweight(
         dir: DocumentFile,
+        rootUri: String,
+        folderPath: String,
         result: MutableList<FileSnapshot>,
         depth: Int
     ) {
@@ -133,12 +144,12 @@ object FileScanner {
             if (file.isDirectory) {
                 val name = file.name ?: continue
                 if (name.startsWith(".")) continue
-                scanDirectoryLightweight(file, result, depth + 1)
+                scanDirectoryLightweight(file, rootUri, childFolderPath(folderPath, name), result, depth + 1)
             } else {
                 val name = file.name ?: continue
                 val ext = name.substringAfterLast('.', "").lowercase()
                 if (ext in SUPPORTED_EXTENSIONS) {
-                    result.add(FileSnapshot(file.uri.toString(), name, file.length(), file.lastModified()))
+                    result.add(FileSnapshot(file.uri.toString(), name, file.length(), file.lastModified(), rootUri, folderPath))
                 }
             }
         }
