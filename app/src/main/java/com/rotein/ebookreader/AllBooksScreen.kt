@@ -139,7 +139,7 @@ fun AllBooksScreen(
     var jumpToBookKey by remember { mutableStateOf<String?>(null) }
 
     // DB에서 읽은 시각 + 즐겨찾기/숨기기/진행률 로드
-    LaunchedEffect(refreshKey) {
+    suspend fun loadRecordStates() {
         val records = withContext(Dispatchers.IO) { dao.getAll() }
         // 책을 열 때 화면에 먼저 반영한 읽은 시각이 DB 저장보다 앞설 수 있으므로 더 최근 값을 유지한다
         val dbLastReadTimes = records.associate { it.bookPath to it.lastReadAt }
@@ -147,6 +147,16 @@ fun AllBooksScreen(
         favorites = records.filter { it.isFavorite }.map { it.bookPath }.toSet()
         hiddenBooks = records.filter { it.isHidden }.map { it.bookPath }.toSet()
         readingProgressMap = records.filter { it.readingProgress > 0f }.associate { it.bookPath to it.readingProgress }
+    }
+
+    LaunchedEffect(refreshKey) { loadRecordStates() }
+
+    // 폴더 위치가 바뀌어 URI가 달라진 책의 기록을 새 URI로 다시 연결하고, 연결된 게 있으면 화면 상태도 다시 읽는다
+    suspend fun relinkMovedRecords(scannedBooks: List<BookFile>) {
+        val relinked = withContext(Dispatchers.IO) {
+            relinkMovedBookRecords(BookDatabase.getInstance(context), scannedBooks)
+        }
+        if (relinked > 0) loadRecordStates()
     }
 
     // 0) 필터 모드 적용 — 폴더 보기도 이 결과를 쓴다
@@ -232,6 +242,7 @@ fun AllBooksScreen(
                 onLoadComplete()
                 val refreshed = withContext(Dispatchers.IO) { FileScanner.refreshBooks(context, saved) }
                 withContext(Dispatchers.IO) { migrateBookPathsToUri(context, refreshed) }
+                relinkMovedRecords(refreshed)
                 BookCache.books = refreshed
                 books = refreshed
                 saveCatalog(refreshed)
@@ -241,6 +252,7 @@ fun AllBooksScreen(
                 val scanned = withContext(Dispatchers.IO) { FileScanner.scanBooks(context) }
                 // 기존 절대 경로 레코드를 SAF URI로 마이그레이션
                 withContext(Dispatchers.IO) { migrateBookPathsToUri(context, scanned) }
+                relinkMovedRecords(scanned)
                 BookCache.books = scanned
                 books = scanned
                 isLoading = false
@@ -263,6 +275,7 @@ fun AllBooksScreen(
             if (startScanKey != scanKey) return@repeatOnLifecycle
             // 미마이그레이션 레코드가 남아있으면 재시도
             withContext(Dispatchers.IO) { migrateBookPathsToUri(context, refreshed) }
+            relinkMovedRecords(refreshed)
             BookCache.books = refreshed
             books = refreshed
             saveCatalog(refreshed)
@@ -280,6 +293,7 @@ fun AllBooksScreen(
         // 스캔 도중 폴더가 추가/제거되었으면 이전 폴더 구성의 결과이므로 버린다
         if (startScanKey != scanKey) return@LaunchedEffect
         withContext(Dispatchers.IO) { migrateBookPathsToUri(context, refreshed) }
+        relinkMovedRecords(refreshed)
         BookCache.books = refreshed
         books = refreshed
         saveCatalog(refreshed)
