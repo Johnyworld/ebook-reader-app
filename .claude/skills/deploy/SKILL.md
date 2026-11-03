@@ -54,8 +54,14 @@ Edit 도구로 수정한다.
 
 ### 6단계: AAB 빌드
 
+- 빌드 전에 프로젝트 루트에 `keystore.properties`와 `ebook-reader-release.jks`가 있는지 확인한다.
+  - 두 파일은 gitignore 대상이라 워크트리에는 없다. `keystore.properties`가 없으면 `app/build.gradle.kts`가 서명 설정을 조용히 건너뛰어, 빌드는 성공해도 서명되지 않은 AAB가 나온다 (Play Console에서 "업로드된 모든 번들에 서명해야 합니다" 오류).
+  - 없으면 원본 체크아웃(`dirname "$(git rev-parse --path-format=absolute --git-common-dir)"`)의 파일을 심볼릭 링크로 연결한다: `ln -s {원본 경로}/keystore.properties keystore.properties`, `ln -s {원본 경로}/ebook-reader-release.jks ebook-reader-release.jks`
+  - 원본에도 없으면 빌드하지 않고 사용자에게 알린다.
 - `./gradlew bundleRelease` 를 실행한다.
-- 빌드 성공 시 AAB 파일 경로를 안내한다: `app/build/outputs/bundle/release/app-release.aab`
+- 빌드 후 `jarsigner -verify app/build/outputs/bundle/release/app-release.aab 2>&1 | grep -E 'jar verified\.|jar is unsigned\.'` 로 서명을 검증한다. `jar verified.`가 아니면 (예: `jar is unsigned.`) 서명 파일을 확인하고 다시 빌드한다.
+  - AAB는 서명이 정상이어도 Warning이 수백 줄 나오므로 결과 줄만 걸러서 본다. 서명이 없어도 exit code가 0일 수 있으므로 문자열로 판정한다.
+- 빌드·서명 검증 성공 시 AAB 파일 경로를 안내한다: `app/build/outputs/bundle/release/app-release.aab`
 - 빌드 실패 시 에러 내용을 보여주고 대응한다.
 
 ### 7단계: 태그 푸시 및 GitHub Release 등록
