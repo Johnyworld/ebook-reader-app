@@ -371,10 +371,16 @@ data class ReaderSettings(
     val fontWeights: Map<String, Int> = emptyMap()
 )
 
+// 리더 렌더링 방식(주입 CSS·JS 레이아웃 보정)이 바뀌어 같은 설정에서도 페이지 수가 달라질 때 올린다.
+// 지문이 바뀌면 저장된 페이지 수 캐시가 무효화되어 모든 책을 한 번씩 다시 스캔한다.
+// r2: 컬럼보다 넓은 표의 글자 크기를 줄여 맞춤 (_fitTables)
+private const val LAYOUT_RENDER_VERSION = 2
+
 fun ReaderSettings.layoutFingerprint(): String =
     "$fontName|$fontSize|$lineHeight|$paragraphSpacing|$paddingVertical|$paddingHorizontal|$dualPage|${textAlign.name}" +
-        // 두께는 가변 글꼴에서 글자 폭을 바꾸므로 포함한다. 기본이면 기존 캐시와 호환되도록 생략.
-        (if (fontWeightLevel != 0) "|w$fontWeightLevel" else "")
+        // 두께는 가변 글꼴에서 글자 폭을 바꾸므로 포함한다. 기본이면 지문을 짧게 유지하도록 생략.
+        (if (fontWeightLevel != 0) "|w$fontWeightLevel" else "") +
+        "|r$LAYOUT_RENDER_VERSION"
 
 object ReaderSettingsStore {
     private const val PREF_NAME = "reader_settings"
