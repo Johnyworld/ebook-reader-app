@@ -206,15 +206,15 @@ class FontWeightTest {
     // --- layoutFingerprint ---
 
     @Test
-    fun `layoutFingerprint - 두께가 기본이면 기존 형식 그대로`() {
-        assertEquals("A|16|1.5|0|20|20|false|JUSTIFY", ReaderSettings(fontName = "A").layoutFingerprint())
+    fun `layoutFingerprint - 두께가 기본이면 w 항목을 생략한다`() {
+        assertEquals("A|16|1.5|0|20|20|false|JUSTIFY|r2", ReaderSettings(fontName = "A").layoutFingerprint())
     }
 
     @Test
     fun `layoutFingerprint - 현재 글꼴 두께가 있으면 뒤에 붙는다`() {
         val s = ReaderSettings(fontName = "A").withFontWeightLevel(-1)
-        assertEquals("A|16|1.5|0|20|20|false|JUSTIFY|w-1", s.layoutFingerprint())
+        assertEquals("A|16|1.5|0|20|20|false|JUSTIFY|w-1|r2", s.layoutFingerprint())
         // 다른 글꼴의 두께는 영향 없음
-        assertEquals("B|16|1.5|0|20|20|false|JUSTIFY", s.copy(fontName = "B").layoutFingerprint())
+        assertEquals("B|16|1.5|0|20|20|false|JUSTIFY|r2", s.copy(fontName = "B").layoutFingerprint())
     }
 }

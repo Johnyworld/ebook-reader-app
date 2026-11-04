@@ -74,7 +74,7 @@ class ReaderHelpersTest {
     fun `layoutFingerprint - 기본 설정`() {
         val settings = ReaderSettings()
         val fp = settings.layoutFingerprint()
-        assertEquals("epub_original|16|1.5|0|20|20|false|JUSTIFY", fp)
+        assertEquals("epub_original|16|1.5|0|20|20|false|JUSTIFY|r2", fp)
     }
 
     @Test
@@ -90,7 +90,7 @@ class ReaderHelpersTest {
             textAlign = ReaderTextAlign.LEFT
         )
         val fp = settings.layoutFingerprint()
-        assertEquals("NotoSans|20|1.8|5|30|15|true|LEFT", fp)
+        assertEquals("NotoSans|20|1.8|5|30|15|true|LEFT|r2", fp)
     }
 
     // --- readerBottomInfoText ---
