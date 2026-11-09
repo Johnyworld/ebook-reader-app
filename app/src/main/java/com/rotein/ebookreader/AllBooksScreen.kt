@@ -1,5 +1,6 @@
 package com.rotein.ebookreader
 
+import android.content.ActivityNotFoundException
 import android.graphics.Bitmap
 import android.net.Uri
 import androidx.activity.compose.BackHandler
@@ -69,6 +70,7 @@ import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.os.LocaleListCompat
+import com.rotein.ebookreader.ui.components.ConfirmDialog
 import com.rotein.ebookreader.ui.components.EreaderDropdownMenu
 import com.rotein.ebookreader.ui.components.PaginationBar
 import androidx.lifecycle.Lifecycle
@@ -218,6 +220,27 @@ fun AllBooksScreen(
             scanKey++
         }
     }
+    // 폴더 선택기 실행 — 시스템 파일 선택기(DocumentsUI)를 지운 기기(루팅·디블로팅 등)에서는
+    // 처리할 앱이 없어 예외가 나므로, 앱이 종료되지 않게 잡고 외부 파일 열기 방법을 안내한다
+    // (토스트는 Android 12부터 두 줄까지만 보여 안내가 잘리므로 대화상자로 보여준다)
+    var showPickerUnavailable by remember { mutableStateOf(false) }
+    val launchFolderPicker: () -> Unit = {
+        try {
+            folderPickerLauncher.launch(null)
+        } catch (_: ActivityNotFoundException) {
+            showPickerUnavailable = true
+        }
+    }
+    if (showPickerUnavailable) {
+        ConfirmDialog(
+            title = stringResource(R.string.add_folder),
+            message = stringResource(R.string.folder_picker_unavailable),
+            onConfirm = { showPickerUnavailable = false },
+            onDismiss = { showPickerUnavailable = false },
+            confirmText = stringResource(R.string.close),
+            dismissText = null
+        )
+    }
 
     // 최초 로드 및 폴더 변경 시: 메모리 캐시 → DB에 저장된 목록 → 전체 스캔 순으로 사용
     // 스플래시는 스캔/커버 로드 완료를 기다리지 않고 바로 내린다 (스캔 중에는 로딩 문구 표시)
@@ -326,7 +349,7 @@ fun AllBooksScreen(
                 targetPage = 0
             },
             onFoldersFirstToggle = { foldersFirst = !foldersFirst },
-            onAddFolder = { folderPickerLauncher.launch(null) },
+            onAddFolder = launchFolderPicker,
             onRemoveFolder = { uri ->
                 FolderUriStore.remove(context, uri)
                 folders = FolderUriStore.load(context)
@@ -371,7 +394,7 @@ fun AllBooksScreen(
                         verticalArrangement = Arrangement.spacedBy(EreaderSpacing.M)
                     ) {
                         Text(stringResource(R.string.folder_select_description))
-                        Button(onClick = { folderPickerLauncher.launch(null) }) {
+                        Button(onClick = launchFolderPicker) {
                             Text(stringResource(R.string.select_folder))
                         }
                     }

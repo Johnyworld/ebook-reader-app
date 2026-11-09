@@ -36,6 +36,7 @@ import com.rotein.ebookreader.ui.theme.EreaderSpacing
 /**
  * 재사용 가능한 컨펌 다이얼로그.
  * Popup + Surface 기반으로 구현하여 scrim/dim/fade 애니메이션 없음 (e-ink 최적화).
+ * [dismissText]가 null이면 취소 버튼 없이 확인 버튼 하나만 보여준다 (안내용).
  */
 @Composable
 fun ConfirmDialog(
@@ -44,7 +45,7 @@ fun ConfirmDialog(
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
     confirmText: String = stringResource(R.string.yes),
-    dismissText: String = stringResource(R.string.no),
+    dismissText: String? = stringResource(R.string.no),
 ) {
     val dialogMaxWidth = if (LocalConfiguration.current.orientation ==
         android.content.res.Configuration.ORIENTATION_LANDSCAPE) 480.dp else 320.dp
@@ -88,18 +89,20 @@ fun ConfirmDialog(
                             .fillMaxWidth()
                             .height(IntrinsicSize.Min),
                     ) {
-                        // 취소 버튼
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .clickable(onClick = onDismiss)
-                                .padding(vertical = EreaderSpacing.M),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(dismissText, style = EreaderFontSize.M)
+                        if (dismissText != null) {
+                            // 취소 버튼
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clickable(onClick = onDismiss)
+                                    .padding(vertical = EreaderSpacing.M),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(dismissText, style = EreaderFontSize.M)
+                            }
+                            // 세로 구분선
+                            VerticalDivider(color = EreaderColors.Black, modifier = Modifier.fillMaxHeight())
                         }
-                        // 세로 구분선
-                        VerticalDivider(color = EreaderColors.Black, modifier = Modifier.fillMaxHeight())
                         // 확인 버튼
                         Box(
                             modifier = Modifier
