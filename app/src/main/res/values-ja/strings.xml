@@ -5,6 +5,7 @@
     <string name="select_folder">フォルダ選択</string>
     <string name="manage_folders">本を読み込むフォルダ</string>
     <string name="add_folder">フォルダ追加</string>
+    <string name="external_file_open_failed">このファイルは開けません。</string>
     <string name="no_folders">フォルダが選択されていません。</string>
     <string name="loading_files">ファイルを検索中…</string>
     <string name="empty">空</string>

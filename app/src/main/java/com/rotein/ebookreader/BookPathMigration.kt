@@ -122,5 +122,5 @@ private fun fileNameFromDocumentUri(uri: String): String? {
     return normalizeFileName(name)
 }
 
-private fun normalizeFileName(name: String): String =
+internal fun normalizeFileName(name: String): String =
     Normalizer.normalize(name, Normalizer.Form.NFC).lowercase()

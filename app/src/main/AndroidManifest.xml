@@ -20,6 +20,16 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- 파일 탐색기·이메일 첨부 등에서 책 파일을 눌렀을 때 eera로 열기 (연결 프로그램) -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="content" />
+                <data android:mimeType="application/epub+zip" />
+                <data android:mimeType="application/pdf" />
+                <!-- 구형 파일 탐색기는 EPUB을 형식을 알 수 없는 파일로 넘긴다. 실제 형식은 앱에서 파일명 확장자로 판단 -->
+                <data android:mimeType="application/octet-stream" />
+            </intent-filter>
         </activity>
     </application>
 

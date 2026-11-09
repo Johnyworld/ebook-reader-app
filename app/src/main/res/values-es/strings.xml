@@ -5,6 +5,7 @@
     <string name="select_folder">Seleccionar carpeta</string>
     <string name="manage_folders">Carpetas de libros</string>
     <string name="add_folder">Añadir carpeta</string>
+    <string name="external_file_open_failed">No se puede abrir este archivo.</string>
     <string name="no_folders">No hay carpetas seleccionadas.</string>
     <string name="loading_files">Buscando archivos…</string>
     <string name="empty">Vacío</string>
