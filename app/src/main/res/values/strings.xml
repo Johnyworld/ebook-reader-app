@@ -7,6 +7,7 @@
     <string name="select_folder">Select Folder</string>
     <string name="manage_folders">Book Source Folders</string>
     <string name="add_folder">Add Folder</string>
+    <string name="folder_picker_unavailable">This device has no system file picker, so folders can\'t be added. Tap a book file in your file manager to open it with eera.</string>
     <string name="external_file_open_failed">This file can\'t be opened.</string>
     <string name="no_folders">No folders selected.</string>
     <string name="loading_files">Searching files…</string>

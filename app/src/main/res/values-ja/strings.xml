@@ -5,6 +5,7 @@
     <string name="select_folder">フォルダ選択</string>
     <string name="manage_folders">本を読み込むフォルダ</string>
     <string name="add_folder">フォルダ追加</string>
+    <string name="folder_picker_unavailable">この端末にはシステムのファイル選択画面がないため、フォルダを追加できません。ファイルマネージャーで本のファイルをタップすると eera で開けます。</string>
     <string name="external_file_open_failed">このファイルは開けません。</string>
     <string name="no_folders">フォルダが選択されていません。</string>
     <string name="loading_files">ファイルを検索中…</string>
